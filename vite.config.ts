@@ -8,12 +8,9 @@ export default defineConfig({
     react({
       // ✅ Use automatic JSX runtime (smaller bundle)
       jsxRuntime: "automatic",
-      // ✅ Only include dev tools in development
+      // ✅ No babel plugins needed
       babel: {
-        plugins:
-          process.env.NODE_ENV === "production"
-            ? ["babel-plugin-transform-remove-console"]
-            : [],
+        plugins: [],
       },
     }),
     runtimeErrorOverlay(),
