@@ -47,7 +47,8 @@ const translations: Record<string, any> = {
     adminPortal: "Admin Portal",
     secureAccess: "Secure Admin Access",
     heroTitle: "Restaurant Management Dashboard",
-    heroDesc: "Access your administrative tools to manage menus, track orders, and oversee restaurant operations.",
+    heroDesc:
+      "Access your administrative tools to manage menus, track orders, and oversee restaurant operations.",
     feature1: "Menu Management",
     feature1Desc: "Update dishes & prices",
     feature2: "Order Tracking",
@@ -67,7 +68,8 @@ const translations: Record<string, any> = {
     signingIn: "Signing in...",
     signIn: "Sign In to Dashboard",
     demoCredentials: "Demo Credentials",
-    securityNotice: "This is a secure admin area. Unauthorized access is prohibited.",
+    securityNotice:
+      "This is a secure admin area. Unauthorized access is prohibited.",
     loginFailed: "Login failed",
   },
   al: {
@@ -75,7 +77,8 @@ const translations: Record<string, any> = {
     adminPortal: "Portali i Adminit",
     secureAccess: "Qasje e Sigurt Admin",
     heroTitle: "Paneli i Menaxhimit të Restorantit",
-    heroDesc: "Hyni në mjetet tuaja administrative për të menaxhuar menutë, ndjekur porositë dhe mbikëqyrur operacionet e restorantit.",
+    heroDesc:
+      "Hyni në mjetet tuaja administrative për të menaxhuar menutë, ndjekur porositë dhe mbikëqyrur operacionet e restorantit.",
     feature1: "Menaxhimi i Menusë",
     feature1Desc: "Përditëso pjatat & çmimet",
     feature2: "Ndjekja e Porosisë",
@@ -85,7 +88,8 @@ const translations: Record<string, any> = {
     feature4: "Qasja e Stafit",
     feature4Desc: "Lejet e ekipit",
     welcomeBack: "Mirësevini përsëri",
-    signInDesc: "Identifikohuni për të hyrë në panelin tuaj të menaxhimit të restorantit",
+    signInDesc:
+      "Identifikohuni për të hyrë në panelin tuaj të menaxhimit të restorantit",
     adminLogin: "Identifikimi i Administratorit",
     credentialsDesc: "Jepni kredencialet tuaja për të vazhduar",
     username: "Përdoruesi",
@@ -95,7 +99,8 @@ const translations: Record<string, any> = {
     signingIn: "Duke u identifikuar...",
     signIn: "Identifikohu në Panel",
     demoCredentials: "Kredencialet Demo",
-    securityNotice: "Kjo është një zonë e sigurt admin. Qasja e paautorizuar është e ndaluar.",
+    securityNotice:
+      "Kjo është një zonë e sigurt admin. Qasja e paautorizuar është e ndaluar.",
     loginFailed: "Identifikimi dështoi",
   },
   mk: {
@@ -103,7 +108,8 @@ const translations: Record<string, any> = {
     adminPortal: "Админ портал",
     secureAccess: "Безбеден админ пристап",
     heroTitle: "Платформа за менаџирање на ресторан",
-    heroDesc: "Пристапете до вашите административни алатки за управување со менија, следење нарачки и надзор на работата на ресторанот.",
+    heroDesc:
+      "Пристапете до вашите административни алатки за управување со менија, следење нарачки и надзор на работата на ресторанот.",
     feature1: "Управување со мени",
     feature1Desc: "Ажурирајте јадења и цени",
     feature2: "Следење на нарачки",
@@ -113,7 +119,8 @@ const translations: Record<string, any> = {
     feature4: "Пристап за персонал",
     feature4Desc: "Тимски дозволи",
     welcomeBack: "Добредојдовте назад",
-    signInDesc: "Најавете се за пристап до вашата контролна табла за управување со ресторани",
+    signInDesc:
+      "Најавете се за пристап до вашата контролна табла за управување со ресторани",
     adminLogin: "Администраторска најава",
     credentialsDesc: "Внесете ги вашите податоци за да продолжите",
     username: "Корисничко име",
@@ -249,7 +256,9 @@ export default function AuthLogin() {
             </div>
             <div>
               <span className="font-bold text-sm">Hajde Ha</span>
-              <p className="text-[10px] text-muted-foreground">{t.adminPortal}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {t.adminPortal}
+              </p>
             </div>
           </div>
         </header>
@@ -266,18 +275,14 @@ export default function AuthLogin() {
               <h1 className="text-3xl font-bold tracking-tight">
                 {t.welcomeBack}
               </h1>
-              <p className="text-muted-foreground">
-                {t.signInDesc}
-              </p>
+              <p className="text-muted-foreground">{t.signInDesc}</p>
             </div>
 
             {/* Login Card */}
             <Card className="border-border/50 shadow-xl shadow-black/5 bg-card/80 backdrop-blur-sm">
               <CardHeader className="pb-2 pt-6">
                 <CardTitle className="text-xl">{t.adminLogin}</CardTitle>
-                <CardDescription>
-                  {t.credentialsDesc}
-                </CardDescription>
+                <CardDescription>{t.credentialsDesc}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6 pt-4">
                 <Form {...form}>
@@ -365,49 +370,13 @@ export default function AuthLogin() {
                     </Button>
                   </form>
                 </Form>
-
-                {/* Demo Credentials */}
-                <div className="relative pt-2">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border/50" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-3 text-muted-foreground/70 font-medium">
-                      {t.demoCredentials}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-muted/30 rounded-xl border border-border/40">
-                  <div className="flex items-center justify-center gap-6 text-sm">
-                    <div className="text-center">
-                      <p className="text-muted-foreground/70 text-xs mb-1">
-                        Username
-                      </p>
-                      <code className="px-3 py-1.5 bg-background rounded-lg text-foreground font-mono text-sm font-medium border border-border/50">
-                        admin
-                      </code>
-                    </div>
-                    <div className="h-8 w-px bg-border/50" />
-                    <div className="text-center">
-                      <p className="text-muted-foreground/70 text-xs mb-1">
-                        Password
-                      </p>
-                      <code className="px-3 py-1.5 bg-background rounded-lg text-foreground font-mono text-sm font-medium border border-border/50">
-                        admin
-                      </code>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
             {/* Security Notice */}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/60">
               <Lock className="h-3 w-3" />
-              <span>
-                {t.securityNotice}
-              </span>
+              <span>{t.securityNotice}</span>
             </div>
           </div>
         </div>
