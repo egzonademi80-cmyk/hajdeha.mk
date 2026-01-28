@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, doublePrecision, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -28,11 +28,15 @@ export const restaurants = pgTable("restaurants", {
   active: boolean("active").default(true).notNull(),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
+}, (table) => {
+  return {
+    slugIdx: index("slug_idx").on(table.slug),
+  };
 });
 
 export const menuItems = pgTable("menu_items", {
   id: serial("id").primaryKey(),
-  restaurantId: integer("restaurant_id").notNull().references(() => restaurants.id),
+  restaurantId: integer("restaurant_id").notNull().references(() => restaurants.id, { onDelete: 'cascade' }),
   name: text("name").notNull(),
   nameAl: text("name_al"),
   nameMk: text("name_mk"),
@@ -46,6 +50,10 @@ export const menuItems = pgTable("menu_items", {
   isVegetarian: boolean("is_vegetarian").default(false).notNull(),
   isVegan: boolean("is_vegan").default(false).notNull(),
   isGlutenFree: boolean("is_gluten_free").default(false).notNull(),
+}, (table) => {
+  return {
+    restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),
+  };
 });
 
 // === RELATIONS ===

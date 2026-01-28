@@ -38,8 +38,16 @@ export function serveStatic(app: Express) {
   // Serve static files with proper caching
   app.use(
     express.static(distPath, {
-      maxAge: "1y",
+      maxAge: "30d",
       etag: true,
+      lastModified: true,
+      setHeaders: (res, path) => {
+        if (path.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        } else {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      },
     }),
   );
 
