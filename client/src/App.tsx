@@ -12,26 +12,33 @@ import AuthLogin from "@/pages/AuthLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminRestaurant from "@/pages/AdminRestaurant";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { DarkModeToggle } from "./components/DarkModeToggle";
+import { useDarkMode } from "./hooks/useDarkMode";
 
 function Router() {
-  return (
-    <Switch>
-      {/* Public Routes */}
-      <Route path="/" component={Home} />
-      <Route path="/restaurant/:slug" component={PublicMenu} />
-      <Route path="/auth/login" component={AuthLogin} />
-      
-      {/* Protected Routes */}
-      <Route path="/admin/dashboard">
-        {() => <ProtectedRoute component={AdminDashboard} />}
-      </Route>
-      <Route path="/admin/restaurant/:id">
-        {() => <ProtectedRoute component={AdminRestaurant} />}
-      </Route>
+  const { isDark, toggleDarkMode } = useDarkMode();
 
-      {/* Fallback */}
-      <Route component={NotFound} />
-    </Switch>
+  return (
+    <div className={isDark ? "dark min-h-screen bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
+      <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
+      <Switch>
+        {/* Public Routes */}
+        <Route path="/" component={Home} />
+        <Route path="/restaurant/:slug" component={PublicMenu} />
+        <Route path="/auth/login" component={AuthLogin} />
+        
+        {/* Protected Routes */}
+        <Route path="/admin/dashboard">
+          {() => <ProtectedRoute component={AdminDashboard} />}
+        </Route>
+        <Route path="/admin/restaurant/:id">
+          {() => <ProtectedRoute component={AdminRestaurant} />}
+        </Route>
+
+        {/* Fallback */}
+        <Route component={NotFound} />
+      </Switch>
+    </div>
   );
 }
 
