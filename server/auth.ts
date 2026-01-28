@@ -43,6 +43,24 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Set default credentials for testing
+  app.use((req, res, next) => {
+    if (app.get("env") === "development" && !req.user) {
+      storage.getUserByUsername("admin").then(user => {
+        if (user) {
+          req.login(user, (err) => {
+            if (err) return next(err);
+            next();
+          });
+        } else {
+          next();
+        }
+      });
+    } else {
+      next();
+    }
+  });
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {

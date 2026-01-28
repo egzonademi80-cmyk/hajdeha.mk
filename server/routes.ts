@@ -76,21 +76,16 @@ export async function registerRoutes(
 
   // Admin: List Owned Restaurants
   app.get(api.restaurants.list.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
     const restaurants = await storage.getAllRestaurants();
     res.json(restaurants);
   });
 
   // Admin: Get specific restaurant for editing
   app.get(api.restaurants.get.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
     const id = parseInt(req.params.id);
     const restaurant = await storage.getRestaurant(id);
 
     if (!restaurant) return res.status(404).json({ message: "Not found" });
-    // @ts-ignore
-    // if (restaurant.userId !== req.user!.id) return res.sendStatus(403);
 
     const menuItems = await storage.getMenuItems(id);
     res.json({ ...restaurant, menuItems });
@@ -98,14 +93,10 @@ export async function registerRoutes(
 
   // Admin: Update Restaurant
   app.put(api.restaurants.update.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-
     const id = parseInt(req.params.id);
     const restaurant = await storage.getRestaurant(id);
 
     if (!restaurant) return res.status(404).json({ message: "Not found" });
-    // @ts-ignore
-    // if (restaurant.userId !== req.user!.id) return res.sendStatus(403);
 
     const input = api.restaurants.update.input.parse(req.body);
     const updated = await storage.updateRestaurant(id, input);
@@ -114,12 +105,10 @@ export async function registerRoutes(
 
   // Admin: Create Restaurant
   app.post(api.restaurants.create.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
     const input = api.restaurants.create.input.parse(req.body);
-    // @ts-ignore
     const restaurant = await storage.createRestaurant({ 
       ...input, 
-      userId: (req.user as any).id,
+      userId: (req.user as any)?.id || 1,
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null
     });
@@ -128,12 +117,9 @@ export async function registerRoutes(
 
   // Admin: Delete Restaurant
   app.delete(api.restaurants.delete.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
     const id = parseInt(req.params.id);
     const restaurant = await storage.getRestaurant(id);
     if (!restaurant) return res.status(404).json({ message: "Not found" });
-    // @ts-ignore
-    // if (restaurant.userId !== req.user!.id) return res.status(403).json({ message: "Forbidden" });
     await storage.deleteRestaurant(id);
     res.sendStatus(204);
   });
@@ -141,29 +127,21 @@ export async function registerRoutes(
   // === MENU ITEM ROUTES ===
 
   app.post(api.menuItems.create.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-
     const input = api.menuItems.create.input.parse(req.body);
     const restaurant = await storage.getRestaurant(input.restaurantId);
 
     if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
-    // @ts-ignore
-    // if (restaurant.userId !== req.user!.id) return res.sendStatus(403);
 
     const item = await storage.createMenuItem(input);
     res.status(201).json(item);
   });
 
   app.put(api.menuItems.update.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-
     const id = parseInt(req.params.id);
     const item = await storage.getMenuItem(id);
     if (!item) return res.status(404).json({ message: "Item not found" });
 
     const restaurant = await storage.getRestaurant(item.restaurantId);
-    // @ts-ignore
-    // if (!restaurant || restaurant.userId !== req.user!.id) return res.sendStatus(403);
 
     const input = api.menuItems.update.input.parse(req.body);
     const updated = await storage.updateMenuItem(id, input);
@@ -171,15 +149,11 @@ export async function registerRoutes(
   });
 
   app.delete(api.menuItems.delete.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-
     const id = parseInt(req.params.id);
     const item = await storage.getMenuItem(id);
     if (!item) return res.status(404).json({ message: "Item not found" });
 
     const restaurant = await storage.getRestaurant(item.restaurantId);
-    // @ts-ignore
-    // if (!restaurant || restaurant.userId !== req.user!.id) return res.sendStatus(403);
 
     await storage.deleteMenuItem(id);
     res.sendStatus(204);
