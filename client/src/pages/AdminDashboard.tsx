@@ -197,7 +197,8 @@ const translations: Record<string, any> = {
     logout: "Logout",
     dashboard: "Dashboard",
     yourRestaurants: "Your Restaurants",
-    dashboardDesc: "Manage all your venues, menus, and QR codes from one centralized dashboard.",
+    dashboardDesc:
+      "Manage all your venues, menus, and QR codes from one centralized dashboard.",
     addRestaurant: "Add Restaurant",
     createNew: "Create New Restaurant",
     name: "Restaurant Name",
@@ -234,7 +235,8 @@ const translations: Record<string, any> = {
     logout: "Çkyçu",
     dashboard: "Paneli",
     yourRestaurants: "Restorantet Tuaja",
-    dashboardDesc: "Menaxhoni të gjitha vendet, menutë dhe kodet QR tuaja nga një panel i centralizuar.",
+    dashboardDesc:
+      "Menaxhoni të gjitha vendet, menutë dhe kodet QR tuaja nga një panel i centralizuar.",
     addRestaurant: "Shto Restorant",
     createNew: "Krijo Restorant të Ri",
     name: "Emri i Restorantit",
@@ -259,7 +261,8 @@ const translations: Record<string, any> = {
     delete: "Fshij",
     confirmDelete: "A jeni të sigurt që dëshironi ta fshini këtë restorant?",
     qrTitle: "Kodi QR i Restorantit",
-    qrDesc: "Klientët mund ta skanojnë këtë kod për të parë menunë tuaj dixhitale menjëherë.",
+    qrDesc:
+      "Klientët mund ta skanojnë këtë kod për të parë menunë tuaj dixhitale menjëherë.",
     downloadQR: "Shkarko Kodin QR",
     successCreate: "Restoranti u krijua me sukses",
     successDelete: "Restoranti u hoq me sukses",
@@ -271,7 +274,8 @@ const translations: Record<string, any> = {
     logout: "Одјава",
     dashboard: "Контролна табла",
     yourRestaurants: "Ваши ресторани",
-    dashboardDesc: "Управувајте со сите ваши локации, менија и QR кодови од една централизирана табла.",
+    dashboardDesc:
+      "Управувајте со сите ваши локации, менија и QR кодови од една централизирана табла.",
     addRestaurant: "Додај ресторан",
     createNew: "Креирај нов ресторан",
     name: "Име на ресторан",
@@ -294,9 +298,11 @@ const translations: Record<string, any> = {
     viewPublic: "Види јавно мени",
     getQR: "Земи QR код",
     delete: "Избриши",
-    confirmDelete: "Дали сте сигурни дека сакате да го избришете овој ресторан?",
+    confirmDelete:
+      "Дали сте сигурни дека сакате да го избришете овој ресторан?",
     qrTitle: "QR код на ресторанот",
-    qrDesc: "Клиентите можат да го скенираат овој код за веднаш да го видат вашето дигитално мени.",
+    qrDesc:
+      "Клиентите можат да го скенираат овој код за веднаш да го видат вашето дигитално мени.",
     downloadQR: "Преземи QR слика",
     successCreate: "Ресторанот е успешно креиран",
     successDelete: "Ресторанот е успешно отстранет",
@@ -314,6 +320,8 @@ export default function AdminDashboard() {
   const { data: user } = useUser();
   const logoutMutation = useLogout();
   const { toast } = useToast();
+
+  const isAdmin = user?.role === "admin";
   const [qrData, setQrData] = useState<string | null>(null);
   const [activeRestaurant, setActiveRestaurant] = useState<any>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -485,9 +493,7 @@ export default function AdminDashboard() {
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
               {t.yourRestaurants}
             </h1>
-            <p className="text-muted-foreground max-w-md">
-              {t.dashboardDesc}
-            </p>
+            <p className="text-muted-foreground max-w-md">{t.dashboardDesc}</p>
           </div>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -501,9 +507,7 @@ export default function AdminDashboard() {
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-              <DialogTitle className="text-xl">
-                {t.createNew}
-              </DialogTitle>
+              <DialogTitle className="text-xl">{t.createNew}</DialogTitle>
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
@@ -720,7 +724,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-
         {/* Restaurant Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {restaurants?.map((restaurant) => (
@@ -836,11 +839,7 @@ export default function AdminDashboard() {
                         size="icon"
                         className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                         onClick={() => {
-                          if (
-                            confirm(
-                              t.confirmDelete,
-                            )
-                          ) {
+                          if (confirm(t.confirmDelete)) {
                             deleteMutation.mutate(restaurant.id);
                           }
                         }}

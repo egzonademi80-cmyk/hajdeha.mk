@@ -538,11 +538,11 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
 
   if (!isEditing) {
     return (
-      <div className="bg-white rounded-2xl p-8 border shadow-sm">
+      <div className="bg-white dark:bg-stone-800 rounded-2xl p-8 border border-stone-200 dark:border-stone-700 shadow-sm transition-colors">
         <div className="space-y-6 w-full">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-semibold text-2xl font-display tracking-tight">
+              <h3 className="font-semibold text-2xl font-display tracking-tight text-foreground">
                 Restaurant Profile
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
@@ -560,8 +560,8 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
             </Button>
           </div>
 
-          <div className="pt-4 border-t">
-            <div className="flex items-center gap-3 mb-6 pb-6 border-b">
+          <div className="pt-4 border-t border-border">
+            <div className="flex items-center gap-3 mb-6 pb-6 border-b border-border">
               <Switch
                 checked={restaurant.active ?? true}
                 onCheckedChange={(checked) => {
@@ -579,7 +579,9 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                 }}
               />
               <div>
-                <span className="font-semibold text-sm">Restaurant Status</span>
+                <span className="font-semibold text-sm text-foreground">
+                  Restaurant Status
+                </span>
                 <p className="text-xs text-muted-foreground">
                   {restaurant.active
                     ? "Currently accepting orders"
@@ -587,7 +589,11 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                 </p>
               </div>
               <div
-                className={`ml-auto px-3 py-1 rounded-full text-xs font-medium ${restaurant.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}
+                className={`ml-auto px-3 py-1 rounded-full text-xs font-medium ${
+                  restaurant.active
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                    : "bg-gray-100 dark:bg-stone-700 text-gray-700 dark:text-stone-300"
+                }`}
               >
                 {restaurant.active ? "Active" : "Inactive"}
               </div>
@@ -599,53 +605,60 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                   <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider block mb-1.5">
                     Restaurant Name
                   </span>
-                  <p className="text-base font-medium">{restaurant.name}</p>
+                  <p className="text-base font-medium text-foreground">
+                    {restaurant.name}
+                  </p>
                 </div>
+
                 <div>
                   <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider block mb-1.5">
                     URL Slug
                   </span>
-                  <p className="text-sm font-mono bg-muted/50 px-3 py-1.5 rounded-md inline-block">
+                  <p className="text-sm font-mono bg-muted/50 dark:bg-stone-700/50 text-foreground px-3 py-1.5 rounded-md inline-block">
                     {restaurant.slug}
                   </p>
                 </div>
+
                 <div>
                   <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider block mb-1.5">
                     Description
                   </span>
-                  <p className="text-sm leading-relaxed">
+                  <p className="text-sm leading-relaxed text-foreground">
                     {restaurant.description || "No description provided"}
                   </p>
                 </div>
+
                 <div>
                   <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider block mb-1.5">
                     Location
                   </span>
                   <div className="flex items-start gap-2">
                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <p className="text-sm">
+                    <p className="text-sm text-foreground">
                       {restaurant.location || "No location set"}
                     </p>
                   </div>
                 </div>
+
                 <div>
                   <span className="font-semibold text-xs text-muted-foreground uppercase tracking-wider block mb-1.5">
                     Working Hours
                   </span>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">
+                    <p className="text-sm font-medium text-foreground">
                       {restaurant.openingTime} - {restaurant.closingTime}
                     </p>
                   </div>
                 </div>
+
                 <div className="pt-3 flex flex-wrap gap-3">
                   {restaurant.website && (
                     <a
                       href={restaurant.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-primary hover:underline bg-primary/5 px-3 py-2 rounded-lg transition-colors"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline bg-primary/5 dark:bg-primary/10 px-3 py-2 rounded-lg transition-colors"
                     >
                       <Globe className="h-4 w-4" />
                       <span className="font-medium">Visit Website</span>
@@ -654,7 +667,7 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                   {restaurant.phoneNumber && (
                     <a
                       href={`tel:${restaurant.phoneNumber}`}
-                      className="flex items-center gap-2 text-sm text-primary hover:underline bg-primary/5 px-3 py-2 rounded-lg transition-colors"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline bg-primary/5 dark:bg-primary/10 px-3 py-2 rounded-lg transition-colors"
                     >
                       <Phone className="h-4 w-4" />
                       <span className="font-medium">
@@ -664,12 +677,14 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                   )}
                 </div>
               </div>
+
               {restaurant.photoUrl && (
-                <div className="rounded-xl overflow-hidden border shadow-sm h-64 lg:h-full">
+                <div className="rounded-xl overflow-hidden border border-stone-200 dark:border-stone-700 shadow-sm h-64 lg:h-full">
                   <img
                     src={restaurant.photoUrl}
                     className="w-full h-full object-cover"
                     alt="Restaurant cover"
+                    loading="lazy"
                   />
                 </div>
               )}
