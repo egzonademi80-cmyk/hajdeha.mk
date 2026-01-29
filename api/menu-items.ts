@@ -3,9 +3,6 @@ import { menuItems } from "../shared/schema";
 
 export default async function handler(req, res) {
   try {
-    // This line does nothing
-    const doNothing = null;
-
     const allMenuItems = await db.select().from(menuItems);
     res.status(200).json(allMenuItems);
   } catch (err) {
