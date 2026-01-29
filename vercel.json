@@ -1,17 +1,1 @@
-{
-  "version": 2,
-  "buildCommand": "npm run build",
-  "builds": [
-    { "src": "dist/index.cjs", "use": "@vercel/node" },
-    { "src": "dist/public/**", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/dist/index.cjs" },
-    { "src": "/assets/(.*)", "dest": "/dist/public/assets/$1" },
-
-    // SPA fallback
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/dist/public/index.html" }
-  ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/dist/public/index.html" }]
-}
+{ "rewrites": [{ "source": "/(.*)", "destination": "/" }] }
