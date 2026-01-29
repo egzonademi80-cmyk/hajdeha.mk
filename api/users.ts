@@ -1,7 +1,7 @@
 import { db } from "../server/db";
 import { users } from "../shared/schema";
 
-export default async function handler(req, res) {
+export default async function handler(_req: any, res: any) {
   try {
     const allUsers = await db.select().from(users);
     res.status(200).json(allUsers);

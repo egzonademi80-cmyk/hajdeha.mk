@@ -1,7 +1,7 @@
 import { db } from "../server/db";
 import { menuItems } from "../shared/schema";
 
-export default async function handler(req, res) {
+export default async function handler(_req: any, res: any) {
   try {
     const allMenuItems = await db.select().from(menuItems);
     res.status(200).json(allMenuItems);
