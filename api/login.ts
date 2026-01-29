@@ -1,12 +1,30 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { db, users } from "./db";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { pgTable, text, serial } from "drizzle-orm/pg-core";
+import { eq } from "drizzle-orm";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
 const scryptAsync = promisify(scrypt);
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
+
+// Define users table
+const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
+// Create DB connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 1,
+});
+
+const db = drizzle(pool, { schema: { users } });
 
 async function comparePasswords(supplied: string, stored: string) {
   const [salt, key] = stored.split(":");
@@ -26,11 +44,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Username and password required" });
     }
 
-    const allUsers = await db
+    const result = await db
       .select()
       .from(users)
       .where(eq(users.username, username));
-    const user = allUsers[0];
+    const user = result[0];
 
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
