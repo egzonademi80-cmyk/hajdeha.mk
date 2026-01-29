@@ -23,14 +23,25 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(Buffer.from(key, "hex"), derivedKey);
 }
 
+import PostgresSessionStore from "connect-pg-simple";
+import { pool } from "./db";
+
+const PostgresStore = PostgresSessionStore(session);
+
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y",
     resave: false,
     saveUninitialized: false,
-    store: undefined, // MemoryStore by default, suitable for this demo
+    store: new PostgresStore({
+      pool: pool,
+      tableName: "session",
+      createTableIfMissing: true,
+    }),
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
     },
   };
 
