@@ -1,7 +1,7 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
-import session from "express-session";
+import cookieSession from "cookie-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
@@ -9,8 +9,6 @@ import { User as SelectUser } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
-// Use a simple hashing function since we don't have bcrypt/argon2
-// In production, use a dedicated library like argon2 or bcrypt
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const derivedKey = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -23,41 +21,27 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(Buffer.from(key, "hex"), derivedKey);
 }
 
-import PostgresSessionStore from "connect-pg-simple";
-import { pool } from "./db";
-
-const PostgresStore = PostgresSessionStore(session);
-
 export function setupAuth(app: Express) {
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y",
-    resave: false,
-    saveUninitialized: false,
-    store: new PostgresStore({
-      pool: pool,
-      tableName: "session",
-      createTableIfMissing: true,
-    }),
-    cookie: {
+  app.use(
+    cookieSession({
+      name: "session",
+      keys: [process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y"],
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-    },
-  };
+    }),
+  );
 
-  // If in production and not on Replit dev, ensure secure cookies (optional logic)
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
   }
 
-  app.use(session(sessionSettings));
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Set default credentials for testing
   app.use((req, res, next) => {
     if (app.get("env") === "development" && !req.user) {
-      storage.getUserByUsername("admin").then(user => {
+      storage.getUserByUsername("admin").then((user) => {
         if (user) {
           req.login(user, (err) => {
             if (err) return next(err);
@@ -79,12 +63,11 @@ export function setupAuth(app: Express) {
         if (!user) {
           return done(null, false, { message: "Invalid username" });
         }
-        
+
         const isValid = await comparePasswords(password, user.password);
         if (!isValid) {
           return done(null, false, { message: "Invalid password" });
         }
-
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -105,5 +88,5 @@ export function setupAuth(app: Express) {
     }
   });
 
-  return { hashPassword }; // Export helper for seeding
+  return { hashPassword };
 }
