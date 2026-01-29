@@ -1,5 +1,5 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import {
   pgTable,
   text,
@@ -9,13 +9,12 @@ import {
   doublePrecision,
   index,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set");
 }
 
-// Define tables directly in this file for Vercel
+// Define tables
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -44,11 +43,9 @@ export const restaurants = pgTable(
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
   },
-  (table) => {
-    return {
-      slugIdx: index("slug_idx").on(table.slug),
-    };
-  },
+  (table) => ({
+    slugIdx: index("slug_idx").on(table.slug),
+  }),
 );
 
 export const menuItems = pgTable(
@@ -72,15 +69,19 @@ export const menuItems = pgTable(
     isVegan: boolean("is_vegan").default(false).notNull(),
     isGlutenFree: boolean("is_gluten_free").default(false).notNull(),
   },
-  (table) => {
-    return {
-      restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),
-    };
-  },
+  (table) => ({
+    restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),
+  }),
 );
 
-const sql = neon(process.env.DATABASE_URL);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 1,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
 
-export const db = drizzle(sql, {
+export const db = drizzle(pool, {
   schema: { users, restaurants, menuItems },
 });
