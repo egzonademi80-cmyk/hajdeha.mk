@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "typescript-language-server"]
+modules = ["nodejs-20", "typescript-language-server", "postgresql-16"]
 [nix]
 channel = "stable-25_05"
 packages = ["unzip"]
