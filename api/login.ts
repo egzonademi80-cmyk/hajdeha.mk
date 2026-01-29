@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { db } from "../server/db";
+import { db } from "./_db";
 import { users } from "../shared/schema";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -27,7 +27,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Username and password required" });
     }
 
-    // Find user
     const user = await db.query.users.findFirst({
       where: eq(users.username, username),
     });
@@ -36,21 +35,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Verify password
     const isValid = await comparePasswords(password, user.password);
 
     if (!isValid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Create JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username },
       JWT_SECRET,
       { expiresIn: "24h" },
     );
 
-    // Return token and user (without password)
     const { password: _, ...userWithoutPassword } = user;
 
     return res.status(200).json({

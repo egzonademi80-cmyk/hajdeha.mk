@@ -1,4 +1,4 @@
-import { db } from "../server/db";
+import { db } from "./_db";
 import { users } from "../shared/schema";
 
 export default async function handler(_req: any, res: any) {

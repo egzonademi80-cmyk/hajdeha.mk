@@ -1,4 +1,4 @@
-import { db } from "../server/db";
+import { db } from "./_db";
 import { menuItems } from "../shared/schema";
 
 export default async function handler(_req: any, res: any) {
