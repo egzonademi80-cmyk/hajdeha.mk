@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { db } from "./_db";
-import { users } from "../shared/schema";
+import { db, users } from "./_db";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { eq } from "drizzle-orm";
@@ -27,9 +26,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Username and password required" });
     }
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.username, username),
-    });
+    const allUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+    const user = allUsers[0];
 
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
