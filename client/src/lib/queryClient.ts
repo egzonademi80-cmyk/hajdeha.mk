@@ -1,5 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const TOKEN_KEY = "auth_token";
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,12 +18,21 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const token = getToken();
+  const headers: HeadersInit = data
+    ? { "Content-Type": "application/json" }
+    : {};
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
+
   await throwIfResNotOk(res);
   return res;
 }
@@ -29,12 +44,21 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const token = getToken();
+    const headers: HeadersInit = {};
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
+      headers,
     });
+
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
     }
+
     await throwIfResNotOk(res);
     return await res.json();
   };
@@ -43,36 +67,21 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
-
-      // ✅ OPTIMIZED: Cache public data for 5 minutes (reduces server load)
-      staleTime: 5 * 60 * 1000, // Changed from Infinity
-
-      // ✅ OPTIMIZED: Keep unused data in cache for 10 minutes
-      gcTime: 10 * 60 * 1000, // Previously cacheTime
-
-      // ✅ Keep these as they are (good defaults)
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       refetchInterval: false,
       refetchOnWindowFocus: false,
-
-      // ✅ OPTIMIZED: Retry once on network errors
-      retry: 1, // Changed from false
-
-      // ✅ NEW: Don't refetch on component mount if data is fresh
+      retry: 1,
       refetchOnMount: false,
-
-      // ✅ NEW: Refetch when browser comes back online
       refetchOnReconnect: true,
     },
     mutations: {
       retry: false,
-
-      // ✅ NEW: Optimistic updates timeout
       gcTime: 5 * 60 * 1000,
     },
   },
 });
 
-// ✅ OPTIONAL: Add query key helpers for better type safety and caching
 export const queryKeys = {
   restaurants: {
     all: ["/api/restaurants"] as const,
@@ -83,3 +92,12 @@ export const queryKeys = {
       ["/api/restaurants", restaurantId, "menu"] as const,
   },
 } as const;
+
+// Export token management functions for use in auth hook
+export { getToken, TOKEN_KEY };
+export function setToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+export function removeToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
