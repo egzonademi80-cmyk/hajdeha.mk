@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { db } from "./_db";
+import { db } from "./db";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";

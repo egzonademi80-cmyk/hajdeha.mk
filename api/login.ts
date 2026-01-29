@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { db, users } from "./_db";
+import { db, users } from "./db";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { eq } from "drizzle-orm";
