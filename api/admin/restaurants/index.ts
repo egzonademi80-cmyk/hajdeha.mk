@@ -1,186 +1,49 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import {
-  pgTable,
-  text,
-  serial,
-  integer,
-  boolean,
-  doublePrecision,
-  index,
-} from "drizzle-orm/pg-core";
-import { eq, and } from "drizzle-orm";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
-
-const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-});
-
-const restaurants = pgTable(
-  "restaurants",
-  {
-    id: serial("id").primaryKey(),
-    name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
-    description: text("description"),
-    descriptionAl: text("description_al"),
-    descriptionMk: text("description_mk"),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id),
-    photoUrl: text("photo_url"),
-    website: text("website"),
-    phoneNumber: text("phone_number"),
-    location: text("location"),
-    openingTime: text("opening_time").default("08:00"),
-    closingTime: text("closing_time").default("22:00"),
-    active: boolean("active").default(true).notNull(),
-    latitude: doublePrecision("latitude"),
-    longitude: doublePrecision("longitude"),
-  },
-  (table) => ({
-    slugIdx: index("slug_idx").on(table.slug),
-  }),
-);
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 1,
-});
-
-const db = drizzle(pool, { schema: { users, restaurants } });
-
-function verifyToken(req: VercelRequest): number | null {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return null;
-    }
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
-    return decoded.id;
-  } catch {
-    return null;
-  }
-}
+import { VercelRequest, VercelResponse } from '@vercel/node';
+import { db } from '../../../server/db';
+import { restaurants } from '../../../shared/schema';
+import { eq } from 'drizzle-orm';
+import { verifyToken, unauthorized, methodNotAllowed } from '../auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const userId = verifyToken(req);
+  const user = verifyToken(req);
+  if (!user) return unauthorized(res);
 
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const { id } = req.query;
-  const restaurantId = id ? parseInt(id as string) : null;
-
-  // GET - Get all restaurants or specific restaurant
-  if (req.method === "GET") {
+  if (req.method === 'GET') {
     try {
-      if (restaurantId) {
-        // Get specific restaurant
-        const result = await db
-          .select()
-          .from(restaurants)
-          .where(
-            and(
-              eq(restaurants.id, restaurantId),
-              eq(restaurants.userId, userId),
-            ),
-          );
-
-        if (result.length === 0) {
-          return res.status(404).json({ error: "Restaurant not found" });
-        }
-
-        return res.status(200).json(result[0]);
-      } else {
-        // Get all user's restaurants
-        const userRestaurants = await db
-          .select()
-          .from(restaurants)
-          .where(eq(restaurants.userId, userId));
-        return res.status(200).json(userRestaurants);
-      }
+      const userRestaurants = await db.select().from(restaurants).where(eq(restaurants.userId, user.userId));
+      return res.status(200).json(userRestaurants);
     } catch (error) {
-      console.error("Get restaurants error:", error);
-      return res.status(500).json({ error: "Database error" });
+      console.error('GET restaurants error:', error);
+      return res.status(500).json({ message: 'Database error' });
     }
   }
 
-  // POST - Create new restaurant
-  if (req.method === "POST") {
+  if (req.method === 'POST') {
     try {
-      const restaurantData = { ...req.body, userId };
-      const newRestaurant = await db
-        .insert(restaurants)
-        .values(restaurantData)
-        .returning();
-      return res.status(201).json(newRestaurant[0]);
+      const { name, slug, description, photoUrl, website, phoneNumber, location, openingTime, closingTime, active, latitude, longitude } = req.body;
+      
+      const [newRestaurant] = await db.insert(restaurants).values({
+        name,
+        slug,
+        description,
+        photoUrl,
+        website,
+        phoneNumber,
+        location,
+        openingTime,
+        closingTime,
+        active: active ?? true,
+        latitude,
+        longitude,
+        userId: user.userId
+      }).returning();
+      
+      return res.status(201).json(newRestaurant);
     } catch (error) {
-      console.error("Create restaurant error:", error);
-      return res.status(500).json({ error: "Database error" });
+      console.error('POST restaurant error:', error);
+      return res.status(500).json({ message: 'Database error' });
     }
   }
 
-  // PATCH/PUT - Update restaurant
-  if (req.method === "PATCH" || req.method === "PUT") {
-    if (!restaurantId) {
-      return res.status(400).json({ error: "Restaurant ID required" });
-    }
-
-    try {
-      const updated = await db
-        .update(restaurants)
-        .set(req.body)
-        .where(
-          and(eq(restaurants.id, restaurantId), eq(restaurants.userId, userId)),
-        )
-        .returning();
-
-      if (updated.length === 0) {
-        return res.status(404).json({ error: "Restaurant not found" });
-      }
-
-      return res.status(200).json(updated[0]);
-    } catch (error) {
-      console.error("Update restaurant error:", error);
-      return res.status(500).json({ error: "Database error" });
-    }
-  }
-
-  // DELETE - Delete restaurant
-  if (req.method === "DELETE") {
-    if (!restaurantId) {
-      return res.status(400).json({ error: "Restaurant ID required" });
-    }
-
-    try {
-      const deleted = await db
-        .delete(restaurants)
-        .where(
-          and(eq(restaurants.id, restaurantId), eq(restaurants.userId, userId)),
-        )
-        .returning();
-
-      if (deleted.length === 0) {
-        return res.status(404).json({ error: "Restaurant not found" });
-      }
-
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      console.error("Delete restaurant error:", error);
-      return res.status(500).json({ error: "Database error" });
-    }
-  }
-
-  return res.status(405).json({ error: "Method not allowed" });
+  return methodNotAllowed(res);
 }
