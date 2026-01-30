@@ -14,6 +14,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { username, password } = req.body;
 
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Username and password are required' });
+  }
+
   try {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     
@@ -34,6 +38,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error('Login error:', error);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ message: 'Internal server error during login', error: String(error) });
   }
 }
