@@ -13,6 +13,14 @@
   ],
   "routes": [
     {
+      "src": "/api/restaurants",
+      "dest": "api/restaurants/index.ts"
+    },
+    {
+      "src": "/api/login",
+      "dest": "api/login.ts"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "api/index.ts"
     },
