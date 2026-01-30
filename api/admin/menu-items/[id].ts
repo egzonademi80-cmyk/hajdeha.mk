@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from '../../../server/db';
-import { menuItems, restaurants } from '../../../shared/schema';
+import { db } from '../../../server/db.js';
+import { menuItems, restaurants } from '../../../shared/schema.js';
 import { eq } from 'drizzle-orm';
 import { verifyToken, unauthorized, methodNotAllowed, notFound, forbidden } from '../auth';
 

@@ -1,0 +1,48 @@
+Jan 30 04:07:06.92
+POST
+500
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/login
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/server/db' imported from /var/task/api/login.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:06:57.96
+GET
+500
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/login
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/server/db' imported from /var/task/api/login.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:06:49.53
+GET
+500
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:06:46.70
+GET
+---
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:06:45.18
+GET
+500
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue. Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:06:45.12
+GET
+500
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue. Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:06:45.06
+GET
+500
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/server/db' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:06:45.04
+GET
+500
+hajdehamk-t5va9p89z-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/server/db' imported from /var/task/api/restaurants/ind

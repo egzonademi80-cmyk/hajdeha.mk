@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from '../server/db';
-import { users } from '../shared/schema';
+import { db } from '../server/db.js';
+import { users } from '../shared/schema.js';
 import { eq } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { compare } from 'bcryptjs';

@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, pool } from '../server/db';
-import { restaurants, menuItems } from '../shared/schema';
+import { db, pool } from '../../server/db';
+import { restaurants, menuItems } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
