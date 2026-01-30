@@ -1,5 +1,5 @@
 import { createServer } from "http";
-import app from "../server/index";
+import app from "../server/index.js";
 
 const server = createServer(app);
 
