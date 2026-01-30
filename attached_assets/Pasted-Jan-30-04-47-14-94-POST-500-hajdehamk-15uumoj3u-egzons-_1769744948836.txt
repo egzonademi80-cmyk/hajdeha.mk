@@ -1,0 +1,78 @@
+Jan 30 04:47:14.94
+POST
+500
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/admin/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/admin/auth' imported from /var/task/api/admin/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/admin/auth' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:46:58.20
+GET
+500
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/admin/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/admin/auth' imported from /var/task/api/admin/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/admin/auth' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:46:50.61
+GET
+500
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/admin/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/admin/auth' imported from /var/task/api/admin/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/admin/auth' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:46:38.06
+POST
+500
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/admin/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/admin/auth' imported from /var/task/api/admin/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/admin/auth' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:46:28.77
+GET
+500
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/admin/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/admin/auth' imported from /var/task/api/admin/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/admin/auth' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:46:26.76
+GET
+500
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/admin/restaurants
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/api/admin/auth' imported from /var/task/api/admin/restaurants/index.js at finalizeResolution (node:internal/modules/esm/resolve:280:11) at moduleResolve (node:internal/modules/esm/resolve:870:10) at moduleResolveWithNodePath (node:internal/modules/esm/resolve:996:14) at defaultResolve (node:internal/modules/esm/resolve:1039:79) at #cachedDefaultResolve (node:internal/modules/esm/loader:718:20) at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:735:38) at ModuleLoader.resolveSync (node:internal/modules/esm/loader:764:52) at #resolve (node:internal/modules/esm/loader:700:17) at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:620:35) at ModuleJob.syncLink (node:internal/modules/esm/module_job:143:33) { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///var/task/api/admin/auth' } Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+Jan 30 04:46:26.26
+POST
+200
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/login
+(node:4) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'. In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees. To prepare for this change: - If you want the current behavior, explicitly use 'sslmode=verify-full' - If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require' See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+Jan 30 04:46:19.02
+GET
+200
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Jan 30 04:44:40.74
+GET
+200
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Jan 30 04:44:40.41
+GET
+---
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Jan 30 04:44:40.25
+GET
+200
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Jan 30 04:44:39.99
+GET
+200
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Jan 30 04:44:39.90
+GET
+200
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/restaurants
+Jan 30 04:44:39.72
+GET
+200
+hajdehamk-15uumoj3u-egzons-projects-406475fe.vercel.app
+/api/restaurants
+(node:4) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 've
