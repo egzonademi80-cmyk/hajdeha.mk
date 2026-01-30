@@ -1,47 +1,36 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { pgTable, text, serial, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, boolean } from "drizzle-orm/pg-core";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
 
 const menuItems = pgTable("menu_items", {
   id: serial("id").primaryKey(),
   restaurantId: integer("restaurant_id").notNull(),
   name: text("name").notNull(),
-  nameAl: text("name_al"),
-  nameMk: text("name_mk"),
   description: text("description"),
-  descriptionAl: text("description_al"),
-  descriptionMk: text("description_mk"),
   price: text("price").notNull(),
-  category: text("category").notNull().default("Main"),
-  imageUrl: text("image_url"),
+  category: text("category").default("Main"),
   active: boolean("active").default(true).notNull(),
-  isVegetarian: boolean("is_vegetarian").default(false).notNull(),
-  isVegan: boolean("is_vegan").default(false).notNull(),
-  isGlutenFree: boolean("is_gluten_free").default(false).notNull(),
 });
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  max: 1,
 });
-
 const db = drizzle(pool, { schema: { menuItems } });
 
 function verifyToken(req: VercelRequest): number | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.substring(7);
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return null;
-    }
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
-    return decoded.id;
+    return (jwt.verify(token, JWT_SECRET) as { id: number }).id;
   } catch {
     return null;
   }
@@ -49,54 +38,32 @@ function verifyToken(req: VercelRequest): number | null {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = verifyToken(req);
-  
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const menuItemId = parseInt(req.query.id as string);
+  if (isNaN(menuItemId))
+    return res.status(400).json({ error: "Invalid menu item ID" });
+
+  if (req.method === "PATCH") {
+    const updated = await db
+      .update(menuItems)
+      .set(req.body)
+      .where(eq(menuItems.id, menuItemId))
+      .returning();
+    if (!updated.length)
+      return res.status(404).json({ error: "Menu item not found" });
+    return res.status(200).json(updated[0]);
   }
 
-  const { id } = req.query;
-  const menuItemId = parseInt(id as string);
-
-  if (isNaN(menuItemId)) {
-    return res.status(400).json({ error: 'Invalid menu item ID' });
+  if (req.method === "DELETE") {
+    const deleted = await db
+      .delete(menuItems)
+      .where(eq(menuItems.id, menuItemId))
+      .returning();
+    if (!deleted.length)
+      return res.status(404).json({ error: "Menu item not found" });
+    return res.status(200).json({ ok: true });
   }
 
-  // PATCH/PUT - Update menu item
-  if (req.method === 'PATCH' || req.method === 'PUT') {
-    try {
-      const updated = await db.update(menuItems)
-        .set(req.body)
-        .where(eq(menuItems.id, menuItemId))
-        .returning();
-      
-      if (updated.length === 0) {
-        return res.status(404).json({ error: 'Menu item not found' });
-      }
-      
-      return res.status(200).json(updated[0]);
-    } catch (error) {
-      console.error('Update menu item error:', error);
-      return res.status(500).json({ error: 'Database error' });
-    }
-  }
-
-  // DELETE - Delete menu item
-  if (req.method === 'DELETE') {
-    try {
-      const deleted = await db.delete(menuItems)
-        .where(eq(menuItems.id, menuItemId))
-        .returning();
-      
-      if (deleted.length === 0) {
-        return res.status(404).json({ error: 'Menu item not found' });
-      }
-      
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      console.error('Delete menu item error:', error);
-      return res.status(500).json({ error: 'Database error' });
-    }
-  }
-
-  return res.status(405).json({ error: 'Method not allowed' });
+  return res.status(405).json({ error: "Method not allowed" });
 }

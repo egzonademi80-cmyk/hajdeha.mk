@@ -15,7 +15,7 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
-  "ffc349504874a85f4559da9703b8be2ccfc56d9202b2a673c00561d5b59ae7e0";
+  "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
 
 const users = pgTable("users", {
   id: serial("id").primaryKey(),
