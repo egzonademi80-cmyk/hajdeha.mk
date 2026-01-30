@@ -32,6 +32,17 @@ export function setupAuth(app: Express) {
     }),
   );
 
+  // Fix for req.session.regenerate is not a function with cookie-session
+  app.use((req, res, next) => {
+    if (req.session && !req.session.regenerate) {
+      req.session.regenerate = (cb: any) => cb();
+    }
+    if (req.session && !req.session.save) {
+      req.session.save = (cb: any) => cb();
+    }
+    next();
+  });
+
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
   }
