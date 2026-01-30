@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, pool } from '../../server/db';
-import { restaurants, menuItems } from '../../shared/schema';
+import { db, pool } from '../../server/db.js';
+import { restaurants, menuItems } from '../../shared/schema.js';
 import { eq } from 'drizzle-orm';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -10,7 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const allRestaurants = await db.select().from(restaurants);
-    const enriched = await Promise.all(allRestaurants.map(async (r) => {
+    const enriched = await Promise.all(allRestaurants.map(async (r: any) => {
       const items = await db.select().from(menuItems).where(eq(menuItems.restaurantId, r.id));
       return { ...r, menuItems: items };
     }));
