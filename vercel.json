@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.ts",
+      "src": "api/**/*.ts",
       "use": "@vercel/node"
     },
     {
@@ -19,6 +19,22 @@
     {
       "src": "/api/login",
       "dest": "api/login.ts"
+    },
+    {
+      "src": "/api/admin/restaurants",
+      "dest": "api/admin/restaurants/index.ts"
+    },
+    {
+      "src": "/api/admin/restaurants/(?<id>[^/]*)",
+      "dest": "api/admin/restaurants/[id].ts?id=$id"
+    },
+    {
+      "src": "/api/admin/menu-items",
+      "dest": "api/admin/menu-items/index.ts"
+    },
+    {
+      "src": "/api/admin/menu-items/(?<id>[^/]*)",
+      "dest": "api/admin/menu-items/[id].ts?id=$id"
     },
     {
       "src": "/api/(.*)",
