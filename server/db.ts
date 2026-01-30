@@ -4,16 +4,13 @@ import * as schema from "../shared/schema.js";
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
+// Use the environment variable for security, falling back to a default if necessary
+const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_eZ0IwR3cXxuD@ep-tiny-rain-ah5sdn17-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require';
 
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: { rejectUnauthorized: false },
-  max: 1, // Important for serverless - limit connections
+  max: 1, 
 });
 
 export const db = drizzle(pool, { schema });

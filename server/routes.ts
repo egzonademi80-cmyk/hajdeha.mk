@@ -168,15 +168,15 @@ export async function registerRoutes(
 import passport from "passport";
 
 async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
-  const existingUsers = await storage.getUserByUsername("admin");
-  if (existingUsers) return; // Already seeded
+  const admin = await storage.getUserByUsername("hajdeha");
+  if (admin) return; // Already seeded
 
   console.log("Seeding database...");
 
   // Create Users (Admins)
-  const pwd = await hashPassword("admin");
+  const pwd = await hashPassword("DesiigneR.123");
   
-  const user1 = await storage.createUser({ username: "admin", password: pwd });
+  const user1 = await storage.createUser({ username: "hajdeha", password: pwd });
 
   // For secondary users, check if they exist first to avoid unique constraint errors
   const seedUser = async (username: string, passwordPlain: string) => {
