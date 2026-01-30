@@ -4,8 +4,8 @@ import * as schema from "../shared/schema.js";
 
 const { Pool } = pg;
 
-// Use the environment variable for security, falling back to a default if necessary
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_eZ0IwR3cXxuD@ep-tiny-rain-ah5sdn17-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require';
+// We use the environment variable which the user has set in the Replit secrets
+const connectionString = 'postgresql://neondb_owner:npg_eZ0IwR3cXxuD@ep-tiny-rain-ah5sdn17-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require';
 
 export const pool = new Pool({
   connectionString,

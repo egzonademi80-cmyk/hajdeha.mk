@@ -105,14 +105,36 @@ export async function registerRoutes(
 
   // Admin: Create Restaurant
   app.post(api.restaurants.create.path, async (req, res) => {
-    const input = api.restaurants.create.input.parse(req.body);
-    const restaurant = await storage.createRestaurant({ 
-      ...input, 
-      userId: (req.user as any)?.id || 1,
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null
-    });
-    res.status(201).json(restaurant);
+    try {
+      console.log("Creating restaurant. Body:", req.body);
+      
+      const input = api.restaurants.create.input.parse(req.body);
+      
+      // Get the current logged in user from session
+      // Passport puts the user object in req.user
+      // Fallback to userId 1 for now if session is not persisting across Vercel requests
+      const user = req.user as any;
+      const userId = user?.id || 1;
+      
+      console.log("Using userId:", userId);
+
+      const restaurantData = { 
+        ...input, 
+        userId: userId,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null
+      };
+      
+      console.log("Saving restaurant to DB:", restaurantData);
+      const restaurant = await storage.createRestaurant(restaurantData);
+      res.status(201).json(restaurant);
+    } catch (error: any) {
+      console.error("Error creating restaurant:", error);
+      res.status(500).json({ 
+        message: error.message || "Failed to create restaurant",
+        details: error.toString()
+      });
+    }
   });
 
   // Admin: Delete Restaurant
