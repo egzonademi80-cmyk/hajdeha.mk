@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { restaurants, menuItems } from "../../shared/schema.js";
+import { restaurants, menuItems } from "../../shared/schema";
 import { eq } from "drizzle-orm";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -16,12 +16,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ message: "Slug is required" });
   }
 
-  // ✅ CREATE CONNECTION INSIDE HANDLER
+  // 🔹 Serverless-safe Postgres client
   const client = postgres(process.env.DATABASE_URL!, {
     ssl: "require",
     max: 1,
   });
-
   const db = drizzle(client);
 
   try {
@@ -50,7 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       details: error.message,
     });
   } finally {
-    // ✅ VERY IMPORTANT IN SERVERLESS
     await client.end();
   }
 }
