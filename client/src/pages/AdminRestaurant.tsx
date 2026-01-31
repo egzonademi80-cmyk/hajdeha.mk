@@ -696,9 +696,9 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-8 border shadow-sm space-y-6">
-      <div>
-        <h3 className="font-semibold text-2xl font-display tracking-tight">
+    <div className="bg-white dark:bg-stone-800 rounded-2xl p-8 border border-stone-200 dark:border-stone-700 shadow-sm space-y-6 transition-colors">
+      <div className="dark:text-stone-100">
+        <h3 className="font-semibold text-2xl font-display tracking-tight text-foreground">
           Edit Restaurant Profile
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
@@ -708,27 +708,27 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
       <div className="grid gap-6 lg:grid-cols-2 pt-4">
         <div className="space-y-5">
           <div className="grid gap-2.5">
-            <Label className="text-sm font-semibold">Restaurant Name</Label>
+            <Label className="text-sm font-semibold text-foreground">Restaurant Name</Label>
             <Input
               value={formData.name}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
-              className="h-10"
+              className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
             />
           </div>
           <div className="grid gap-2.5">
-            <Label className="text-sm font-semibold">URL Slug</Label>
+            <Label className="text-sm font-semibold text-foreground">URL Slug</Label>
             <Input
               value={formData.slug}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, slug: e.target.value }))
               }
-              className="h-10 font-mono"
+              className="h-10 font-mono bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
             />
           </div>
           <div className="grid gap-2.5">
-            <Label className="text-sm font-semibold">Phone Number</Label>
+            <Label className="text-sm font-semibold text-foreground">Phone Number</Label>
             <Input
               value={formData.phoneNumber}
               onChange={(e) =>
@@ -738,34 +738,34 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                 }))
               }
               placeholder="+389 XX XXX XXX"
-              className="h-10"
+              className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
             />
           </div>
           <div className="grid gap-2.5">
-            <Label className="text-sm font-semibold">Location Address</Label>
+            <Label className="text-sm font-semibold text-foreground">Location Address</Label>
             <Input
               value={formData.location}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, location: e.target.value }))
               }
               placeholder="e.g. Rruga e Marshit, Tetovë"
-              className="h-10"
+              className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2.5">
-              <Label className="text-sm font-semibold">Latitude</Label>
+              <Label className="text-sm font-semibold text-foreground">Latitude</Label>
               <Input
                 value={formData.latitude}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, latitude: e.target.value }))
                 }
                 placeholder="e.g. 42.01"
-                className="h-10"
+                className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
               />
             </div>
             <div className="grid gap-2.5">
-              <Label className="text-sm font-semibold">Longitude</Label>
+              <Label className="text-sm font-semibold text-foreground">Longitude</Label>
               <Input
                 value={formData.longitude}
                 onChange={(e) =>
@@ -775,21 +775,21 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                   }))
                 }
                 placeholder="e.g. 20.97"
-                className="h-10"
+                className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
               />
             </div>
           </div>
         </div>
         <div className="space-y-5">
           <div className="grid gap-2.5">
-            <Label className="text-sm font-semibold">Website URL</Label>
+            <Label className="text-sm font-semibold text-foreground">Website URL</Label>
             <Input
               value={formData.website}
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, website: e.target.value }))
               }
               placeholder="https://yourwebsite.com"
-              className="h-10"
+              className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
             />
           </div>
           <ImageUpload
@@ -800,7 +800,7 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
             label="Cover Photo"
           />
           <div className="grid gap-2.5">
-            <Label className="text-sm font-semibold">Description</Label>
+            <Label className="text-sm font-semibold text-foreground">Description</Label>
             <Textarea
               value={formData.description}
               onChange={(e) =>
@@ -809,13 +809,13 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                   description: e.target.value,
                 }))
               }
-              className="h-[120px] resize-none"
+              className="h-[120px] resize-none bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
               placeholder="Tell customers about your restaurant..."
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2.5">
-              <Label className="text-sm font-semibold">Opening Time</Label>
+              <Label className="text-sm font-semibold text-foreground">Opening Time</Label>
               <Input
                 type="time"
                 value={formData.openingTime}
@@ -825,11 +825,11 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                     openingTime: e.target.value,
                   }))
                 }
-                className="h-10"
+                className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
               />
             </div>
             <div className="grid gap-2.5">
-              <Label className="text-sm font-semibold">Closing Time</Label>
+              <Label className="text-sm font-semibold text-foreground">Closing Time</Label>
               <Input
                 type="time"
                 value={formData.closingTime}
@@ -839,14 +839,14 @@ function RestaurantDetailsForm({ restaurant }: { restaurant: any }) {
                     closingTime: e.target.value,
                   }))
                 }
-                className="h-10"
+                className="h-10 bg-white dark:bg-stone-900 dark:text-stone-100 dark:border-stone-700"
               />
             </div>
           </div>
         </div>
       </div>
-      <div className="flex gap-3 justify-end pt-6 border-t">
-        <Button variant="ghost" onClick={() => setIsEditing(false)}>
+      <div className="flex gap-3 justify-end pt-6 border-t dark:border-stone-700">
+        <Button variant="ghost" onClick={() => setIsEditing(false)} className="dark:text-stone-100 dark:hover:bg-stone-700">
           Cancel
         </Button>
         <Button onClick={handleSave} disabled={isPending} className="shadow-sm">

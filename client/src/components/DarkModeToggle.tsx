@@ -34,7 +34,7 @@ export function DarkModeToggle({
       variant="ghost"
       size="icon"
       onClick={toggleDarkMode}
-      className="fixed top-6 right-6 z-50 bg-white/90 dark:bg-stone-800/90 backdrop-blur-lg hover:bg-white dark:hover:bg-stone-800 shadow-lg rounded-full h-11 w-11 border border-white/50 dark:border-stone-700/50 transition-all hover:scale-105"
+      className="fixed top-6 right-6 z-50 bg-white/90 dark:bg-stone-800/90 backdrop-blur-lg hover:bg-stone-100 dark:hover:bg-stone-700 shadow-lg rounded-full h-11 w-11 border border-stone-200 dark:border-stone-700/50 transition-all hover:scale-105"
       aria-label="Toggle dark mode"
     >
       {isDark ? (
