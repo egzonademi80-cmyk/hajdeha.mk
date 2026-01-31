@@ -2,23 +2,6 @@ import { VercelRequest, VercelResponse } from "@vercel/node";
 import { db } from "../../server/db.js";
 import { restaurants } from "../../shared/schema.js";
 
-function isOpenNow(openingTime: string, closingTime: string): boolean {
-  const now = new Date();
-  const [openH, openM] = openingTime.split(":").map(Number);
-  const [closeH, closeM] = closingTime.split(":").map(Number);
-
-  const nowTotal = now.getHours() * 60 + now.getMinutes();
-  const openTotal = openH * 60 + openM;
-  const closeTotal = closeH * 60 + closeM;
-
-  // Nëse closingTime është pas mesnate
-  if (closeTotal < openTotal) {
-    return nowTotal >= openTotal || nowTotal <= closeTotal;
-  }
-
-  return nowTotal >= openTotal && nowTotal <= closeTotal;
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ message: "Method not allowed" });
@@ -31,21 +14,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         name: restaurants.name,
         slug: restaurants.slug,
         photoUrl: restaurants.photoUrl,
-        active: restaurants.active,
         openingTime: restaurants.openingTime,
         closingTime: restaurants.closingTime,
       })
       .from(restaurants);
 
-    // Shto fushën isOpen për secilin restaurat
-    const result = list.map((r) => ({
-      id: r.id,
-      name: r.name,
-      slug: r.slug,
-      photoUrl: r.photoUrl,
-      active: r.active,
-      isOpen: isOpenNow(r.openingTime, r.closingTime),
-    }));
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const result = list.map((r) => {
+      const [openHour, openMin] = r.openingTime.split(":").map(Number);
+      const [closeHour, closeMin] = r.closingTime.split(":").map(Number);
+
+      const openMinutes = openHour * 60 + openMin;
+      const closeMinutes = closeHour * 60 + closeMin;
+
+      const isOpen =
+        currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+
+      return { ...r, isOpen };
+    });
 
     return res.status(200).json(result);
   } catch (error) {
