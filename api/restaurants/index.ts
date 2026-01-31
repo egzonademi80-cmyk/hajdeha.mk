@@ -1,26 +1,25 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, pool } from '../../server/db.js';
-import { restaurants, menuItems } from '../../shared/schema.js';
-import { eq } from 'drizzle-orm';
+import { VercelRequest, VercelResponse } from "@vercel/node";
+import { db } from "../../server/db";
+import { restaurants } from "../../shared/schema";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' });
+  if (req.method !== "GET") {
+    return res.status(405).json({ message: "Method not allowed" });
   }
 
   try {
-    const allRestaurants = await db.select().from(restaurants);
-    const enriched = await Promise.all(allRestaurants.map(async (r: any) => {
-      const items = await db.select().from(menuItems).where(eq(menuItems.restaurantId, r.id));
-      return { ...r, menuItems: items };
-    }));
-    
-    return res.status(200).json(enriched);
+    const list = await db
+      .select({
+        id: restaurants.id,
+        name: restaurants.name,
+        slug: restaurants.slug,
+        image: restaurants.image,
+      })
+      .from(restaurants);
+
+    return res.status(200).json(list);
   } catch (error) {
-    console.error('Public GET restaurants error:', error);
-    // Log connection state to help debug
-    console.log('Pool total count:', pool.totalCount);
-    console.log('Pool idle count:', pool.idleCount);
-    return res.status(500).json({ message: 'Database connection failed. Please check your DATABASE_URL.', error: String(error) });
+    console.error("Public GET restaurants error:", error);
+    return res.status(500).json({ message: "Failed to fetch restaurants" });
   }
 }
