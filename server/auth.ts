@@ -4,7 +4,7 @@ import { Express } from "express";
 import cookieSession from "cookie-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import { User as SelectUser } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
