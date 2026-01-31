@@ -298,7 +298,8 @@ export default function Home() {
     queryFn: async () => {
       const res = await fetch(api.restaurants.listAll.path);
       if (!res.ok) throw new Error("Failed to fetch restaurants");
-      return api.restaurants.listAll.responses[200].parse(await res.json());
+      const data = await res.json();
+      return api.restaurants.listAll.responses[200].parse(data);
     },
   });
   const restaurants = useMemo(() => {
