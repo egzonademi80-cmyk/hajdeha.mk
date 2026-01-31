@@ -36,10 +36,14 @@ export async function registerRoutes(
   });
 
   app.post(api.auth.logout.path, (req, res, next) => {
-    req.logout((err) => {
-      if (err) return next(err);
+    if (req.logout) {
+      req.logout((err) => {
+        if (err) return next(err);
+        res.sendStatus(200);
+      });
+    } else {
       res.sendStatus(200);
-    });
+    }
   });
 
   app.get(api.auth.user.path, (req, res) => {

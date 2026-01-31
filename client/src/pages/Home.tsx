@@ -295,6 +295,11 @@ export default function Home() {
   const [showOpenOnly, setShowOpenOnly] = useState(false);
   const { data: restaurantsData, isLoading } = useQuery({
     queryKey: [api.restaurants.listAll.path],
+    queryFn: async () => {
+      const res = await fetch(api.restaurants.listAll.path);
+      if (!res.ok) throw new Error("Failed to fetch restaurants");
+      return api.restaurants.listAll.responses[200].parse(await res.json());
+    },
   });
   const restaurants = useMemo(() => {
     const activeRestaurants = ((restaurantsData as any[]) || []).filter(
@@ -314,7 +319,7 @@ export default function Home() {
           parseFloat(r.longitude),
         );
       }
-      const isOpen = IsOpen(r.openingTime, r.closingTime);
+      const isOpen = IsOpen(r.openingTime || undefined, r.closingTime || undefined);
       return { ...r, distance, isOpen };
     });
 

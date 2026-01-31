@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
 import {
   Loader2,
   UtensilsCrossed,
@@ -332,12 +332,12 @@ export default function PublicMenu() {
   } = useQuery({
     queryKey: [api.restaurants.getBySlug.path, slug],
     queryFn: async () => {
-      const res = await fetch(`/api/restaurants/${slug}`);
+      const url = buildUrl(api.restaurants.getBySlug.path, { slug: slug! });
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Restaurant not found");
-      return res.json();
+      return api.restaurants.getBySlug.responses[200].parse(await res.json());
     },
     enabled: !!slug,
-    // ✅ FAST LOAD: Use initial data if available or high-priority fetching
     staleTime: 10 * 60 * 1000,
   });
 
@@ -425,7 +425,7 @@ export default function PublicMenu() {
   }
 
   const groupedMenu = groupItems(filteredItems);
-  const isOpen = IsOpen(restaurant.openingTime, restaurant.closingTime);
+  const isOpen = IsOpen(restaurant.openingTime || undefined, restaurant.closingTime || undefined);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 pb-32 transition-colors duration-300">
@@ -722,8 +722,8 @@ export default function PublicMenu() {
                 <RestaurantMap
                   location={restaurant.location || "Tetovë Center, 1200"}
                   name={restaurant.name}
-                  latitude={restaurant.latitude}
-                  longitude={restaurant.longitude}
+                  latitude={restaurant.latitude ? String(restaurant.latitude) : null}
+                  longitude={restaurant.longitude ? String(restaurant.longitude) : null}
                 />
                 <div className="flex items-start gap-3 bg-stone-50 dark:bg-stone-700/50 p-4 rounded-xl border border-stone-100 dark:border-stone-600">
                   <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
