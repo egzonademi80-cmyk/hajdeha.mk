@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
-import { db } from "../../server/db";
-import { restaurants } from "../../shared/schema";
+import { db } from "../../server/db.js"; // relative path nga api/restaurants
+import { restaurants } from "../../shared/schema.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -8,12 +8,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Nxjerr të gjithë restorantet
     const list = await db
       .select({
         id: restaurants.id,
         name: restaurants.name,
         slug: restaurants.slug,
         photoUrl: restaurants.photoUrl,
+        active: restaurants.active,
       })
       .from(restaurants);
 
