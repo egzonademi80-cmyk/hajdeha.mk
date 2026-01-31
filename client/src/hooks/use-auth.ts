@@ -57,6 +57,8 @@ export function useLogin() {
     onSuccess: (data) => {
       if (data.token) {
         setToken(data.token);
+        // Store in localStorage for persistence across page reloads
+        localStorage.setItem("hajdeha-token", data.token);
       }
       queryClient.setQueryData(["/api/user"], data.user);
       setLocation("/admin/dashboard");
