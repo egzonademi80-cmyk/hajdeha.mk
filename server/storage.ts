@@ -1,11 +1,16 @@
 import { db } from "./db.js";
 import { eq } from "drizzle-orm";
 import {
-  users, restaurants, menuItems,
-  type User, type InsertUser,
-  type Restaurant, type InsertRestaurant,
-  type MenuItem, type InsertMenuItem
-} from "@shared/schema";
+  users,
+  restaurants,
+  menuItems,
+  type User,
+  type InsertUser,
+  type Restaurant,
+  type InsertRestaurant,
+  type MenuItem,
+  type InsertMenuItem,
+} from "../shared/schema.js";
 
 export interface IStorage {
   // User operations
@@ -19,14 +24,20 @@ export interface IStorage {
   getRestaurantsByUserId(userId: number): Promise<Restaurant[]>;
   getAllRestaurants(): Promise<Restaurant[]>;
   createRestaurant(restaurant: InsertRestaurant): Promise<Restaurant>;
-  updateRestaurant(id: number, updates: Partial<InsertRestaurant>): Promise<Restaurant>;
+  updateRestaurant(
+    id: number,
+    updates: Partial<InsertRestaurant>,
+  ): Promise<Restaurant>;
   deleteRestaurant(id: number): Promise<void>;
 
   // Menu Item operations
   getMenuItems(restaurantId: number): Promise<MenuItem[]>;
   getMenuItem(id: number): Promise<MenuItem | undefined>;
   createMenuItem(item: InsertMenuItem): Promise<MenuItem>;
-  updateMenuItem(id: number, updates: Partial<InsertMenuItem>): Promise<MenuItem>;
+  updateMenuItem(
+    id: number,
+    updates: Partial<InsertMenuItem>,
+  ): Promise<MenuItem>;
   deleteMenuItem(id: number): Promise<void>;
 }
 
@@ -38,7 +49,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
     return user;
   }
 
@@ -49,12 +63,18 @@ export class DatabaseStorage implements IStorage {
 
   // Restaurant methods
   async getRestaurant(id: number): Promise<Restaurant | undefined> {
-    const [restaurant] = await db.select().from(restaurants).where(eq(restaurants.id, id));
+    const [restaurant] = await db
+      .select()
+      .from(restaurants)
+      .where(eq(restaurants.id, id));
     return restaurant;
   }
 
   async getRestaurantBySlug(slug: string): Promise<Restaurant | undefined> {
-    const [restaurant] = await db.select().from(restaurants).where(eq(restaurants.slug, slug));
+    const [restaurant] = await db
+      .select()
+      .from(restaurants)
+      .where(eq(restaurants.slug, slug));
     return restaurant;
   }
 
@@ -67,11 +87,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRestaurant(restaurant: InsertRestaurant): Promise<Restaurant> {
-    const [newRestaurant] = await db.insert(restaurants).values(restaurant).returning();
+    const [newRestaurant] = await db
+      .insert(restaurants)
+      .values(restaurant)
+      .returning();
     return newRestaurant;
   }
 
-  async updateRestaurant(id: number, updates: Partial<InsertRestaurant>): Promise<Restaurant> {
+  async updateRestaurant(
+    id: number,
+    updates: Partial<InsertRestaurant>,
+  ): Promise<Restaurant> {
     const [updated] = await db
       .update(restaurants)
       .set(updates)
@@ -87,11 +113,17 @@ export class DatabaseStorage implements IStorage {
 
   // Menu Item methods
   async getMenuItems(restaurantId: number): Promise<MenuItem[]> {
-    return db.select().from(menuItems).where(eq(menuItems.restaurantId, restaurantId));
+    return db
+      .select()
+      .from(menuItems)
+      .where(eq(menuItems.restaurantId, restaurantId));
   }
 
   async getMenuItem(id: number): Promise<MenuItem | undefined> {
-    const [item] = await db.select().from(menuItems).where(eq(menuItems.id, id));
+    const [item] = await db
+      .select()
+      .from(menuItems)
+      .where(eq(menuItems.id, id));
     return item;
   }
 
@@ -100,7 +132,10 @@ export class DatabaseStorage implements IStorage {
     return newItem;
   }
 
-  async updateMenuItem(id: number, updates: Partial<InsertMenuItem>): Promise<MenuItem> {
+  async updateMenuItem(
+    id: number,
+    updates: Partial<InsertMenuItem>,
+  ): Promise<MenuItem> {
     const [updated] = await db
       .update(menuItems)
       .set(updates)
