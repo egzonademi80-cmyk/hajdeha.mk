@@ -19,6 +19,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const [restaurant] = await db.select().from(restaurants).where(eq(restaurants.slug, restaurantSlug));
 
     if (!restaurant) {
+      // Try to find by ID if the slug looks like a number
+      if (!isNaN(Number(restaurantSlug))) {
+        const [restaurantById] = await db.select().from(restaurants).where(eq(restaurants.id, Number(restaurantSlug)));
+        if (restaurantById) {
+          const items = await db.select().from(menuItems).where(eq(menuItems.restaurantId, restaurantById.id));
+          return res.status(200).json({ ...restaurantById, menuItems: items });
+        }
+      }
       return res.status(404).json({ message: 'Restaurant not found' });
     }
 
