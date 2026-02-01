@@ -22,6 +22,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       const { name, slug, description, photoUrl, website, phoneNumber, location, openingTime, closingTime, active, latitude, longitude } = req.body;
       
+      // Check slug uniqueness
+      const [existing] = await db.select().from(restaurants).where(eq(restaurants.slug, slug));
+      if (existing) {
+        return res.status(400).json({ message: 'Slug already exists. Please choose a different URL slug.' });
+      }
+      
       const [newRestaurant] = await db.insert(restaurants).values({
         name,
         slug,

@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from '../../../server/db.js';
 import { restaurants, menuItems } from '../../../shared/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 import { verifyToken, unauthorized, methodNotAllowed, notFound, forbidden } from '../auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -28,6 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const updateData = { ...req.body };
       delete updateData.id;
       delete updateData.userId;
+
+      if (updateData.slug) {
+        const [existing] = await db.select().from(restaurants).where(and(eq(restaurants.slug, updateData.slug), ne(restaurants.id, id)));
+        if (existing) {
+          return res.status(400).json({ message: 'Slug already exists. Please choose a different URL slug.' });
+        }
+      }
 
       const [updated] = await db
         .update(restaurants)
