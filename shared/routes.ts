@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertRestaurantSchema, insertMenuItemSchema, restaurants, menuItems, users } from './schema';
+import { insertRestaurantSchema, insertMenuItemSchema, restaurants, menuItems, users } from './schema.js';
 
 // === ERROR SCHEMAS ===
 export const errorSchemas = {
