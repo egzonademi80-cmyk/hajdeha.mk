@@ -16,8 +16,10 @@ export function useDarkMode() {
 
     if (isDark) {
       root.classList.add("dark");
+      root.style.setProperty('color-scheme', 'dark');
     } else {
       root.classList.remove("dark");
+      root.style.setProperty('color-scheme', 'light');
     }
 
     localStorage.setItem("hajdeha-dark-mode", String(isDark));
