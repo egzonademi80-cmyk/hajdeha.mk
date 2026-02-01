@@ -13,7 +13,7 @@ export function DarkModeToggle({
 }: DarkModeToggleProps) {
   const [show, setShow] = useState(false);
 
-  // Show button after scrolling down 100px
+  // Show button after scrolling down 60px
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 60) {
@@ -22,6 +22,9 @@ export function DarkModeToggle({
         setShow(false);
       }
     };
+
+    // Initialize visibility based on current scroll position
+    handleScroll();
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
