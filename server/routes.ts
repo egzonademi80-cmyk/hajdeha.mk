@@ -2,11 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { setupAuth } from "./auth.js";
-import { api } from "@shared/routes";
+import { api } from "../shared/routes.js";
 import { z } from "zod";
 
 import { db } from "./db.js";
-import { restaurants as restaurantsTable } from "@shared/schema";
+import { restaurants as restaurantsTable } from "../shared/schema.js";
 
 export async function registerRoutes(
   httpServer: Server,
