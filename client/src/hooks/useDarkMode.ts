@@ -14,18 +14,24 @@ export function useDarkMode() {
   useEffect(() => {
     const root = window.document.documentElement;
 
+    // Remove both classes first to ensure clean state
+    root.classList.remove("dark", "light");
+
     if (isDark) {
       root.classList.add("dark");
-      root.style.setProperty('color-scheme', 'dark');
+      root.style.setProperty("color-scheme", "dark");
     } else {
-      root.classList.remove("dark");
-      root.style.setProperty('color-scheme', 'light');
+      root.classList.add("light");
+      root.style.setProperty("color-scheme", "light");
     }
 
+    // Save to localStorage
     localStorage.setItem("hajdeha-dark-mode", String(isDark));
   }, [isDark]);
 
-  const toggleDarkMode = () => setIsDark(!isDark);
+  const toggleDarkMode = () => {
+    setIsDark((prev) => !prev);
+  };
 
   return { isDark, toggleDarkMode };
 }
