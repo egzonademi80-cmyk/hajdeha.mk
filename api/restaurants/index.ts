@@ -1,43 +1,26 @@
-import { VercelRequest, VercelResponse } from "@vercel/node";
-import { db } from "../../server/db.js";
-import { restaurants } from "../../shared/schema.js";
+mport { VercelRequest, VercelResponse } from '@vercel/node';
+import { db, pool } from '../../server/db.js';
+import { restaurants, menuItems } from '../../shared/schema.js';
+import { eq } from 'drizzle-orm';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ message: "Method not allowed" });
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    const list = await db
-      .select({
-        id: restaurants.id,
-        name: restaurants.name,
-        slug: restaurants.slug,
-        photoUrl: restaurants.photoUrl,
-        openingTime: restaurants.openingTime,
-        closingTime: restaurants.closingTime,
-      })
-      .from(restaurants);
-
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    const result = list.map((r) => {
-      const [openHour, openMin] = r.openingTime.split(":").map(Number);
-      const [closeHour, closeMin] = r.closingTime.split(":").map(Number);
-
-      const openMinutes = openHour * 60 + openMin;
-      const closeMinutes = closeHour * 60 + closeMin;
-
-      const isOpen =
-        currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
-
-      return { ...r, isOpen };
-    });
-
-    return res.status(200).json(result);
+    const allRestaurants = await db.select().from(restaurants);
+    const enriched = await Promise.all(allRestaurants.map(async (r: any) => {
+      const items = await db.select().from(menuItems).where(eq(menuItems.restaurantId, r.id));
+      return { ...r, menuItems: items };
+    }));
+    
+    return res.status(200).json(enriched);
   } catch (error) {
-    console.error("Public GET restaurants error:", error);
-    return res.status(500).json({ message: "Failed to fetch restaurants" });
+    console.error('Public GET restaurants error:', error);
+    // Log connection state to help debug
+    console.log('Pool total count:', pool.totalCount);
+    console.log('Pool idle count:', pool.idleCount);
+    return res.status(500).json({ message: 'Database connection failed. Please check your DATABASE_URL.', error: String(error) });
   }
 }
