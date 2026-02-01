@@ -4,7 +4,6 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-
 // Pages
 import Home from "@/pages/Home";
 import PublicMenu from "@/pages/PublicMenu";
@@ -19,14 +18,16 @@ function Router() {
   const { isDark, toggleDarkMode } = useDarkMode();
 
   return (
-    <div className={isDark ? "dark min-h-screen bg-background text-foreground" : "min-h-screen bg-background text-foreground"}>
+    <div className="min-h-screen bg-background text-foreground">
       <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
       <Switch>
         {/* Public Routes */}
-        <Route path="/" component={Home} />
+        <Route path="/">
+          {() => <Home isDark={isDark} toggleDarkMode={toggleDarkMode} />}
+        </Route>
         <Route path="/restaurant/:slug" component={PublicMenu} />
         <Route path="/auth/login" component={AuthLogin} />
-        
+
         {/* Protected Routes */}
         <Route path="/admin/dashboard">
           {() => <ProtectedRoute component={AdminDashboard} />}
@@ -34,7 +35,6 @@ function Router() {
         <Route path="/admin/restaurant/:id">
           {() => <ProtectedRoute component={AdminRestaurant} />}
         </Route>
-
         {/* Fallback */}
         <Route component={NotFound} />
       </Switch>

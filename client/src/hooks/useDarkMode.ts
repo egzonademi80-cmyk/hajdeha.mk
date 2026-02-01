@@ -12,17 +12,17 @@ export function useDarkMode() {
   });
 
   useEffect(() => {
-    const root = window.document.documentElement;
-
-    // Remove both classes first to ensure clean state
-    root.classList.remove("dark", "light");
+    const root = document.documentElement;
 
     if (isDark) {
+      root.classList.remove("light");
       root.classList.add("dark");
-      root.style.setProperty("color-scheme", "dark");
+      root.style.colorScheme = "dark";
     } else {
-      root.classList.add("light");
-      root.style.setProperty("color-scheme", "light");
+      root.classList.remove("dark");
+      // Don't add "light" class - Tailwind doesn't need it
+      // Just removing "dark" is enough for light mode
+      root.style.colorScheme = "light";
     }
 
     // Save to localStorage
