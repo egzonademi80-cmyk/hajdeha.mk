@@ -425,7 +425,10 @@ export default function PublicMenu() {
   }
 
   const groupedMenu = groupItems(filteredItems);
-  const isOpen = IsOpen(restaurant.openingTime || undefined, restaurant.closingTime || undefined);
+  const isOpen = IsOpen(
+    restaurant.openingTime || undefined,
+    restaurant.closingTime || undefined,
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 pb-32 transition-colors duration-300">
@@ -605,25 +608,33 @@ export default function PublicMenu() {
                     transition={{ delay: itemIdx * 0.05 }}
                     className="group flex gap-5 items-start bg-white dark:bg-stone-800 p-6 rounded-2xl shadow-sm border border-stone-100 dark:border-stone-700 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-300"
                   >
-                      {item.imageUrl && (
-                        <img
-                          src={item.imageUrl}
-                          loading="lazy"
-                          className="w-28 h-28 rounded-xl object-cover shadow-md flex-shrink-0 group-hover:scale-105 transition-transform duration-300"
-                          alt={item.name}
-                        />
-                      )}
+                    {item.imageUrl && (
+                      <img
+                        src={item.imageUrl}
+                        loading="lazy"
+                        className="w-28 h-28 rounded-xl object-cover shadow-md flex-shrink-0 group-hover:scale-105 transition-transform duration-300"
+                        alt={item.name}
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start gap-3 mb-2">
                         <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-lg leading-tight">
-                          {item.name}
+                          {lang === "al" && item.nameAl
+                            ? item.nameAl
+                            : lang === "mk" && item.nameMk
+                              ? item.nameMk
+                              : item.name}
                         </h3>
                         <span className="text-primary font-bold text-xl whitespace-nowrap">
                           {item.price}
                         </span>
                       </div>
                       <p className="text-sm text-stone-500 dark:text-stone-400 line-clamp-2 mb-3 leading-relaxed">
-                        {item.description}
+                        {lang === "al" && item.descriptionAl
+                          ? item.descriptionAl
+                          : lang === "mk" && item.descriptionMk
+                            ? item.descriptionMk
+                            : item.description}
                       </p>
 
                       {(item.isVegetarian ||
@@ -722,8 +733,12 @@ export default function PublicMenu() {
                 <RestaurantMap
                   location={restaurant.location || "Tetovë Center, 1200"}
                   name={restaurant.name}
-                  latitude={restaurant.latitude ? String(restaurant.latitude) : null}
-                  longitude={restaurant.longitude ? String(restaurant.longitude) : null}
+                  latitude={
+                    restaurant.latitude ? String(restaurant.latitude) : null
+                  }
+                  longitude={
+                    restaurant.longitude ? String(restaurant.longitude) : null
+                  }
                 />
                 <div className="flex items-start gap-3 bg-stone-50 dark:bg-stone-700/50 p-4 rounded-xl border border-stone-100 dark:border-stone-600">
                   <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
