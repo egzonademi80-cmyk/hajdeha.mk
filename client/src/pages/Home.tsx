@@ -759,7 +759,19 @@ export default function Home() {
               </div>
 
               {/* Contact Form */}
-              <div className="md:col-span-3 p-8 md:p-12 bg-white dark:bg-stone-900 text-primary-foreground dark:text-stone-100 rounded-2xl transition-colors duration-300 ">
+              <div
+                className="
+                md:col-span-3
+                p-8 md:p-12
+                bg-white
+                text-stone-900
+                dark:bg-stone-900
+                dark:text-stone-100
+                rounded-2xl
+                transition-colors
+                duration-300
+              "
+              >
                 <form
                   className="space-y-6"
                   action="https://formspree.io/f/xykkalgq"
