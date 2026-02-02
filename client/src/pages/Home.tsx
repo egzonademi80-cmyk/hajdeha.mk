@@ -708,7 +708,7 @@ export default function Home() {
             <h2 className="text-3xl font-display font-bold mb-4 transition-colors duration-300">
               {t.contactTitle}
             </h2>
-            <p className="text-3xl font-display font-bold mb-4 transition-colors duration-300">
+            <p className="text-stone-600 dark:text-stone-200 leading-relaxed transition-colors duration-300">
               {t.contactSubtitle}
             </p>
           </div>
