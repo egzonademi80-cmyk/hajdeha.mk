@@ -84,7 +84,11 @@ export const insertRestaurantSchema = createInsertSchema(restaurants, {
   latitude: z.preprocess((val) => val === "" ? null : Number(val), z.number().nullable()),
   longitude: z.preprocess((val) => val === "" ? null : Number(val), z.number().nullable()),
 }).omit({ id: true });
-export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
+export const insertMenuItemSchema = createInsertSchema(menuItems, {
+  name: z.string().min(1),
+  nameAl: z.string().optional().nullable(),
+  nameMk: z.string().optional().nullable(),
+}).omit({ id: true });
 
 // === EXPLICIT TYPES ===
 
