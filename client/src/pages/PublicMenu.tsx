@@ -76,6 +76,9 @@ const translations: Record<string, any> = {
     enterYourName: "Enter your name",
     pleaseEnterName: "Please enter your name",
     customerName: "Name",
+    orderType: "Order Type",
+    dineIn: "Dine In",
+    takeaway: "Takeaway",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -109,6 +112,9 @@ const translations: Record<string, any> = {
     enterYourName: "Shkruani emrin tuaj",
     pleaseEnterName: "Ju lutemi shkruani emrin tuaj",
     customerName: "Emri",
+    orderType: "Lloji i porosisë",
+    dineIn: "Hani këtu",
+    takeaway: "Me marrë",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
@@ -142,6 +148,9 @@ const translations: Record<string, any> = {
     enterYourName: "Внесете го вашето име",
     pleaseEnterName: "Ве молиме внесете го вашето име",
     customerName: "Име",
+    orderType: "Тип на нарачка",
+    dineIn: "Јадење тука",
+    takeaway: "За понесување",
   },
 };
 
@@ -344,6 +353,7 @@ export default function PublicMenu() {
   const [cart, setCart] = useState<Record<number, number>>({});
   const [openOrderDialog, setOpenOrderDialog] = useState(false);
   const [customerName, setCustomerName] = useState("");
+  const [orderType, setOrderType] = useState<"dineIn" | "takeaway">("dineIn");
 
   const callRestaurant = () => {
     if (!restaurant?.phoneNumber) return;
@@ -806,21 +816,51 @@ export default function PublicMenu() {
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                          {t.yourName || "Your Name"} *
-                        </label>
-                        <input
-                          type="text"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          placeholder={t.enterYourName || "Enter your name"}
-                          className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                          required
-                        />
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                            {t.yourName || "Your Name"} *
+                          </label>
+                          <input
+                            type="text"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder={t.enterYourName || "Enter your name"}
+                            className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                            {t.orderType || "Order Type"} *
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={
+                                orderType === "dineIn" ? "default" : "outline"
+                              }
+                              className="flex-1 h-10 rounded-xl"
+                              onClick={() => setOrderType("dineIn")}
+                            >
+                              {t.dineIn || "Dine In"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={
+                                orderType === "takeaway" ? "default" : "outline"
+                              }
+                              className="flex-1 h-10 rounded-xl"
+                              onClick={() => setOrderType("takeaway")}
+                            >
+                              {t.takeaway || "Takeaway"}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
 
-                      <ScrollArea className="max-h-[50vh] pr-4">
+                      <ScrollArea className="max-h-[40vh] pr-4">
                         <div className="space-y-4 py-4">
                           {Object.entries(cart).map(([id, qty]) => {
                             const item = restaurant.menuItems.find(
@@ -896,7 +936,8 @@ export default function PublicMenu() {
                           );
                           let total = 0;
                           let message = `${t.newOrder}\n`;
-                          message += `${t.customerName || "Name"}: ${customerName}\n\n`;
+                          message += `${t.customerName || "Name"}: ${customerName}\n`;
+                          message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n`;
 
                           Object.entries(cart).forEach(([id, qty]) => {
                             const item = restaurant.menuItems.find(
@@ -911,7 +952,7 @@ export default function PublicMenu() {
                             message += `• ${qty}x ${item.name} - ${price} den\n`;
                           });
 
-                          message += `${t.total}: ${total} den`;
+                          message += `\n${t.total}: ${total} den`;
 
                           window.open(
                             `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
@@ -992,21 +1033,51 @@ export default function PublicMenu() {
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                          {t.yourName || "Your Name"} *
-                        </label>
-                        <input
-                          type="text"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          placeholder={t.enterYourName || "Enter your name"}
-                          className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                          required
-                        />
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                            {t.yourName || "Your Name"} *
+                          </label>
+                          <input
+                            type="text"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder={t.enterYourName || "Enter your name"}
+                            className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                            {t.orderType || "Order Type"} *
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={
+                                orderType === "dineIn" ? "default" : "outline"
+                              }
+                              className="flex-1 h-10 rounded-xl"
+                              onClick={() => setOrderType("dineIn")}
+                            >
+                              {t.dineIn || "Dine In"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={
+                                orderType === "takeaway" ? "default" : "outline"
+                              }
+                              className="flex-1 h-10 rounded-xl"
+                              onClick={() => setOrderType("takeaway")}
+                            >
+                              {t.takeaway || "Takeaway"}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
 
-                      <ScrollArea className="max-h-[50vh] pr-4">
+                      <ScrollArea className="max-h-[40vh] pr-4">
                         <div className="space-y-4 py-4">
                           {Object.entries(cart).map(([id, qty]) => {
                             const item = restaurant.menuItems.find(
@@ -1082,7 +1153,8 @@ export default function PublicMenu() {
                           );
                           let total = 0;
                           let message = `${t.newOrder}\n`;
-                          message += `${t.customerName || "Name"}: ${customerName}\n\n`;
+                          message += `${t.customerName || "Name"}: ${customerName}\n`;
+                          message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n`;
 
                           Object.entries(cart).forEach(([id, qty]) => {
                             const item = restaurant.menuItems.find(
@@ -1097,7 +1169,7 @@ export default function PublicMenu() {
                             message += `• ${qty}x ${item.name} - ${price} den\n`;
                           });
 
-                          message += `${t.total}: ${total} den`;
+                          message += `\n${t.total}: ${total} den`;
 
                           window.open(
                             `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
