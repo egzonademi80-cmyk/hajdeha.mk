@@ -1,5 +1,6 @@
 {
   "version": 2,
+
   "builds": [
     {
       "src": "api/**/*.ts",
@@ -8,10 +9,18 @@
     {
       "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist/public" }
+      "config": {
+        "distDir": "dist/public"
+      }
     }
   ],
+
   "routes": [
+    {
+      "src": "^/favicon\\.png$",
+      "dest": "/favicon.png"
+    },
+
     {
       "src": "/api/restaurants",
       "dest": "api/restaurants/index.ts"
@@ -40,10 +49,12 @@
       "src": "/api/(.*)",
       "dest": "api/index.ts"
     },
+
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
     },
+
     {
       "src": "/(.*)",
       "dest": "/index.html"
