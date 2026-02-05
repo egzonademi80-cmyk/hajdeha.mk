@@ -1,5 +1,3 @@
-import path from "path";
-import express from "express";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
@@ -146,27 +144,7 @@ export async function registerRoutes(
       });
     }
   });
-  // I thotë Express-it të shërbejë file-et nga dosja public (si sitemap.xml, favicon, etj.)
-  const publicPath = path.resolve(__dirname, "../../client/public");
-  app.use(express.static(publicPath));
 
-  // Route specifike për Sitemap që të shmanget error-i HTML
-  app.get("/sitemap.xml", (_req, res) => {
-    const sitemapFile = path.join(publicPath, "sitemap.xml");
-    res.header("Content-Type", "application/xml");
-    res.sendFile(sitemapFile, (err) => {
-      if (err) {
-        console.error("Sitemap nuk u gjet në path-in:", sitemapFile);
-        res.status(404).send("Sitemap not found");
-      }
-    });
-  });
-  // Route për Manifest (për të hequr errorin Syntax Error: Line 1)
-  app.get("/manifest.json", (_req, res) => {
-    const manifestFile = path.join(publicPath, "manifest.json");
-    res.header("Content-Type", "application/json");
-    res.sendFile(manifestFile);
-  });
   // Admin: Delete Restaurant
   app.delete(api.restaurants.delete.path, async (req, res) => {
     const id = parseInt(req.params.id);

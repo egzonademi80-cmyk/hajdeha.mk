@@ -84,7 +84,6 @@ const translations: Record<string, any> = {
     asap: "ASAP",
     pickDateTime: "Pick Date & Time",
     selectDateTime: "Select date and time",
-    dateTimePlaceholder: "Select date and time...",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -125,7 +124,6 @@ const translations: Record<string, any> = {
     asap: "Sa më shpejt",
     pickDateTime: "Zgjidh datën dhe orën",
     selectDateTime: "Zgjidhni datën dhe orën",
-    dateTimePlaceholder: "Zgjidhni datën dhe orën...",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
@@ -164,9 +162,8 @@ const translations: Record<string, any> = {
     takeaway: "За понесување",
     deliveryTime: "Време на достава",
     asap: "Што е можно побрзо",
-    pickDateTime: "Избери датум и време",
-    selectDateTime: "Изберете датум и време",
-    dateTimePlaceholder: "Изберете датум и време...",
+    pickDateTime: "За кога?",
+    selectDateTime: "Избери датум и време",
   },
 };
 
@@ -964,22 +961,15 @@ export default function PublicMenu() {
                             </Button>
                           </div>
                           {deliveryTime === "scheduled" && (
-                            <div className="relative">
-                              <input
-                                type="datetime-local"
-                                value={scheduledDateTime}
-                                onChange={(e) =>
-                                  setScheduledDateTime(e.target.value)
-                                }
-                                min={getMinDateTime()}
-                                className={`w-full px-3 py-2 text-sm rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary ${!scheduledDateTime ? "text-stone-400 dark:text-stone-500" : ""}`}
-                              />
-                              {!scheduledDateTime && (
-                                <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-sm text-stone-400 dark:text-stone-500">
-                                  {t.dateTimePlaceholder}
-                                </div>
-                              )}
-                            </div>
+                            <input
+                              type="datetime-local"
+                              value={scheduledDateTime}
+                              onChange={(e) =>
+                                setScheduledDateTime(e.target.value)
+                              }
+                              min={getMinDateTime()}
+                              className="w-full px-3 py-2 text-sm rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
                           )}
                         </div>
                       </div>
@@ -1117,174 +1107,180 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-lg max-h-[90vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle className="text-2xl font-bold dark:text-stone-100">
+                    <DialogContent className="bg-white dark:bg-stone-900 border-none rounded-[32px] max-w-lg w-[95vw] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                      {/* 1. FIXED HEADER */}
+                      <DialogHeader className="p-6 pb-2 flex-shrink-0">
+                        <DialogTitle className="text-2xl font-black dark:text-stone-100">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-3 flex-shrink-0">
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                            {t.yourName || "Your Name"} *
-                          </label>
-                          <input
-                            type="text"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
-                            placeholder={t.enterYourName || "Enter your name"}
-                            className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                            {t.orderType || "Order Type"} *
-                          </label>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant={
-                                orderType === "dineIn" ? "default" : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setOrderType("dineIn")}
-                            >
-                              {t.dineIn || "Dine In"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={
-                                orderType === "takeaway" ? "default" : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setOrderType("takeaway")}
-                            >
-                              {t.takeaway || "Takeaway"}
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                            {t.deliveryTime}
-                          </label>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant={
-                                deliveryTime === "asap" ? "default" : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setDeliveryTime("asap")}
-                            >
-                              <Clock className="h-4 w-4 mr-2" />
-                              {t.asap}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={
-                                deliveryTime === "scheduled"
-                                  ? "default"
-                                  : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setDeliveryTime("scheduled")}
-                            >
-                              <Calendar className="h-4 w-4 mr-2" />
-                              {t.pickDateTime}
-                            </Button>
-                          </div>
-                          {deliveryTime === "scheduled" && (
+                      {/* 2. SCROLLABLE BODY */}
+                      <ScrollArea className="flex-1 px-6">
+                        <div className="space-y-6 py-4">
+                          {/* Name Input */}
+                          <div className="space-y-2">
+                            <label className="text-xs font-black uppercase tracking-wider text-stone-500">
+                              {t.yourName || "Your Name"} *
+                            </label>
                             <input
-                              type="datetime-local"
-                              value={scheduledDateTime}
-                              onChange={(e) =>
-                                setScheduledDateTime(e.target.value)
-                              }
-                              min={getMinDateTime()}
-                              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                              type="text"
+                              value={customerName}
+                              onChange={(e) => setCustomerName(e.target.value)}
+                              placeholder={t.enterYourName}
+                              className="w-full px-4 py-3 rounded-2xl border-2 border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-[#E76236] transition-colors"
+                              required
                             />
-                          )}
-                        </div>
-                      </div>
+                          </div>
 
-                      <ScrollArea className="flex-1 min-h-0 pr-4">
-                        <div className="space-y-4 py-4">
-                          {Object.entries(cart).map(([id, qty]) => {
-                            const item = restaurant.menuItems.find(
-                              (i) => i.id === parseInt(id),
-                            );
-                            if (!item) return null;
+                          {/* Order Type Toggle */}
+                          <div className="space-y-2">
+                            <label className="text-xs font-black uppercase tracking-wider text-stone-500">
+                              {t.orderType} *
+                            </label>
+                            <div className="flex gap-2">
+                              {["dineIn", "takeaway"].map((type) => (
+                                <Button
+                                  key={type}
+                                  type="button"
+                                  variant={
+                                    orderType === type ? "default" : "outline"
+                                  }
+                                  className={`flex-1 h-11 rounded-xl font-bold transition-all ${
+                                    orderType === type
+                                      ? "bg-[#E76236] text-white border-none shadow-md"
+                                      : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border-none"
+                                  }`}
+                                  onClick={() => setOrderType(type)}
+                                >
+                                  {type === "dineIn" ? t.dineIn : t.takeaway}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
 
-                            return (
-                              <div
-                                key={id}
-                                className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                          {/* Delivery/ASAP Toggle */}
+                          <div className="space-y-2">
+                            <label className="text-xs font-black uppercase tracking-wider text-stone-500">
+                              {t.deliveryTime}
+                            </label>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                className={`flex-1 h-11 rounded-xl font-bold transition-all ${
+                                  deliveryTime === "asap"
+                                    ? "bg-[#E76236] text-white shadow-md"
+                                    : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400"
+                                }`}
+                                onClick={() => setDeliveryTime("asap")}
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                                    {qty}x
+                                <Clock className="h-4 w-4 mr-2" />
+                                {t.asap}
+                              </Button>
+                              <Button
+                                type="button"
+                                className={`flex-1 h-11 rounded-xl font-bold transition-all ${
+                                  deliveryTime === "scheduled"
+                                    ? "bg-[#E76236] text-white shadow-md"
+                                    : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400"
+                                }`}
+                                onClick={() => setDeliveryTime("scheduled")}
+                              >
+                                <Calendar className="h-4 w-4 mr-2" />
+                                {t.pickDateTime}
+                              </Button>
+                            </div>
+                            {deliveryTime === "scheduled" && (
+                              <input
+                                type="datetime-local"
+                                value={scheduledDateTime}
+                                onChange={(e) =>
+                                  setScheduledDateTime(e.target.value)
+                                }
+                                min={getMinDateTime()}
+                                className="w-full mt-2 px-4 py-3 rounded-xl bg-stone-100 dark:bg-stone-800 border-none font-bold"
+                              />
+                            )}
+                          </div>
+
+                          {/* Cart Items List */}
+                          <div className="space-y-3">
+                            <label className="text-xs font-black uppercase tracking-wider text-stone-500">
+                              Items
+                            </label>
+                            {Object.entries(cart).map(([id, qty]) => {
+                              const item = restaurant.menuItems.find(
+                                (i) => i.id === parseInt(id),
+                              );
+                              if (!item) return null;
+                              return (
+                                <div
+                                  key={id}
+                                  className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-100 dark:border-stone-800"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <span className="h-8 w-8 flex items-center justify-center rounded-lg bg-[#E76236]/10 text-[#E76236] font-black text-sm">
+                                      {qty}x
+                                    </span>
+                                    <div>
+                                      <p className="font-bold text-sm dark:text-stone-100 leading-tight">
+                                        {item.name}
+                                      </p>
+                                      <p className="text-xs text-stone-500">
+                                        {item.price}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="font-bold dark:text-stone-100">
-                                      {item.name}
-                                    </p>
-                                    <p className="text-xs text-stone-500 dark:text-stone-400">
-                                      {item.price}
-                                    </p>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 rounded-lg"
+                                      onClick={() => updateCart(item.id, -1)}
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 rounded-lg"
+                                      onClick={() => updateCart(item.id, 1)}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
                                   </div>
                                 </div>
-
-                                <div className="flex gap-1">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => updateCart(item.id, -1)}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => updateCart(item.id, 1)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          <div className="flex justify-between items-center p-4 mt-2 rounded-2xl bg-stone-100 dark:bg-stone-700 sticky bottom-0">
-                            <span className="text-base font-semibold dark:text-stone-100">
-                              {t.totalBill}
-                            </span>
-                            <p className="text-2xl font-bold text-primary">
-                              {cartTotal} DEN
-                            </p>
+                              );
+                            })}
                           </div>
                         </div>
                       </ScrollArea>
 
-                      <div className="flex-shrink-0 space-y-3 pt-4 border-t border-stone-200 dark:border-stone-700">
-                        <Button
-                          className="w-full h-11 rounded-2xl text-base font-bold"
-                          onClick={handleWhatsAppOrder}
-                        >
-                          🟢 {t.orderOnWhatsapp}
-                        </Button>
-
-                        <Button
-                          onClick={callRestaurant}
-                          variant="outline"
-                          className="w-full h-11 rounded-xl font-bold"
-                        >
-                          <Phone className="h-4 w-4 mr-2" />
-                          {t.callToOrder}
-                        </Button>
+                      {/* 3. FIXED FOOTER */}
+                      <div className="p-6 bg-white dark:bg-stone-900 border-t border-stone-100 dark:border-stone-800 flex-shrink-0">
+                        <div className="flex justify-between items-center mb-4">
+                          <span className="text-xs font-black uppercase tracking-widest text-stone-400">
+                            {t.totalBill}
+                          </span>
+                          <span className="text-2xl font-black text-[#E76236]">
+                            {cartTotal} DEN
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          <Button
+                            className="w-full h-12 rounded-2xl text-base font-black bg-[#E76236] hover:bg-[#d1542e] text-white shadow-lg shadow-[#E76236]/20"
+                            onClick={handleWhatsAppOrder}
+                          >
+                            🟢 {t.orderOnWhatsapp}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="w-full h-10 text-stone-500 font-bold"
+                            onClick={callRestaurant}
+                          >
+                            <Phone className="h-4 w-4 mr-2" /> {t.callToOrder}
+                          </Button>
+                        </div>
                       </div>
                     </DialogContent>
                   </Dialog>
