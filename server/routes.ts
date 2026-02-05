@@ -10,7 +10,7 @@ import { restaurants as restaurantsTable } from "../shared/schema.js";
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express,
+  app: Express
 ): Promise<Server> {
   const { hashPassword } = setupAuth(app);
 
@@ -26,9 +26,7 @@ export async function registerRoutes(
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) {
-        return res
-          .status(401)
-          .json({ message: info?.message || "Authentication failed" });
+        return res.status(401).json({ message: info?.message || "Authentication failed" });
       }
       req.logIn(user, (err) => {
         if (err) return next(err);
@@ -60,12 +58,10 @@ export async function registerRoutes(
   // Public: List all restaurants
   app.get(api.restaurants.listAll.path, async (_req, res) => {
     const restaurants = await db.select().from(restaurantsTable);
-    const enriched = await Promise.all(
-      restaurants.map(async (r) => {
-        const menuItems = await storage.getMenuItems(r.id);
-        return { ...r, menuItems };
-      }),
-    );
+    const enriched = await Promise.all(restaurants.map(async (r) => {
+      const menuItems = await storage.getMenuItems(r.id);
+      return { ...r, menuItems };
+    }));
     res.json(enriched);
   });
 
@@ -115,32 +111,32 @@ export async function registerRoutes(
   app.post(api.restaurants.create.path, async (req, res) => {
     try {
       console.log("Creating restaurant. Body:", req.body);
-
+      
       const input = api.restaurants.create.input.parse(req.body);
-
+      
       // Get the current logged in user from session
       // Passport puts the user object in req.user
       // Fallback to userId 1 for now if session is not persisting across Vercel requests
       const user = req.user as any;
       const userId = user?.id || 1;
-
+      
       console.log("Using userId:", userId);
 
-      const restaurantData = {
-        ...input,
+      const restaurantData = { 
+        ...input, 
         userId: userId,
         latitude: input.latitude ?? null,
-        longitude: input.longitude ?? null,
+        longitude: input.longitude ?? null
       };
-
+      
       console.log("Saving restaurant to DB:", restaurantData);
       const restaurant = await storage.createRestaurant(restaurantData);
       res.status(201).json(restaurant);
     } catch (error: any) {
       console.error("Error creating restaurant:", error);
-      res.status(500).json({
+      res.status(500).json({ 
         message: error.message || "Failed to create restaurant",
-        details: error.toString(),
+        details: error.toString()
       });
     }
   });
@@ -160,8 +156,7 @@ export async function registerRoutes(
     const input = api.menuItems.create.input.parse(req.body);
     const restaurant = await storage.getRestaurant(input.restaurantId);
 
-    if (!restaurant)
-      return res.status(404).json({ message: "Restaurant not found" });
+    if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
 
     const item = await storage.createMenuItem(input);
     res.status(201).json(item);
@@ -206,20 +201,14 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
 
   // Create Users (Admins)
   const pwd = await hashPassword("DesiigneR.123");
-
-  const user1 = await storage.createUser({
-    username: "hajdeha",
-    password: pwd,
-  });
+  
+  const user1 = await storage.createUser({ username: "hajdeha", password: pwd });
 
   // For secondary users, check if they exist first to avoid unique constraint errors
   const seedUser = async (username: string, passwordPlain: string) => {
     const existing = await storage.getUserByUsername(username);
     if (existing) return existing;
-    return storage.createUser({
-      username,
-      password: await hashPassword(passwordPlain),
-    });
+    return storage.createUser({ username, password: await hashPassword(passwordPlain) });
   };
 
   const user2 = await seedUser("admin2", "password123");
@@ -231,8 +220,7 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
     name: "Test Restaurant Tetovë",
     slug: "test-restaurant-tetove",
     description: "Authentic local cuisine in the heart of Tetovo.",
-    photoUrl:
-      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+    photoUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
     website: "https://test-restaurant.mk",
     phoneNumber: "+389 44 123 456",
     location: "Rruga e Marshit, Tetovë 1200",
@@ -245,8 +233,7 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
     name: "Hajde Grill",
     slug: "hajde-grill",
     description: "Best grilled meats and traditional qebapa.",
-    photoUrl:
-      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+    photoUrl: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
     website: "https://hajdegrill.mk",
     phoneNumber: "+389 44 234 567",
     location: "Bulevardi Iliria, Tetovë 1200",
@@ -259,8 +246,7 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
     name: "Cafe Hajde",
     slug: "cafe-hajde",
     description: "Premium coffee and delightful desserts.",
-    photoUrl:
-      "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80",
+    photoUrl: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80",
     website: "https://cafehajde.mk",
     phoneNumber: "+389 44 345 678",
     location: "Sheshi Iliria, Tetovë 1200",
@@ -270,73 +256,19 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
 
   // Create Menu Items
   // Restaurant 1: Pizza, Burger, Coca-Cola
-  await storage.createMenuItem({
-    restaurantId: r1.id,
-    name: "Pizza Margherita",
-    price: "500 DEN",
-    category: "Food",
-    description: "Tomato sauce, mozzarella, basil",
-  });
-  await storage.createMenuItem({
-    restaurantId: r1.id,
-    name: "Classic Burger",
-    price: "350 DEN",
-    category: "Food",
-    description: "Beef patty, lettuce, tomato, house sauce",
-  });
-  await storage.createMenuItem({
-    restaurantId: r1.id,
-    name: "Coca-Cola",
-    price: "100 DEN",
-    category: "Drinks",
-    description: "330ml can",
-  });
+  await storage.createMenuItem({ restaurantId: r1.id, name: "Pizza Margherita", price: "500 DEN", category: "Food", description: "Tomato sauce, mozzarella, basil" });
+  await storage.createMenuItem({ restaurantId: r1.id, name: "Classic Burger", price: "350 DEN", category: "Food", description: "Beef patty, lettuce, tomato, house sauce" });
+  await storage.createMenuItem({ restaurantId: r1.id, name: "Coca-Cola", price: "100 DEN", category: "Drinks", description: "330ml can" });
 
   // Restaurant 2: Grilled Chicken, Qebapa, Ayran
-  await storage.createMenuItem({
-    restaurantId: r2.id,
-    name: "Grilled Chicken",
-    price: "450 DEN",
-    category: "Mains",
-    description: "Served with fries and salad",
-  });
-  await storage.createMenuItem({
-    restaurantId: r2.id,
-    name: "Qebapa (10 pcs)",
-    price: "300 DEN",
-    category: "Mains",
-    description: "Traditional minced meat rolls with bread",
-  });
-  await storage.createMenuItem({
-    restaurantId: r2.id,
-    name: "Ayran",
-    price: "60 DEN",
-    category: "Drinks",
-    description: "Refreshing yogurt drink",
-  });
+  await storage.createMenuItem({ restaurantId: r2.id, name: "Grilled Chicken", price: "450 DEN", category: "Mains", description: "Served with fries and salad" });
+  await storage.createMenuItem({ restaurantId: r2.id, name: "Qebapa (10 pcs)", price: "300 DEN", category: "Mains", description: "Traditional minced meat rolls with bread" });
+  await storage.createMenuItem({ restaurantId: r2.id, name: "Ayran", price: "60 DEN", category: "Drinks", description: "Refreshing yogurt drink" });
 
   // Restaurant 3: Espresso, Cappuccino, Cheesecake
-  await storage.createMenuItem({
-    restaurantId: r3.id,
-    name: "Espresso",
-    price: "80 DEN",
-    category: "Coffee",
-    description: "Strong and rich",
-  });
-  await storage.createMenuItem({
-    restaurantId: r3.id,
-    name: "Cappuccino",
-    price: "120 DEN",
-    category: "Coffee",
-    description: "Espresso with steamed milk foam",
-  });
-  await storage.createMenuItem({
-    restaurantId: r3.id,
-    name: "Cheesecake",
-    price: "250 DEN",
-    category: "Dessert",
-    description: "New York style with berry topping",
-  });
+  await storage.createMenuItem({ restaurantId: r3.id, name: "Espresso", price: "80 DEN", category: "Coffee", description: "Strong and rich" });
+  await storage.createMenuItem({ restaurantId: r3.id, name: "Cappuccino", price: "120 DEN", category: "Coffee", description: "Espresso with steamed milk foam" });
+  await storage.createMenuItem({ restaurantId: r3.id, name: "Cheesecake", price: "250 DEN", category: "Dessert", description: "New York style with berry topping" });
 
   console.log("Database seeded successfully!");
 }
