@@ -19,6 +19,7 @@ import {
   WheatOff,
   Clock,
   CheckCircle2,
+  Calendar,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type MenuItem } from "@shared/schema";
@@ -79,6 +80,11 @@ const translations: Record<string, any> = {
     orderType: "Order Type",
     dineIn: "Dine In",
     takeaway: "Takeaway",
+    deliveryTime: "Delivery Time",
+    asap: "ASAP",
+    pickDateTime: "Pick Date & Time",
+    selectDateTime: "Select date and time",
+    dateTimePlaceholder: "Select date and time...",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -115,6 +121,11 @@ const translations: Record<string, any> = {
     orderType: "Lloji i porosisë",
     dineIn: "Hani këtu",
     takeaway: "Me marrë",
+    deliveryTime: "Koha e dorëzimit",
+    asap: "Sa më shpejt",
+    pickDateTime: "Zgjidh datën dhe orën",
+    selectDateTime: "Zgjidhni datën dhe orën",
+    dateTimePlaceholder: "Zgjidhni datën dhe orën...",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
@@ -151,6 +162,11 @@ const translations: Record<string, any> = {
     orderType: "Тип на нарачка",
     dineIn: "Јадење тука",
     takeaway: "За понесување",
+    deliveryTime: "Време на достава",
+    asap: "Што е можно побрзо",
+    pickDateTime: "Избери датум и време",
+    selectDateTime: "Изберете датум и време",
+    dateTimePlaceholder: "Изберете датум и време...",
   },
 };
 
@@ -354,6 +370,10 @@ export default function PublicMenu() {
   const [openOrderDialog, setOpenOrderDialog] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [orderType, setOrderType] = useState<"dineIn" | "takeaway">("dineIn");
+  const [deliveryTime, setDeliveryTime] = useState<"asap" | "scheduled">(
+    "asap",
+  );
+  const [scheduledDateTime, setScheduledDateTime] = useState("");
 
   const callRestaurant = () => {
     if (!restaurant?.phoneNumber) return;
@@ -401,6 +421,60 @@ export default function PublicMenu() {
   }, [restaurant?.menuItems]);
 
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+
+  // Get minimum datetime (current time + 30 minutes)
+  const getMinDateTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30);
+    return now.toISOString().slice(0, 16);
+  };
+
+  const handleWhatsAppOrder = () => {
+    if (!restaurant?.phoneNumber) return;
+
+    if (!customerName.trim()) {
+      alert(t.pleaseEnterName || "Please enter your name");
+      return;
+    }
+
+    const phone = restaurant.phoneNumber.replace(/\D/g, "");
+    let total = 0;
+    let message = `${t.newOrder}\n`;
+    message += `${t.customerName || "Name"}: ${customerName}\n`;
+    message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n`;
+
+    // Add delivery time information
+    if (deliveryTime === "asap") {
+      message += `${t.deliveryTime}: ${t.asap}\n\n`;
+    } else if (scheduledDateTime) {
+      const dateTime = new Date(scheduledDateTime);
+      const formattedDateTime = dateTime.toLocaleString(lang, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+      message += `${t.deliveryTime}: ${formattedDateTime}\n\n`;
+    } else {
+      message += "\n";
+    }
+
+    Object.entries(cart).forEach(([id, qty]) => {
+      const item = restaurant.menuItems.find((i) => i.id === parseInt(id));
+      if (!item) return;
+
+      const price = parseInt(item.price);
+      const itemTotal = price * qty;
+      total += itemTotal;
+
+      message += `• ${qty}x ${item.name} - ${price} den\n`;
+    });
+
+    message += `\n${t.total}: ${total} den`;
+
+    window.open(
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      "_blank",
+    );
+  };
 
   if (isLoading) {
     return (
@@ -809,16 +883,16 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[95vw]">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[95vw] max-h-[85vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-lg font-bold dark:text-stone-100">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                      <div className="space-y-3 flex-shrink-0">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
                             {t.yourName || "Your Name"} *
                           </label>
                           <input
@@ -826,13 +900,13 @@ export default function PublicMenu() {
                             value={customerName}
                             onChange={(e) => setCustomerName(e.target.value)}
                             placeholder={t.enterYourName || "Enter your name"}
-                            className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full px-3 py-2 text-sm rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
                             required
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
                             {t.orderType || "Order Type"} *
                           </label>
                           <div className="flex gap-2">
@@ -841,7 +915,7 @@ export default function PublicMenu() {
                               variant={
                                 orderType === "dineIn" ? "default" : "outline"
                               }
-                              className="flex-1 h-10 rounded-xl"
+                              className="flex-1 h-9 rounded-xl text-xs"
                               onClick={() => setOrderType("dineIn")}
                             >
                               {t.dineIn || "Dine In"}
@@ -851,16 +925,66 @@ export default function PublicMenu() {
                               variant={
                                 orderType === "takeaway" ? "default" : "outline"
                               }
-                              className="flex-1 h-10 rounded-xl"
+                              className="flex-1 h-9 rounded-xl text-xs"
                               onClick={() => setOrderType("takeaway")}
                             >
                               {t.takeaway || "Takeaway"}
                             </Button>
                           </div>
                         </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+                            {t.deliveryTime}
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={
+                                deliveryTime === "asap" ? "default" : "outline"
+                              }
+                              className="flex-1 h-9 rounded-xl text-xs"
+                              onClick={() => setDeliveryTime("asap")}
+                            >
+                              <Clock className="h-3 w-3 mr-1.5" />
+                              {t.asap}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={
+                                deliveryTime === "scheduled"
+                                  ? "default"
+                                  : "outline"
+                              }
+                              className="flex-1 h-9 rounded-xl text-xs"
+                              onClick={() => setDeliveryTime("scheduled")}
+                            >
+                              <Calendar className="h-3 w-3 mr-1.5" />
+                              {t.pickDateTime}
+                            </Button>
+                          </div>
+                          {deliveryTime === "scheduled" && (
+                            <div className="relative">
+                              <input
+                                type="datetime-local"
+                                value={scheduledDateTime}
+                                onChange={(e) =>
+                                  setScheduledDateTime(e.target.value)
+                                }
+                                min={getMinDateTime()}
+                                className={`w-full px-3 py-2 text-sm rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary ${!scheduledDateTime ? "text-stone-400 dark:text-stone-500" : ""}`}
+                              />
+                              {!scheduledDateTime && (
+                                <div className="absolute inset-0 flex items-center px-3 pointer-events-none text-sm text-stone-400 dark:text-stone-500">
+                                  {t.dateTimePlaceholder}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      <ScrollArea className="max-h-[40vh] pr-4">
+                      <ScrollArea className="flex-1 min-h-0 pr-2 -mr-2">
                         <div className="space-y-4 py-4">
                           {Object.entries(cart).map(([id, qty]) => {
                             const item = restaurant.menuItems.find(
@@ -918,60 +1042,27 @@ export default function PublicMenu() {
                         </div>
                       </ScrollArea>
 
-                      <Button
-                        className="w-full h-11 rounded-2xl text-base font-bold mt-4"
-                        onClick={() => {
-                          if (!restaurant?.phoneNumber) return;
-
-                          if (!customerName.trim()) {
-                            alert(
-                              t.pleaseEnterName || "Please enter your name",
-                            );
-                            return;
-                          }
-
-                          const phone = restaurant.phoneNumber.replace(
-                            /\D/g,
-                            "",
-                          );
-                          let total = 0;
-                          let message = `${t.newOrder}\n`;
-                          message += `${t.customerName || "Name"}: ${customerName}\n`;
-                          message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n`;
-
-                          Object.entries(cart).forEach(([id, qty]) => {
-                            const item = restaurant.menuItems.find(
-                              (i) => i.id === parseInt(id),
-                            );
-                            if (!item) return;
-
-                            const price = parseInt(item.price);
-                            const itemTotal = price * qty;
-                            total += itemTotal;
-
-                            message += `• ${qty}x ${item.name} - ${price} den\n`;
-                          });
-
-                          message += `\n${t.total}: ${total} den`;
-
-                          window.open(
-                            `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                            "_blank",
-                          );
-                        }}
-                      >
-                        🟢 {t.orderOnWhatsapp}
-                      </Button>
-
-                      <a
-                        href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                        className="flex justify-start mt-2"
-                      >
-                        <Button className="h-9 text-xs font-semibold rounded-xl flex-1">
-                          <Phone className="h-3 w-3 mr-1" />
-                          {t.callToOrder}
+                      <div className="flex-shrink-0 space-y-2 pt-3 border-t border-stone-200 dark:border-stone-700">
+                        <Button
+                          className="w-full h-10 rounded-xl text-sm font-bold"
+                          onClick={handleWhatsAppOrder}
+                        >
+                          🟢 {t.orderOnWhatsapp}
                         </Button>
-                      </a>
+
+                        <a
+                          href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                          className="block"
+                        >
+                          <Button
+                            variant="outline"
+                            className="w-full h-9 text-xs font-semibold rounded-xl"
+                          >
+                            <Phone className="h-3 w-3 mr-1" />
+                            {t.callToOrder}
+                          </Button>
+                        </a>
+                      </div>
                     </DialogContent>
                   </Dialog>
 
@@ -1026,14 +1117,14 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-lg">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-lg max-h-[90vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-2xl font-bold dark:text-stone-100">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-4">
+                      <div className="space-y-3 flex-shrink-0">
                         <div className="space-y-2">
                           <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
                             {t.yourName || "Your Name"} *
@@ -1075,9 +1166,52 @@ export default function PublicMenu() {
                             </Button>
                           </div>
                         </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                            {t.deliveryTime}
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={
+                                deliveryTime === "asap" ? "default" : "outline"
+                              }
+                              className="flex-1 h-10 rounded-xl"
+                              onClick={() => setDeliveryTime("asap")}
+                            >
+                              <Clock className="h-4 w-4 mr-2" />
+                              {t.asap}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={
+                                deliveryTime === "scheduled"
+                                  ? "default"
+                                  : "outline"
+                              }
+                              className="flex-1 h-10 rounded-xl"
+                              onClick={() => setDeliveryTime("scheduled")}
+                            >
+                              <Calendar className="h-4 w-4 mr-2" />
+                              {t.pickDateTime}
+                            </Button>
+                          </div>
+                          {deliveryTime === "scheduled" && (
+                            <input
+                              type="datetime-local"
+                              value={scheduledDateTime}
+                              onChange={(e) =>
+                                setScheduledDateTime(e.target.value)
+                              }
+                              min={getMinDateTime()}
+                              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                          )}
+                        </div>
                       </div>
 
-                      <ScrollArea className="max-h-[40vh] pr-4">
+                      <ScrollArea className="flex-1 min-h-0 pr-4">
                         <div className="space-y-4 py-4">
                           {Object.entries(cart).map(([id, qty]) => {
                             const item = restaurant.menuItems.find(
@@ -1135,58 +1269,23 @@ export default function PublicMenu() {
                         </div>
                       </ScrollArea>
 
-                      <Button
-                        className="w-full h-11 rounded-2xl text-base font-bold mt-4"
-                        onClick={() => {
-                          if (!restaurant?.phoneNumber) return;
+                      <div className="flex-shrink-0 space-y-3 pt-4 border-t border-stone-200 dark:border-stone-700">
+                        <Button
+                          className="w-full h-11 rounded-2xl text-base font-bold"
+                          onClick={handleWhatsAppOrder}
+                        >
+                          🟢 {t.orderOnWhatsapp}
+                        </Button>
 
-                          if (!customerName.trim()) {
-                            alert(
-                              t.pleaseEnterName || "Please enter your name",
-                            );
-                            return;
-                          }
-
-                          const phone = restaurant.phoneNumber.replace(
-                            /\D/g,
-                            "",
-                          );
-                          let total = 0;
-                          let message = `${t.newOrder}\n`;
-                          message += `${t.customerName || "Name"}: ${customerName}\n`;
-                          message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n`;
-
-                          Object.entries(cart).forEach(([id, qty]) => {
-                            const item = restaurant.menuItems.find(
-                              (i) => i.id === parseInt(id),
-                            );
-                            if (!item) return;
-
-                            const price = parseInt(item.price);
-                            const itemTotal = price * qty;
-                            total += itemTotal;
-
-                            message += `• ${qty}x ${item.name} - ${price} den\n`;
-                          });
-
-                          message += `\n${t.total}: ${total} den`;
-
-                          window.open(
-                            `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                            "_blank",
-                          );
-                        }}
-                      >
-                        🟢 {t.orderOnWhatsapp}
-                      </Button>
-
-                      <Button
-                        onClick={callRestaurant}
-                        className="w-full h-11 rounded-xl font-bold mt-4"
-                      >
-                        <Phone className="h-4 w-4 mr-2" />
-                        {t.callToOrder}
-                      </Button>
+                        <Button
+                          onClick={callRestaurant}
+                          variant="outline"
+                          className="w-full h-11 rounded-xl font-bold"
+                        >
+                          <Phone className="h-4 w-4 mr-2" />
+                          {t.callToOrder}
+                        </Button>
+                      </div>
                     </DialogContent>
                   </Dialog>
 
