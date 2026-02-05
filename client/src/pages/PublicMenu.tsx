@@ -79,6 +79,9 @@ const translations: Record<string, any> = {
     orderType: "Order Type",
     dineIn: "Dine In",
     takeaway: "Takeaway",
+    deliveryTime: "Delivery Time",
+    asap: "ASAP",
+    customTime: "Custom Time",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -115,6 +118,9 @@ const translations: Record<string, any> = {
     orderType: "Lloji i porosisë",
     dineIn: "Hani këtu",
     takeaway: "Me marrë",
+    deliveryTime: "Koha e dorëzimit",
+    asap: "Sa më shpejt",
+    customTime: "Kohë custom",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
@@ -151,6 +157,9 @@ const translations: Record<string, any> = {
     orderType: "Тип на нарачка",
     dineIn: "Јадење тука",
     takeaway: "За понесување",
+    deliveryTime: "Време на достава",
+    asap: "Што побрзо",
+    customTime: "Прилагодено време",
   },
 };
 
@@ -354,6 +363,10 @@ export default function PublicMenu() {
   const [openOrderDialog, setOpenOrderDialog] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [orderType, setOrderType] = useState<"dineIn" | "takeaway">("dineIn");
+  const [deliveryTime, setDeliveryTime] = useState<
+    "asap" | "15min" | "30min" | "45min" | "custom"
+  >("asap");
+  const [customDateTime, setCustomDateTime] = useState("");
 
   const callRestaurant = () => {
     if (!restaurant?.phoneNumber) return;
@@ -809,169 +822,238 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[95vw]">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[95vw] max-h-[90vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-lg font-bold dark:text-stone-100">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                            {t.yourName || "Your Name"} *
-                          </label>
-                          <input
-                            type="text"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
-                            placeholder={t.enterYourName || "Enter your name"}
-                            className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                            {t.orderType || "Order Type"} *
-                          </label>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant={
-                                orderType === "dineIn" ? "default" : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setOrderType("dineIn")}
-                            >
-                              {t.dineIn || "Dine In"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={
-                                orderType === "takeaway" ? "default" : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setOrderType("takeaway")}
-                            >
-                              {t.takeaway || "Takeaway"}
-                            </Button>
+                      <ScrollArea className="flex-1 pr-4">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                              {t.yourName || "Your Name"} *
+                            </label>
+                            <input
+                              type="text"
+                              value={customerName}
+                              onChange={(e) => setCustomerName(e.target.value)}
+                              placeholder={t.enterYourName || "Enter your name"}
+                              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                              required
+                            />
                           </div>
-                        </div>
-                      </div>
 
-                      <ScrollArea className="max-h-[40vh] pr-4">
-                        <div className="space-y-4 py-4">
-                          {Object.entries(cart).map(([id, qty]) => {
-                            const item = restaurant.menuItems.find(
-                              (i) => i.id === parseInt(id),
-                            );
-                            if (!item) return null;
-
-                            return (
-                              <div
-                                key={id}
-                                className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                              {t.orderType || "Order Type"} *
+                            </label>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant={
+                                  orderType === "dineIn" ? "default" : "outline"
+                                }
+                                className="flex-1 h-10 rounded-xl"
+                                onClick={() => setOrderType("dineIn")}
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                                    {qty}x
-                                  </div>
-                                  <div>
-                                    <p className="font-bold dark:text-stone-100">
-                                      {item.name}
-                                    </p>
-                                    <p className="text-xs text-stone-500 dark:text-stone-400">
-                                      {item.price}
-                                    </p>
-                                  </div>
-                                </div>
+                                {t.dineIn || "Dine In"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={
+                                  orderType === "takeaway"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className="flex-1 h-10 rounded-xl"
+                                onClick={() => setOrderType("takeaway")}
+                              >
+                                {t.takeaway || "Takeaway"}
+                              </Button>
+                            </div>
+                          </div>
 
-                                <div className="flex gap-1">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => updateCart(item.id, -1)}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => updateCart(item.id, 1)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                              {t.deliveryTime || "Delivery Time"}
+                            </label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <Button
+                                type="button"
+                                variant={
+                                  deliveryTime === "asap"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className="h-10 rounded-xl text-xs"
+                                onClick={() => setDeliveryTime("asap")}
+                              >
+                                {t.asap}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={
+                                  deliveryTime === "custom"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className="h-10 rounded-xl text-xs col-span-2"
+                                onClick={() => setDeliveryTime("custom")}
+                              >
+                                {t.customTime}
+                              </Button>
+                            </div>
+                            {deliveryTime === "custom" && (
+                              <input
+                                type="datetime-local"
+                                value={customDateTime}
+                                onChange={(e) =>
+                                  setCustomDateTime(e.target.value)
+                                }
+                                min={new Date().toISOString().slice(0, 16)}
+                                className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary mt-2"
+                              />
+                            )}
+                          </div>
+
+                          <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
+                            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-3">
+                              {t.orderSummary}
+                            </h3>
+                            <ScrollArea className="h-[240px] pr-2">
+                              <div className="space-y-3">
+                                {Object.entries(cart).map(([id, qty]) => {
+                                  const item = restaurant.menuItems.find(
+                                    (i) => i.id === parseInt(id),
+                                  );
+                                  if (!item) return null;
+
+                                  return (
+                                    <div
+                                      key={id}
+                                      className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
+                                          {qty}x
+                                        </div>
+                                        <div>
+                                          <p className="font-bold dark:text-stone-100 text-sm">
+                                            {item.name}
+                                          </p>
+                                          <p className="text-xs text-stone-500 dark:text-stone-400">
+                                            {item.price}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-8 w-8"
+                                          onClick={() =>
+                                            updateCart(item.id, -1)
+                                          }
+                                        >
+                                          <Minus className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-8 w-8"
+                                          onClick={() => updateCart(item.id, 1)}
+                                        >
+                                          <Plus className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            );
-                          })}
+                            </ScrollArea>
 
-                          <div className="flex justify-between items-center p-4 mt-2 rounded-2xl bg-stone-100 dark:bg-stone-700 sticky bottom-0">
-                            <span className="text-base font-semibold dark:text-stone-100">
-                              {t.totalBill}
-                            </span>
-                            <p className="text-2xl font-bold text-primary">
-                              {cartTotal} DEN
-                            </p>
+                            <div className="flex justify-between items-center p-4 mt-3 rounded-2xl bg-stone-100 dark:bg-stone-700">
+                              <span className="text-base font-semibold dark:text-stone-100">
+                                {t.totalBill}
+                              </span>
+                              <p className="text-2xl font-bold text-primary">
+                                {cartTotal} DEN
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </ScrollArea>
 
-                      <Button
-                        className="w-full h-11 rounded-2xl text-base font-bold mt-4"
-                        onClick={() => {
-                          if (!restaurant?.phoneNumber) return;
+                      <div className="pt-4 space-y-2 border-t border-stone-200 dark:border-stone-700">
+                        <Button
+                          className="w-full h-11 rounded-2xl text-base font-bold"
+                          onClick={() => {
+                            if (!restaurant?.phoneNumber) return;
 
-                          if (!customerName.trim()) {
-                            alert(
-                              t.pleaseEnterName || "Please enter your name",
+                            if (!customerName.trim()) {
+                              alert(
+                                t.pleaseEnterName || "Please enter your name",
+                              );
+                              return;
+                            }
+
+                            const phone = restaurant.phoneNumber.replace(
+                              /\D/g,
+                              "",
                             );
-                            return;
-                          }
+                            let total = 0;
+                            let message = `${t.newOrder}\n`;
+                            message += `${t.customerName || "Name"}: ${customerName}\n`;
+                            message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n`;
 
-                          const phone = restaurant.phoneNumber.replace(
-                            /\D/g,
-                            "",
-                          );
-                          let total = 0;
-                          let message = `${t.newOrder}\n`;
-                          message += `${t.customerName || "Name"}: ${customerName}\n`;
-                          message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n`;
+                            const timeMap: Record<string, string> = {
+                              asap: t.asap,
+                              "15min": t.for15min,
+                              "30min": t.for30min,
+                              "45min": t.for45min,
+                              custom: customDateTime
+                                ? new Date(customDateTime).toLocaleString()
+                                : t.customTime,
+                            };
+                            message += `${t.deliveryTime || "Delivery Time"}: ${timeMap[deliveryTime]}\n\n`;
 
-                          Object.entries(cart).forEach(([id, qty]) => {
-                            const item = restaurant.menuItems.find(
-                              (i) => i.id === parseInt(id),
+                            Object.entries(cart).forEach(([id, qty]) => {
+                              const item = restaurant.menuItems.find(
+                                (i) => i.id === parseInt(id),
+                              );
+                              if (!item) return;
+
+                              const price = parseInt(item.price);
+                              const itemTotal = price * qty;
+                              total += itemTotal;
+
+                              message += `• ${qty}x ${item.name} - ${price} den\n`;
+                            });
+
+                            message += `\n${t.total}: ${total} den`;
+
+                            window.open(
+                              `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+                              "_blank",
                             );
-                            if (!item) return;
-
-                            const price = parseInt(item.price);
-                            const itemTotal = price * qty;
-                            total += itemTotal;
-
-                            message += `• ${qty}x ${item.name} - ${price} den\n`;
-                          });
-
-                          message += `\n${t.total}: ${total} den`;
-
-                          window.open(
-                            `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                            "_blank",
-                          );
-                        }}
-                      >
-                        🟢 {t.orderOnWhatsapp}
-                      </Button>
-
-                      <a
-                        href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                        className="flex justify-start mt-2"
-                      >
-                        <Button className="h-9 text-xs font-semibold rounded-xl flex-1">
-                          <Phone className="h-3 w-3 mr-1" />
-                          {t.callToOrder}
+                          }}
+                        >
+                          🟢 {t.orderOnWhatsapp}
                         </Button>
-                      </a>
+
+                        <a
+                          href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                          className="flex justify-start"
+                        >
+                          <Button className="h-9 text-xs font-semibold rounded-xl w-full">
+                            <Phone className="h-3 w-3 mr-1" />
+                            {t.callToOrder}
+                          </Button>
+                        </a>
+                      </div>
                     </DialogContent>
                   </Dialog>
 
@@ -1026,167 +1108,234 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-lg">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-lg max-h-[90vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-2xl font-bold dark:text-stone-100">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                            {t.yourName || "Your Name"} *
-                          </label>
-                          <input
-                            type="text"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
-                            placeholder={t.enterYourName || "Enter your name"}
-                            className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                            {t.orderType || "Order Type"} *
-                          </label>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant={
-                                orderType === "dineIn" ? "default" : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setOrderType("dineIn")}
-                            >
-                              {t.dineIn || "Dine In"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={
-                                orderType === "takeaway" ? "default" : "outline"
-                              }
-                              className="flex-1 h-10 rounded-xl"
-                              onClick={() => setOrderType("takeaway")}
-                            >
-                              {t.takeaway || "Takeaway"}
-                            </Button>
+                      <ScrollArea className="flex-1 pr-4">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                              {t.yourName || "Your Name"} *
+                            </label>
+                            <input
+                              type="text"
+                              value={customerName}
+                              onChange={(e) => setCustomerName(e.target.value)}
+                              placeholder={t.enterYourName || "Enter your name"}
+                              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                              required
+                            />
                           </div>
-                        </div>
-                      </div>
 
-                      <ScrollArea className="max-h-[40vh] pr-4">
-                        <div className="space-y-4 py-4">
-                          {Object.entries(cart).map(([id, qty]) => {
-                            const item = restaurant.menuItems.find(
-                              (i) => i.id === parseInt(id),
-                            );
-                            if (!item) return null;
-
-                            return (
-                              <div
-                                key={id}
-                                className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                              {t.orderType || "Order Type"} *
+                            </label>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant={
+                                  orderType === "dineIn" ? "default" : "outline"
+                                }
+                                className="flex-1 h-10 rounded-xl"
+                                onClick={() => setOrderType("dineIn")}
                               >
-                                <div className="flex items-center gap-3">
-                                  <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                                    {qty}x
-                                  </div>
-                                  <div>
-                                    <p className="font-bold dark:text-stone-100">
-                                      {item.name}
-                                    </p>
-                                    <p className="text-xs text-stone-500 dark:text-stone-400">
-                                      {item.price}
-                                    </p>
-                                  </div>
-                                </div>
+                                {t.dineIn || "Dine In"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={
+                                  orderType === "takeaway"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className="flex-1 h-10 rounded-xl"
+                                onClick={() => setOrderType("takeaway")}
+                              >
+                                {t.takeaway || "Takeaway"}
+                              </Button>
+                            </div>
+                          </div>
 
-                                <div className="flex gap-1">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => updateCart(item.id, -1)}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => updateCart(item.id, 1)}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                              {t.deliveryTime || "Delivery Time"}
+                            </label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <Button
+                                type="button"
+                                variant={
+                                  deliveryTime === "asap"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className="h-10 rounded-xl"
+                                onClick={() => setDeliveryTime("asap")}
+                              >
+                                {t.asap}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={
+                                  deliveryTime === "custom"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className="h-10 rounded-xl col-span-2"
+                                onClick={() => setDeliveryTime("custom")}
+                              >
+                                {t.customTime}
+                              </Button>
+                            </div>
+                            {deliveryTime === "custom" && (
+                              <input
+                                type="datetime-local"
+                                value={customDateTime}
+                                onChange={(e) =>
+                                  setCustomDateTime(e.target.value)
+                                }
+                                min={new Date().toISOString().slice(0, 16)}
+                                className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary mt-2"
+                              />
+                            )}
+                          </div>
+
+                          <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
+                            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-3">
+                              {t.orderSummary}
+                            </h3>
+                            <ScrollArea className="h-[250px] pr-2">
+                              <div className="space-y-3">
+                                {Object.entries(cart).map(([id, qty]) => {
+                                  const item = restaurant.menuItems.find(
+                                    (i) => i.id === parseInt(id),
+                                  );
+                                  if (!item) return null;
+
+                                  return (
+                                    <div
+                                      key={id}
+                                      className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
+                                          {qty}x
+                                        </div>
+                                        <div>
+                                          <p className="font-bold dark:text-stone-100">
+                                            {item.name}
+                                          </p>
+                                          <p className="text-xs text-stone-500 dark:text-stone-400">
+                                            {item.price}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            updateCart(item.id, -1)
+                                          }
+                                        >
+                                          <Minus className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => updateCart(item.id, 1)}
+                                        >
+                                          <Plus className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            );
-                          })}
+                            </ScrollArea>
 
-                          <div className="flex justify-between items-center p-4 mt-2 rounded-2xl bg-stone-100 dark:bg-stone-700 sticky bottom-0">
-                            <span className="text-base font-semibold dark:text-stone-100">
-                              {t.totalBill}
-                            </span>
-                            <p className="text-2xl font-bold text-primary">
-                              {cartTotal} DEN
-                            </p>
+                            <div className="flex justify-between items-center p-4 mt-3 rounded-2xl bg-stone-100 dark:bg-stone-700">
+                              <span className="text-base font-semibold dark:text-stone-100">
+                                {t.totalBill}
+                              </span>
+                              <p className="text-2xl font-bold text-primary">
+                                {cartTotal} DEN
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </ScrollArea>
 
-                      <Button
-                        className="w-full h-11 rounded-2xl text-base font-bold mt-4"
-                        onClick={() => {
-                          if (!restaurant?.phoneNumber) return;
+                      <div className="pt-4 space-y-3 border-t border-stone-200 dark:border-stone-700">
+                        <Button
+                          className="w-full h-11 rounded-2xl text-base font-bold"
+                          onClick={() => {
+                            if (!restaurant?.phoneNumber) return;
 
-                          if (!customerName.trim()) {
-                            alert(
-                              t.pleaseEnterName || "Please enter your name",
+                            if (!customerName.trim()) {
+                              alert(
+                                t.pleaseEnterName || "Please enter your name",
+                              );
+                              return;
+                            }
+
+                            const phone = restaurant.phoneNumber.replace(
+                              /\D/g,
+                              "",
                             );
-                            return;
-                          }
+                            let total = 0;
+                            let message = `${t.newOrder}\n`;
+                            message += `${t.customerName || "Name"}: ${customerName}\n`;
+                            message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n`;
 
-                          const phone = restaurant.phoneNumber.replace(
-                            /\D/g,
-                            "",
-                          );
-                          let total = 0;
-                          let message = `${t.newOrder}\n`;
-                          message += `${t.customerName || "Name"}: ${customerName}\n`;
-                          message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n`;
+                            const timeMap: Record<string, string> = {
+                              asap: t.asap,
+                              "15min": t.for15min,
+                              "30min": t.for30min,
+                              "45min": t.for45min,
+                              custom: customDateTime
+                                ? new Date(customDateTime).toLocaleString()
+                                : t.customTime,
+                            };
+                            message += `${t.deliveryTime || "Delivery Time"}: ${timeMap[deliveryTime]}\n\n`;
 
-                          Object.entries(cart).forEach(([id, qty]) => {
-                            const item = restaurant.menuItems.find(
-                              (i) => i.id === parseInt(id),
+                            Object.entries(cart).forEach(([id, qty]) => {
+                              const item = restaurant.menuItems.find(
+                                (i) => i.id === parseInt(id),
+                              );
+                              if (!item) return;
+
+                              const price = parseInt(item.price);
+                              const itemTotal = price * qty;
+                              total += itemTotal;
+
+                              message += `• ${qty}x ${item.name} - ${price} den\n`;
+                            });
+
+                            message += `\n${t.total}: ${total} den`;
+
+                            window.open(
+                              `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+                              "_blank",
                             );
-                            if (!item) return;
+                          }}
+                        >
+                          🟢 {t.orderOnWhatsapp}
+                        </Button>
 
-                            const price = parseInt(item.price);
-                            const itemTotal = price * qty;
-                            total += itemTotal;
-
-                            message += `• ${qty}x ${item.name} - ${price} den\n`;
-                          });
-
-                          message += `\n${t.total}: ${total} den`;
-
-                          window.open(
-                            `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                            "_blank",
-                          );
-                        }}
-                      >
-                        🟢 {t.orderOnWhatsapp}
-                      </Button>
-
-                      <Button
-                        onClick={callRestaurant}
-                        className="w-full h-11 rounded-xl font-bold mt-4"
-                      >
-                        <Phone className="h-4 w-4 mr-2" />
-                        {t.callToOrder}
-                      </Button>
+                        <Button
+                          onClick={callRestaurant}
+                          className="w-full h-11 rounded-xl font-bold"
+                        >
+                          <Phone className="h-4 w-4 mr-2" />
+                          {t.callToOrder}
+                        </Button>
+                      </div>
                     </DialogContent>
                   </Dialog>
 
