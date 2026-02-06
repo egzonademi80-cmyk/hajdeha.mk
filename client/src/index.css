@@ -63,10 +63,25 @@
     @apply border-border;
   }
 
+  html {
+    /* Prevents the horizontal scrollbar from appearing during animations */
+    overflow-x: hidden;
+    /* Fixes height issues on mobile browsers */
+    height: -webkit-fill-available;
+  }
+
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20;
     font-family: var(--font-sans);
     transition: background-color 0.3s ease, color 0.3s ease;
+
+    /* CRITICAL FIXES: */
+    width: 100%;
+    overflow-x: clip; /* Kills horizontal scroll from x:-20 animations */
+    min-height: 100vh;
+    min-height: -webkit-fill-available; /* Fills mobile screen correctly */
+    margin: 0;
+    padding: 0;
   }
 
   h1, h2, h3, h4, h5, h6 {

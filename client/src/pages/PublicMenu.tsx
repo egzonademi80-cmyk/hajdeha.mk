@@ -417,7 +417,7 @@ export default function PublicMenu() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-stone-50 dark:from-stone-900 dark:via-stone-950 dark:to-stone-900 flex flex-col items-center justify-center gap-6 text-stone-400 dark:text-stone-500">
+      <div className="h-[100dvh] w-full max-w-full overflow-x-hidden bg-gradient-to-br from-stone-50 via-white to-stone-50 dark:from-stone-900 dark:via-stone-950 dark:to-stone-900 flex flex-col items-center justify-center gap-6 text-stone-400 dark:text-stone-500">
         <div className="relative">
           <div className="absolute inset-0 bg-primary/20 dark:bg-primary/10 rounded-full blur-2xl animate-pulse"></div>
           <Loader2 className="h-12 w-12 animate-spin text-primary relative" />
@@ -822,7 +822,7 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[95vw] max-h-[90vh] flex flex-col">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[88.8vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-lg font-bold dark:text-stone-100">
                           {t.orderSummary}
@@ -922,7 +922,7 @@ export default function PublicMenu() {
                             <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-3">
                               {t.orderSummary}
                             </h3>
-                            <ScrollArea className="h-[240px] pr-2">
+                            <ScrollArea className="h-[90px] pr-2">
                               <div className="space-y-3">
                                 {Object.entries(cart).map(([id, qty]) => {
                                   const item = restaurant.menuItems.find(
@@ -975,7 +975,7 @@ export default function PublicMenu() {
                               </div>
                             </ScrollArea>
 
-                            <div className="flex justify-between items-center p-4 mt-3 rounded-2xl bg-stone-100 dark:bg-stone-700">
+                            <div className="flex justify-between items-center p-4 mt-3 rounded-2xl ">
                               <span className="text-base font-semibold dark:text-stone-100">
                                 {t.totalBill}
                               </span>
@@ -1108,7 +1108,7 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-lg max-h-[90vh] flex flex-col">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-lg max-h-[110vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-2xl font-bold dark:text-stone-100">
                           {t.orderSummary}
