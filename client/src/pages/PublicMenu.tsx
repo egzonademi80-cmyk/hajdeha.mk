@@ -1002,20 +1002,20 @@ export default function PublicMenu() {
                               "",
                             );
                             let total = 0;
-                            let message = `${t.newOrder}\n`;
-                            message += `${t.customerName || "Name"}: ${customerName}\n`;
-                            message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n`;
-
+                            let message = `🧾                    *${t.newOrder || "New Order"}*\n`;
+                            message += `${t.customerName || "Name"}\n`;
+                            message += `*${customerName}*\n`;
+                            message += `${t.orderType || "Order Type"}\n`;
+                            message += `*${orderType === "dineIn" ? t.dineIn : t.takeaway}*\n`;
                             const timeMap: Record<string, string> = {
                               asap: t.asap,
-                              "15min": t.for15min,
-                              "30min": t.for30min,
-                              "45min": t.for45min,
                               custom: customDateTime
                                 ? new Date(customDateTime).toLocaleString()
                                 : t.customTime,
                             };
-                            message += `${t.deliveryTime || "Delivery Time"}: ${timeMap[deliveryTime]}\n\n`;
+                            message += `${t.deliveryTime || "Delivery Time"}\n`;
+                            message += `*${timeMap[deliveryTime]}*\n\n`;
+                            message += `🛒      *${t.orderSummary || "Order Details"}*\n`;
 
                             Object.entries(cart).forEach(([id, qty]) => {
                               const item = restaurant.menuItems.find(
@@ -1027,10 +1027,10 @@ export default function PublicMenu() {
                               const itemTotal = price * qty;
                               total += itemTotal;
 
-                              message += `• ${qty}x ${item.name} - ${price} den\n`;
+                              message += `• ${qty} × ${item.name} — ${itemTotal} den\n`;
                             });
 
-                            message += `\n${t.total}: ${total} den`;
+                            message += `\n💰 *${t.total || "Total"}*: ${total} den`;
 
                             window.open(
                               `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
@@ -1286,35 +1286,33 @@ export default function PublicMenu() {
                               "",
                             );
                             let total = 0;
-                            let message = `${t.newOrder}\n`;
-                            message += `${t.customerName || "Name"}: ${customerName}\n`;
-                            message += `${t.orderType || "Order Type"}: ${orderType === "dineIn" ? t.dineIn : t.takeaway}\n`;
 
+                            let message = `🧾 *${t.newOrder || "New Order"}*\n\n`;
+
+                            message += `👤 *${t.customerName || "Name"}*\n`;
+                            message += `${customerName}\n\n`;
+                            message += `🍽️ *${t.orderType || "Order Type"}*\n`;
+                            message += `${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n`;
                             const timeMap: Record<string, string> = {
                               asap: t.asap,
-                              "15min": t.for15min,
-                              "30min": t.for30min,
-                              "45min": t.for45min,
                               custom: customDateTime
                                 ? new Date(customDateTime).toLocaleString()
                                 : t.customTime,
                             };
-                            message += `${t.deliveryTime || "Delivery Time"}: ${timeMap[deliveryTime]}\n\n`;
-
+                            message += `⏰ *${t.deliveryTime || "Delivery Time"}*\n`;
+                            message += `${timeMap[deliveryTime]}\n\n`;
+                            message += `🛒 *${t.orderSummary || "Order Details"}*\n`;
                             Object.entries(cart).forEach(([id, qty]) => {
                               const item = restaurant.menuItems.find(
                                 (i) => i.id === parseInt(id),
                               );
                               if (!item) return;
-
                               const price = parseInt(item.price);
                               const itemTotal = price * qty;
                               total += itemTotal;
-
-                              message += `• ${qty}x ${item.name} - ${price} den\n`;
+                              message += `• ${qty} × ${item.name} — ${itemTotal} den\n`;
                             });
-
-                            message += `\n${t.total}: ${total} den`;
+                            message += `\n💰 *${t.total || "Total"}*: ${total} den`;
 
                             window.open(
                               `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
