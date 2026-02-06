@@ -822,7 +822,7 @@ export default function PublicMenu() {
                       </Button>
                     </DialogTrigger>
 
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[88.8vh] flex flex-col">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[110vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-lg font-bold dark:text-stone-100">
                           {t.orderSummary}
@@ -840,7 +840,7 @@ export default function PublicMenu() {
                               value={customerName}
                               onChange={(e) => setCustomerName(e.target.value)}
                               placeholder={t.enterYourName || "Enter your name"}
-                              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none"
                               required
                             />
                           </div>
@@ -855,7 +855,7 @@ export default function PublicMenu() {
                                 variant={
                                   orderType === "dineIn" ? "default" : "outline"
                                 }
-                                className="flex-1 h-10 rounded-xl"
+                                className="flex-1 h-10 rounded-xl text-xs"
                                 onClick={() => setOrderType("dineIn")}
                               >
                                 {t.dineIn || "Dine In"}
@@ -867,7 +867,7 @@ export default function PublicMenu() {
                                     ? "default"
                                     : "outline"
                                 }
-                                className="flex-1 h-10 rounded-xl"
+                                className="flex-1 h-10 rounded-xl text-xs"
                                 onClick={() => setOrderType("takeaway")}
                               >
                                 {t.takeaway || "Takeaway"}
@@ -918,12 +918,9 @@ export default function PublicMenu() {
                             )}
                           </div>
 
-                          <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
-                            <h3 className="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-3">
-                              {t.orderSummary}
-                            </h3>
-                            <ScrollArea className="h-[90px] pr-2">
-                              <div className="space-y-3">
+                          <div className="pt-2 border-t border-stone-200 dark:border-stone-700">
+                            <ScrollArea className="h-[110px] pr-1">
+                              <div className="space-y-2">
                                 {Object.entries(cart).map(([id, qty]) => {
                                   const item = restaurant.menuItems.find(
                                     (i) => i.id === parseInt(id),
@@ -975,11 +972,11 @@ export default function PublicMenu() {
                               </div>
                             </ScrollArea>
 
-                            <div className="flex justify-between items-center p-4 mt-3 rounded-2xl ">
+                            <div className="flex justify-between items-center p-2 pt-1 pb-1 rounded-2xl ">
                               <span className="text-base font-semibold dark:text-stone-100">
                                 {t.totalBill}
                               </span>
-                              <p className="text-2xl font-bold text-primary">
+                              <p className="text-xl font-bold text-primary">
                                 {cartTotal} DEN
                               </p>
                             </div>
