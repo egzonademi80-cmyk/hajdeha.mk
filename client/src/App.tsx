@@ -19,7 +19,7 @@ function Router() {
   const { isDark, toggleDarkMode } = useDarkMode();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-[100dvh] bg-background text-foreground">
       <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
       <Switch>
         {/* Public Routes */}
