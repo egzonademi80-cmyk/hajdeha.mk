@@ -5,7 +5,9 @@ import { pgTable, text, serial } from "drizzle-orm/pg-core";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
 
 const users = pgTable("users", {
   id: serial("id").primaryKey(),
