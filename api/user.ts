@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(200).json({ user: null });
+      return res.status(401).json({ message: "Not authenticated" });
     }
 
     const token = authHeader.substring(7);
@@ -44,16 +44,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select()
       .from(users)
       .where(eq(users.id, decoded.id));
+
     const user = result[0];
 
     if (!user) {
-      return res.status(200).json({ user: null });
+      return res.status(401).json({ message: "Not authenticated" });
     }
 
     const { password: _, ...userWithoutPassword } = user;
+
     return res.status(200).json({ user: userWithoutPassword });
   } catch (error) {
     console.error("Get user error:", error);
-    return res.status(200).json({ user: null });
+    return res.status(401).json({ message: "Not authenticated" });
   }
 }

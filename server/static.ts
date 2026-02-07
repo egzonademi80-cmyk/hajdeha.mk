@@ -1,16 +1,20 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+// Define __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export function serveStatic(app: Express) {
   const distPath = path.resolve(__dirname, "public");
-
   if (!fs.existsSync(distPath)) {
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
   }
-
   // Serve sitemap with correct MIME type (must be before express.static)
   app.get("/sitemap.xml", (_req, res) => {
     res.setHeader("Content-Type", "application/xml");
@@ -21,7 +25,6 @@ export function serveStatic(app: Express) {
     }
     return res.status(404).send("Sitemap not found");
   });
-
   // Serve robots.txt with correct MIME type
   app.get("/robots.txt", (_req, res) => {
     res.setHeader("Content-Type", "text/plain");
@@ -32,7 +35,6 @@ export function serveStatic(app: Express) {
     }
     return res.status(404).send("Robots.txt not found");
   });
-
   // Serve PWA manifest with correct MIME type
   app.get("/manifest.json", (_req, res) => {
     res.setHeader("Content-Type", "application/manifest+json");
@@ -42,7 +44,6 @@ export function serveStatic(app: Express) {
     }
     return res.status(404).send("Manifest not found");
   });
-
   // Serve service worker with correct headers
   app.get("/service-worker.js", (_req, res) => {
     res.setHeader("Content-Type", "application/javascript");
@@ -54,7 +55,6 @@ export function serveStatic(app: Express) {
     }
     return res.status(404).send("Service worker not found");
   });
-
   // Serve static files with proper caching
   // Exclude sitemap.xml and robots.txt from static middleware
   app.use(
@@ -65,7 +65,10 @@ export function serveStatic(app: Express) {
       index: false, // Don't serve index.html from static
       setHeaders: (res, filepath) => {
         // Don't let static middleware handle these files
-        if (filepath.endsWith("sitemap.xml") || filepath.endsWith("robots.txt")) {
+        if (
+          filepath.endsWith("sitemap.xml") ||
+          filepath.endsWith("robots.txt")
+        ) {
           return;
         }
         if (filepath.endsWith(".html")) {
@@ -76,7 +79,6 @@ export function serveStatic(app: Express) {
       },
     }),
   );
-
   // SPA fallback - serve index.html for all other routes
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
