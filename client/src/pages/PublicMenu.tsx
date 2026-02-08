@@ -817,8 +817,7 @@ export default function PublicMenu() {
                         variant="outline"
                         className="flex-1 h-9 text-xs font-semibold rounded-xl"
                       >
-                        <UtensilsCrossed className="h-3 w-3 mr-1" />
-                        {t.viewOrder}
+                        🟢 {t.orderOnWhatsapp}
                       </Button>
                     </DialogTrigger>
 
@@ -985,8 +984,9 @@ export default function PublicMenu() {
                       </ScrollArea>
 
                       <div className="pt-4 space-y-2 border-t border-stone-200 dark:border-stone-700">
+                        <div className="flex gap-2">
                         <Button
-                          className="w-full h-11 rounded-2xl text-base font-bold"
+                          className="flex-1 h-9 text-xs font-semibold rounded-xl"
                           onClick={() => {
                             if (!restaurant?.phoneNumber) return;
 
@@ -1043,13 +1043,14 @@ export default function PublicMenu() {
 
                         <a
                           href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                          className="flex justify-start"
+                          className="flex justify-end"
                         >
-                          <Button className="h-9 text-xs font-semibold rounded-xl w-full">
+                          <Button className="h-9 text-xs font-semibold rounded-xl flex-1">
                             <Phone className="h-3 w-3 mr-1" />
                             {t.callToOrder}
                           </Button>
                         </a>
+                      </div>
                       </div>
                     </DialogContent>
                   </Dialog>
