@@ -810,7 +810,7 @@ export default function PublicMenu() {
                   </Button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button
@@ -823,12 +823,12 @@ export default function PublicMenu() {
 
                     <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[110vh] flex flex-col">
                       <DialogHeader>
-                        <DialogTitle className="text-lg font-bold dark:text-stone-100">
+                        <DialogTitle className="text-lg font-bold text-primary  ">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
 
-                      <ScrollArea className="flex-1 pr-4">
+                      <ScrollArea className="flex-1 ">
                         <div className="space-y-4">
                           <div className="space-y-2">
                             <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
@@ -917,9 +917,9 @@ export default function PublicMenu() {
                             )}
                           </div>
 
-                          <div className="pt-2 border-t border-stone-200 dark:border-stone-700">
-                            <ScrollArea className="h-[110px] pr-1">
-                              <div className="space-y-2">
+                          <div className="pt-2 border-stone-200 dark:border-stone-700">
+                            <ScrollArea className="h-[140px] pr-1">
+                              <div className="space-y-1">
                                 {Object.entries(cart).map(([id, qty]) => {
                                   const item = restaurant.menuItems.find(
                                     (i) => i.id === parseInt(id),
@@ -962,7 +962,7 @@ export default function PublicMenu() {
                                           className="h-8 w-8"
                                           onClick={() => updateCart(item.id, 1)}
                                         >
-                                          <Plus className="h-3 w-3" />
+                                          <Plus className="h-3 w-3 text-primary" />
                                         </Button>
                                       </div>
                                     </div>
@@ -971,7 +971,7 @@ export default function PublicMenu() {
                               </div>
                             </ScrollArea>
 
-                            <div className="flex justify-between items-center p-2 pt-1 pb-1 rounded-2xl ">
+                            <div className="flex justify-between items-center p-2 pt-4 pb-1 rounded-2xl ">
                               <span className="text-base font-semibold dark:text-stone-100">
                                 {t.totalBill}
                               </span>
@@ -983,74 +983,78 @@ export default function PublicMenu() {
                         </div>
                       </ScrollArea>
 
-                      <div className="pt-4 space-y-2 border-t border-stone-200 dark:border-stone-700">
-                        <div className="flex gap-2">
-                        <Button
-                          className="flex-1 h-9 text-xs font-semibold rounded-xl"
-                          onClick={() => {
-                            if (!restaurant?.phoneNumber) return;
+                      <div className="pt-4  border-stone-200 dark:border-stone-700">
+                        <div className="flex gap-1">
+                          {/* Order on WhatsApp Button */}
+                          <Button
+                            className="flex-1 h-auto px-3 py-1 text-xs font-semibold rounded-xl flex items-center justify-center"
+                            onClick={() => {
+                              if (!restaurant?.phoneNumber) return;
 
-                            if (!customerName.trim()) {
-                              alert(
-                                t.pleaseEnterName || "Please enter your name",
+                              if (!customerName.trim()) {
+                                alert(
+                                  t.pleaseEnterName || "Please enter your name",
+                                );
+                                return;
+                              }
+
+                              const phone = restaurant.phoneNumber.replace(
+                                /\D/g,
+                                "",
                               );
-                              return;
-                            }
+                              let total = 0;
+                              let message = `🧾 *${t.newOrder || "New Order"}*\n`;
+                              message += `${t.customerName || "Name"}\n`;
+                              message += `*${customerName}*\n`;
+                              message += `${t.orderType || "Order Type"}\n`;
+                              message += `*${orderType === "dineIn" ? t.dineIn : t.takeaway}*\n`;
 
-                            const phone = restaurant.phoneNumber.replace(
-                              /\D/g,
-                              "",
-                            );
-                            let total = 0;
-                            let message = `🧾                    *${t.newOrder || "New Order"}*\n`;
-                            message += `${t.customerName || "Name"}\n`;
-                            message += `*${customerName}*\n`;
-                            message += `${t.orderType || "Order Type"}\n`;
-                            message += `*${orderType === "dineIn" ? t.dineIn : t.takeaway}*\n`;
-                            const timeMap: Record<string, string> = {
-                              asap: t.asap,
-                              custom: customDateTime
-                                ? new Date(customDateTime).toLocaleString()
-                                : t.customTime,
-                            };
-                            message += `${t.deliveryTime || "Delivery Time"}\n`;
-                            message += `*${timeMap[deliveryTime]}*\n\n`;
-                            message += `🛒      *${t.orderSummary || "Order Details"}*\n`;
+                              const timeMap: Record<string, string> = {
+                                asap: t.asap,
+                                custom: customDateTime
+                                  ? new Date(customDateTime).toLocaleString()
+                                  : t.customTime,
+                              };
 
-                            Object.entries(cart).forEach(([id, qty]) => {
-                              const item = restaurant.menuItems.find(
-                                (i) => i.id === parseInt(id),
+                              message += `${t.deliveryTime || "Delivery Time"}\n`;
+                              message += `*${timeMap[deliveryTime]}*\n\n`;
+                              message += `🛒 *${t.orderSummary || "Order Details"}*\n`;
+
+                              Object.entries(cart).forEach(([id, qty]) => {
+                                const item = restaurant.menuItems.find(
+                                  (i) => i.id === parseInt(id),
+                                );
+                                if (!item) return;
+
+                                const price = parseInt(item.price);
+                                const itemTotal = price * qty;
+                                total += itemTotal;
+
+                                message += `• ${qty} × ${item.name} — ${itemTotal} den\n`;
+                              });
+
+                              message += `\n💰 *${t.total || "Total"}*: ${total} den`;
+
+                              window.open(
+                                `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+                                "_blank",
                               );
-                              if (!item) return;
-
-                              const price = parseInt(item.price);
-                              const itemTotal = price * qty;
-                              total += itemTotal;
-
-                              message += `• ${qty} × ${item.name} — ${itemTotal} den\n`;
-                            });
-
-                            message += `\n💰 *${t.total || "Total"}*: ${total} den`;
-
-                            window.open(
-                              `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                              "_blank",
-                            );
-                          }}
-                        >
-                          🟢 {t.orderOnWhatsapp}
-                        </Button>
-
-                        <a
-                          href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                          className="flex justify-end"
-                        >
-                          <Button className="h-9 text-xs font-semibold rounded-xl flex-1">
-                            <Phone className="h-3 w-3 mr-1" />
-                            {t.callToOrder}
+                            }}
+                          >
+                            🟢 {t.orderOnWhatsapp}
                           </Button>
-                        </a>
-                      </div>
+
+                          {/* Call to Order Button */}
+                          <a
+                            href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                            className="flex-1"
+                          >
+                            <Button className="w-full h-auto px-3 py-1 text-xs font-semibold rounded-xl flex items-center justify-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {t.callToOrder || "Call to Order"}
+                            </Button>
+                          </a>
+                        </div>
                       </div>
                     </DialogContent>
                   </Dialog>
