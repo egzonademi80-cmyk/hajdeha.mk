@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import {
   Loader2,
@@ -19,6 +19,15 @@ import {
   WheatOff,
   Clock,
   CheckCircle2,
+  Mic,
+  MicOff,
+  Share2,
+  Facebook,
+  Twitter,
+  Link as LinkIcon,
+  Copy,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type MenuItem } from "@shared/schema";
@@ -37,11 +46,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 
 const translations: Record<string, any> = {
   en: {
@@ -82,6 +94,18 @@ const translations: Record<string, any> = {
     deliveryTime: "Delivery Time",
     asap: "ASAP",
     customTime: "Custom Time",
+    voiceSearch: "Voice Search",
+    listening: "Listening...",
+    tapToSpeak: "Tap to speak",
+    voiceNotSupported: "Voice search not supported",
+    aiSearching: "🤖 AI is finding best matches...",
+    foundMatches: "Found {count} matches for",
+    noVoiceMatches: "No items match your search. Try different words.",
+    shareItem: "Share Item",
+    shareOn: "Share on",
+    copyLink: "Copy Link",
+    linkCopied: "Link copied!",
+    searchPlaceholder: "Search menu items...",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -121,10 +145,22 @@ const translations: Record<string, any> = {
     deliveryTime: "Koha e dorëzimit",
     asap: "Sa më shpejt",
     customTime: "Kohë custom",
+    voiceSearch: "Kërkim me zë",
+    listening: "Duke dëgjuar...",
+    tapToSpeak: "Kliko për të folur",
+    voiceNotSupported: "Kërkimi me zë nuk mbështetet",
+    aiSearching: "🤖 AI po gjen përputhjet më të mira...",
+    foundMatches: "U gjetën {count} përputhje për",
+    noVoiceMatches: "Nuk ka artikuj që përputhen. Provo fjalë të tjera.",
+    shareItem: "Ndaj artikullin",
+    shareOn: "Ndaj në",
+    copyLink: "Kopjo lidhjen",
+    linkCopied: "Lidhja u kopjua!",
+    searchPlaceholder: "Kërko në menu...",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
-    newOrder: "Нова порака",
+    newOrder: "Нова нарачка",
     total: "Вкупно",
     loading: "Се вчитува менито...",
     notFound: "Ресторанот не е пронајден",
@@ -160,6 +196,18 @@ const translations: Record<string, any> = {
     deliveryTime: "Време на достава",
     asap: "Што побрзо",
     customTime: "Прилагодено време",
+    voiceSearch: "Гласовно пребарување",
+    listening: "Слушам...",
+    tapToSpeak: "Допрете за да зборувате",
+    voiceNotSupported: "Гласовното пребарување не е поддржано",
+    aiSearching: "🤖 AI бара најдобри совпаѓања...",
+    foundMatches: "Пронајдени {count} совпаѓања за",
+    noVoiceMatches: "Нема ставки што одговараат. Обидете се со други зборови.",
+    shareItem: "Сподели производ",
+    shareOn: "Сподели на",
+    copyLink: "Копирај линк",
+    linkCopied: "Линкот е копиран!",
+    searchPlaceholder: "Пребарај во менито...",
   },
 };
 
@@ -171,6 +219,395 @@ const leafletStyles = `
     z-index: 10;
   }
 `;
+
+// AI-Powered Fuzzy Matching Utility
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1,
+        );
+      }
+    }
+  }
+
+  return matrix[str2.length][str1.length];
+}
+
+function calculateSimilarity(str1: string, str2: string): number {
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+
+  // Exact match
+  if (s1 === s2) return 1;
+
+  // Contains check (high score)
+  if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+
+  // Word-by-word matching
+  const words1 = s1.split(/\s+/);
+  const words2 = s2.split(/\s+/);
+  let wordMatches = 0;
+
+  for (const w1 of words1) {
+    for (const w2 of words2) {
+      if (w1 === w2 || w1.includes(w2) || w2.includes(w1)) {
+        wordMatches++;
+        break;
+      }
+    }
+  }
+
+  const wordScore = wordMatches / Math.max(words1.length, words2.length);
+
+  // Levenshtein distance
+  const maxLen = Math.max(s1.length, s2.length);
+  const distance = levenshteinDistance(s1, s2);
+  const distanceScore = 1 - distance / maxLen;
+
+  // Combined score
+  return Math.max(wordScore, distanceScore);
+}
+
+function findBestMatches(
+  query: string,
+  items: MenuItem[],
+  lang: "en" | "al" | "mk",
+  threshold: number = 0.3,
+): MenuItem[] {
+  const scoredItems = items.map((item) => {
+    const name =
+      lang === "al" && item.nameAl
+        ? item.nameAl
+        : lang === "mk" && item.nameMk
+          ? item.nameMk
+          : item.name;
+
+    const description =
+      lang === "al" && item.descriptionAl
+        ? item.descriptionAl
+        : lang === "mk" && item.descriptionMk
+          ? item.descriptionMk
+          : item.description;
+
+    const nameScore = calculateSimilarity(query, name);
+    const descScore = calculateSimilarity(query, description) * 0.7; // Description is less important
+    const categoryScore = calculateSimilarity(query, item.category) * 0.5;
+
+    const maxScore = Math.max(nameScore, descScore, categoryScore);
+
+    return {
+      item,
+      score: maxScore,
+    };
+  });
+
+  return scoredItems
+    .filter((scored) => scored.score >= threshold)
+    .sort((a, b) => b.score - a.score)
+    .map((scored) => scored.item);
+}
+
+// Voice Search Hook with AI Fuzzy Matching
+function useVoiceSearch(
+  onResult: (text: string, matches: MenuItem[]) => void,
+  allItems: MenuItem[],
+  lang: "en" | "al" | "mk",
+) {
+  const [isListening, setIsListening] = useState(false);
+  const [isSupported, setIsSupported] = useState(false);
+  const recognitionRef = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition ||
+        (window as any).webkitSpeechRecognition;
+      setIsSupported(!!SpeechRecognition);
+
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        // Set language based on current language
+        const langMap = {
+          en: "en-US",
+          al: "sq-AL",
+          mk: "mk-MK",
+        };
+        recognition.lang = langMap[lang] || "en-US";
+
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+
+          // AI-powered fuzzy matching to find best results
+          const matches = findBestMatches(transcript, allItems, lang);
+
+          onResult(transcript, matches);
+          setIsListening(false);
+        };
+
+        recognition.onerror = () => {
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef[0] = recognition;
+      }
+    }
+  }, [onResult, allItems, lang]);
+
+  const startListening = () => {
+    if (recognitionRef[0] && !isListening) {
+      recognitionRef[0].start();
+      setIsListening(true);
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef[0] && isListening) {
+      recognitionRef[0].stop();
+      setIsListening(false);
+    }
+  };
+
+  return { isListening, isSupported, startListening, stopListening };
+}
+
+// Share Dialog Component
+function ShareDialog({
+  item,
+  restaurantSlug,
+}: {
+  item: MenuItem;
+  restaurantSlug: string;
+}) {
+  const [lang] = useState<"en" | "al" | "mk">(() => {
+    const saved = localStorage.getItem("hajdeha-lang");
+    return (saved as any) || "en";
+  });
+  const t = translations[lang];
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  const itemUrl = `${window.location.origin}/restaurant/${restaurantSlug}#item-${item.id}`;
+  const shareText = `Check out ${item.name} at ${item.price}!`;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(itemUrl);
+      setCopied(true);
+      toast({ title: t.linkCopied });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const shareToFacebook = () => {
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(itemUrl)}`,
+      "_blank",
+    );
+  };
+
+  const shareToTwitter = () => {
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(itemUrl)}`,
+      "_blank",
+    );
+  };
+
+  const shareNative = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: item.name,
+          text: shareText,
+          url: itemUrl,
+        });
+      } catch (err) {
+        console.error("Share failed:", err);
+      }
+    }
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 rounded-full hover:bg-primary/10"
+        >
+          <Share2 className="h-4 w-4 text-primary" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md bg-white dark:bg-stone-800">
+        <DialogHeader>
+          <DialogTitle className="dark:text-stone-100">
+            {t.shareItem}
+          </DialogTitle>
+          <DialogDescription className="dark:text-stone-400">
+            {item.name} - {item.price}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 gap-2"
+              onClick={shareToFacebook}
+            >
+              <Facebook className="h-4 w-4 text-blue-600" />
+              Facebook
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 gap-2"
+              onClick={shareToTwitter}
+            >
+              <Twitter className="h-4 w-4 text-sky-500" />
+              Twitter
+            </Button>
+          </div>
+
+          {navigator.share && (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={shareNative}
+            >
+              <Share2 className="h-4 w-4" />
+              {t.shareOn}...
+            </Button>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={itemUrl}
+              className="flex-1 bg-stone-50 dark:bg-stone-700 dark:text-stone-100"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={copyLink}
+              className="flex-shrink-0"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-green-600" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// People Also Ordered Component
+function PeopleAlsoOrdered({
+  currentItemId,
+  allItems,
+  onAddToCart,
+}: {
+  currentItemId: number;
+  allItems: MenuItem[];
+  onAddToCart: (itemId: number) => void;
+}) {
+  const [lang] = useState<"en" | "al" | "mk">(() => {
+    const saved = localStorage.getItem("hajdeha-lang");
+    return (saved as any) || "en";
+  });
+  const t = translations[lang];
+
+  // Simulate "people also ordered" - in production, this would come from analytics
+  // For now, we'll show random items from the same category
+  const currentItem = allItems.find((item) => item.id === currentItemId);
+  const suggestions = useMemo(() => {
+    if (!currentItem) return [];
+
+    const sameCategory = allItems.filter(
+      (item) =>
+        item.id !== currentItemId &&
+        item.category === currentItem.category &&
+        item.active,
+    );
+
+    // Shuffle and take first 3
+    return sameCategory.sort(() => Math.random() - 0.5).slice(0, 3);
+  }, [currentItemId, allItems, currentItem]);
+
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="mt-6 pt-6 border-t border-stone-200 dark:border-stone-700">
+      <div className="flex items-center gap-2 mb-4">
+        <TrendingUp className="h-4 w-4 text-primary" />
+        <h4 className="font-semibold text-sm text-stone-900 dark:text-stone-100">
+          {t.peopleAlsoOrdered}
+        </h4>
+      </div>
+      <div className="grid grid-cols-1 gap-3">
+        {suggestions.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-700/50 border border-stone-100 dark:border-stone-600"
+          >
+            {item.imageUrl && (
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="w-16 h-16 rounded-lg object-cover"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm text-stone-900 dark:text-stone-100 truncate">
+                {item.name}
+              </p>
+              <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
+                {item.description}
+              </p>
+              <p className="text-sm font-bold text-primary mt-1">
+                {item.price}
+              </p>
+            </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 rounded-full flex-shrink-0 hover:bg-primary/10"
+              onClick={() => onAddToCart(item.id)}
+            >
+              <Plus className="h-4 w-4 text-primary" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function RestaurantMap({
   location,
@@ -342,6 +779,7 @@ export default function PublicMenu() {
   });
   const t = translations[lang];
   const { isDark, toggleDarkMode } = useDarkMode();
+  const { toast } = useToast();
 
   const {
     data: restaurant,
@@ -367,6 +805,39 @@ export default function PublicMenu() {
     "asap" | "15min" | "30min" | "45min" | "custom"
   >("asap");
   const [customDateTime, setCustomDateTime] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [voiceSearchMatches, setVoiceSearchMatches] = useState<MenuItem[]>([]);
+  const [showVoiceResults, setShowVoiceResults] = useState(false);
+
+  // AI-Powered Voice Search Handler
+  const handleVoiceResult = (text: string, matches: MenuItem[]) => {
+    setSearchTerm(text);
+    setVoiceSearchMatches(matches);
+    setShowVoiceResults(true);
+
+    if (matches.length > 0) {
+      toast({
+        title: `🤖 ${t.foundMatches.replace("{count}", matches.length.toString())} "${text}"`,
+        description: `Showing ${matches.length} best matches`,
+      });
+
+      // Scroll to first match
+      setTimeout(() => {
+        const firstMatch = document.getElementById(`item-${matches[0].id}`);
+        if (firstMatch) {
+          firstMatch.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300);
+    } else {
+      toast({
+        title: t.noVoiceMatches,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const { isListening, isSupported, startListening, stopListening } =
+    useVoiceSearch(handleVoiceResult, restaurant?.menuItems || [], lang);
 
   const callRestaurant = () => {
     if (!restaurant?.phoneNumber) return;
@@ -399,13 +870,34 @@ export default function PublicMenu() {
 
   const filteredItems = useMemo(() => {
     if (!restaurant?.menuItems) return [];
+
+    // If we have voice search results, use those
+    if (showVoiceResults && voiceSearchMatches.length > 0) {
+      return voiceSearchMatches;
+    }
+
     return restaurant.menuItems.filter((item: MenuItem) => {
       if (!item.active) return false;
+
       const categoryMatch =
         selectedCategory === "All" || item.category === selectedCategory;
+
+      // Use AI fuzzy matching for text search too
+      if (searchTerm !== "") {
+        const matches = findBestMatches(searchTerm, [item], lang, 0.3);
+        return categoryMatch && matches.length > 0;
+      }
+
       return categoryMatch;
     });
-  }, [restaurant?.menuItems, selectedCategory]);
+  }, [
+    restaurant?.menuItems,
+    selectedCategory,
+    searchTerm,
+    showVoiceResults,
+    voiceSearchMatches,
+    lang,
+  ]);
 
   const categories = useMemo(() => {
     if (!restaurant?.menuItems) return [];
@@ -414,6 +906,8 @@ export default function PublicMenu() {
   }, [restaurant?.menuItems]);
 
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+
+  // Save order to history
 
   if (isLoading) {
     return (
@@ -564,45 +1058,96 @@ export default function PublicMenu() {
         </div>
       </header>
 
+      {/* Enhanced Search Bar with Voice */}
       <div className="sticky top-0 z-40 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-b border-stone-100 dark:border-stone-800 py-4 shadow-sm transition-colors duration-300">
-        <div className="max-w-4xl mx-auto px-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-between bg-white dark:bg-stone-800 rounded-xl h-12 border-stone-200 dark:border-stone-700 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                    <UtensilsCrossed className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="truncate font-semibold text-stone-900 dark:text-stone-100">
-                    {selectedCategory === "All"
-                      ? t.allCategories
-                      : selectedCategory}
-                  </span>
-                </div>
-                <ChevronDown className="h-4 w-4 text-stone-400 dark:text-stone-500" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
-              <DropdownMenuItem
-                onClick={() => setSelectedCategory("All")}
-                className="hover:bg-stone-50 dark:hover:bg-stone-700 cursor-pointer py-3 px-4 font-semibold text-stone-700 dark:text-stone-200 focus:bg-stone-50 dark:focus:bg-stone-700 focus:text-stone-900 dark:focus:text-stone-100 rounded-lg m-1"
-              >
-                {t.allCategories}
-              </DropdownMenuItem>
-              {categories.map((cat: any) => (
-                <DropdownMenuItem
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className="hover:bg-stone-50 dark:hover:bg-stone-700 cursor-pointer py-3 px-4 font-medium text-stone-700 dark:text-stone-200 focus:bg-stone-50 dark:focus:bg-stone-700 focus:text-stone-900 dark:focus:text-stone-100 rounded-lg m-1"
+        <div className="max-w-4xl mx-auto px-4 space-y-3">
+          {/* Search Input with Voice */}
+          <div className="relative">
+            <Input
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowVoiceResults(false); // Reset voice results when typing
+              }}
+              placeholder={t.searchPlaceholder}
+              className="h-12 pl-4 pr-24 rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700"
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setShowVoiceResults(false);
+                    setVoiceSearchMatches([]);
+                  }}
                 >
-                  {cat}
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+              {isSupported && (
+                <Button
+                  variant={isListening ? "default" : "ghost"}
+                  size="icon"
+                  className={`h-8 w-8 ${isListening ? "animate-pulse" : ""}`}
+                  onClick={isListening ? stopListening : startListening}
+                  title={isListening ? t.listening : t.tapToSpeak}
+                >
+                  {isListening ? (
+                    <div className="relative">
+                      <Mic className="h-4 w-4" />
+                      <Sparkles className="h-2 w-2 absolute -top-1 -right-1 text-yellow-400" />
+                    </div>
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Category Filter & Order History */}
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="flex-1 justify-between bg-white dark:bg-stone-800 rounded-xl h-12 border-stone-200 dark:border-stone-700 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                      <UtensilsCrossed className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="truncate font-semibold text-stone-900 dark:text-stone-100">
+                      {selectedCategory === "All"
+                        ? t.allCategories
+                        : selectedCategory}
+                    </span>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-stone-400 dark:text-stone-500" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
+                <DropdownMenuItem
+                  onClick={() => setSelectedCategory("All")}
+                  className="hover:bg-stone-50 dark:hover:bg-stone-700 cursor-pointer py-3 px-4 font-semibold text-stone-700 dark:text-stone-200 focus:bg-stone-50 dark:focus:bg-stone-700 focus:text-stone-900 dark:focus:text-stone-100 rounded-lg m-1"
+                >
+                  {t.allCategories}
                 </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {categories.map((cat: any) => (
+                  <DropdownMenuItem
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className="hover:bg-stone-50 dark:hover:bg-stone-700 cursor-pointer py-3 px-4 font-medium text-stone-700 dark:text-stone-200 focus:bg-stone-50 dark:focus:bg-stone-700 focus:text-stone-900 dark:focus:text-stone-100 rounded-lg m-1"
+                  >
+                    {cat}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -626,6 +1171,7 @@ export default function PublicMenu() {
                 {items.map((item: MenuItem, itemIdx: number) => (
                   <motion.article
                     key={item.id}
+                    id={`item-${item.id}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: itemIdx * 0.05 }}
@@ -648,9 +1194,12 @@ export default function PublicMenu() {
                               ? item.nameMk
                               : item.name}
                         </h3>
-                        <span className="text-primary font-bold text-xl whitespace-nowrap">
-                          {item.price}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-primary font-bold text-xl whitespace-nowrap">
+                            {item.price}
+                          </span>
+                          <ShareDialog item={item} restaurantSlug={slug!} />
+                        </div>
                       </div>
                       <p className="text-sm text-stone-500 dark:text-stone-400 line-clamp-2 mb-3 leading-relaxed">
                         {lang === "al" && item.descriptionAl
@@ -785,6 +1334,7 @@ export default function PublicMenu() {
             className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t-2 border-stone-200 dark:border-stone-700 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-3 sm:p-5 z-50"
           >
             <div className="max-w-4xl mx-auto">
+              {/* Mobile View */}
               <div className="flex flex-col gap-2 sm:hidden">
                 <div className="flex items-center gap-2">
                   <div className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg">
@@ -823,12 +1373,12 @@ export default function PublicMenu() {
 
                     <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[110vh] flex flex-col">
                       <DialogHeader>
-                        <DialogTitle className="text-lg font-bold text-primary  ">
+                        <DialogTitle className="text-lg font-bold text-primary">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
 
-                      <ScrollArea className="flex-1 ">
+                      <ScrollArea className="flex-1">
                         <div className="space-y-4">
                           <div className="space-y-2">
                             <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
@@ -971,7 +1521,7 @@ export default function PublicMenu() {
                               </div>
                             </ScrollArea>
 
-                            <div className="flex justify-between items-center p-2 pt-4 pb-1 rounded-2xl ">
+                            <div className="flex justify-between items-center p-2 pt-4 pb-1 rounded-2xl">
                               <span className="text-base font-semibold dark:text-stone-100">
                                 {t.totalBill}
                               </span>
@@ -983,9 +1533,8 @@ export default function PublicMenu() {
                         </div>
                       </ScrollArea>
 
-                      <div className="pt-4  border-stone-200 dark:border-stone-700">
+                      <div className="pt-4 border-stone-200 dark:border-stone-700">
                         <div className="flex gap-1">
-                          {/* Order on WhatsApp Button */}
                           <Button
                             className="flex-1 h-auto px-3 py-1 text-xs font-semibold rounded-xl flex items-center justify-center"
                             onClick={() => {
@@ -1044,7 +1593,6 @@ export default function PublicMenu() {
                             🟢 {t.orderOnWhatsapp}
                           </Button>
 
-                          {/* Call to Order Button */}
                           <a
                             href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
                             className="flex-1"
@@ -1071,6 +1619,7 @@ export default function PublicMenu() {
                 </div>
               </div>
 
+              {/* Desktop View */}
               <div className="hidden sm:flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="bg-primary text-primary-foreground p-3 rounded-xl">
