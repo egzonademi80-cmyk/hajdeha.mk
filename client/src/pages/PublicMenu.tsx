@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { TrendingUp } from "lucide-react";
 import {
   Loader2,
   UtensilsCrossed,
@@ -98,7 +99,7 @@ const translations: Record<string, any> = {
     listening: "Listening...",
     tapToSpeak: "Tap to speak",
     voiceNotSupported: "Voice search not supported",
-    aiSearching: "🤖 AI is finding best matches...",
+    aiSearching: "Finding best matches...",
     foundMatches: "Found {count} matches for",
     noVoiceMatches: "No items match your search. Try different words.",
     shareItem: "Share Item",
@@ -149,7 +150,7 @@ const translations: Record<string, any> = {
     listening: "Duke dëgjuar...",
     tapToSpeak: "Kliko për të folur",
     voiceNotSupported: "Kërkimi me zë nuk mbështetet",
-    aiSearching: "🤖 AI po gjen përputhjet më të mira...",
+    aiSearching: "Duke gjetur përputhjet më të mira...",
     foundMatches: "U gjetën {count} përputhje për",
     noVoiceMatches: "Nuk ka artikuj që përputhen. Provo fjalë të tjera.",
     shareItem: "Ndaj artikullin",
@@ -200,7 +201,7 @@ const translations: Record<string, any> = {
     listening: "Слушам...",
     tapToSpeak: "Допрете за да зборувате",
     voiceNotSupported: "Гласовното пребарување не е поддржано",
-    aiSearching: "🤖 AI бара најдобри совпаѓања...",
+    aiSearching: "Ce бара најдобри совпаѓања...",
     foundMatches: "Пронајдени {count} совпаѓања за",
     noVoiceMatches: "Нема ставки што одговараат. Обидете се со други зборови.",
     shareItem: "Сподели производ",
@@ -306,7 +307,9 @@ function findBestMatches(
           : item.description;
 
     const nameScore = calculateSimilarity(query, name);
-    const descScore = calculateSimilarity(query, description) * 0.7; // Description is less important
+    const descScore = description
+      ? calculateSimilarity(query, description) * 0.7
+      : 0;
     const categoryScore = calculateSimilarity(query, item.category) * 0.5;
 
     const maxScore = Math.max(nameScore, descScore, categoryScore);
@@ -491,7 +494,7 @@ function ShareDialog({
             </Button>
           </div>
 
-          {navigator.share && (
+          {"share" in navigator && (
             <Button
               variant="outline"
               className="w-full gap-2"
@@ -817,8 +820,10 @@ export default function PublicMenu() {
 
     if (matches.length > 0) {
       toast({
-        title: `🤖 ${t.foundMatches.replace("{count}", matches.length.toString())} "${text}"`,
-        description: `Showing ${matches.length} best matches`,
+        title: `${t.foundMatches.replace("{count}", matches.length.toString())} "${text}"`,
+        description: matches.length
+          ? `${matches.length} matches found`
+          : "No matches found",
       });
 
       // Scroll to first match
@@ -1175,13 +1180,13 @@ export default function PublicMenu() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: itemIdx * 0.05 }}
-                    className="group flex gap-5 items-start bg-white dark:bg-stone-800 p-6 rounded-2xl shadow-sm border border-stone-100 dark:border-stone-700 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-300"
+                    className="group flex gap-5 items-start bg-white dark:bg-stone-800 p-4 rounded-2xl shadow-sm border border-stone-100 dark:border-stone-700 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-300"
                   >
                     {item.imageUrl && (
                       <img
                         src={item.imageUrl}
                         loading="lazy"
-                        className="w-28 h-28 rounded-xl object-cover shadow-md flex-shrink-0 group-hover:scale-105 transition-transform duration-300"
+                        className="w-16 h-24 rounded-xl object-cover shadow-md flex-shrink-0 group-hover:scale-105 transition-transform duration-300"
                         alt={item.name}
                       />
                     )}
