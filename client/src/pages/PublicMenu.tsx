@@ -29,6 +29,8 @@ import {
   Copy,
   Check,
   Sparkles,
+  Bot,
+  Send,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type MenuItem } from "@shared/schema";
@@ -774,6 +776,538 @@ function IsOpen(openingTime?: string, closingTime?: string) {
   return currentTime >= openingTime && currentTime <= closingTime;
 }
 
+// ========== AI ASSISTANT COMPONENT - ADDED HERE ==========
+interface AIMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  recommendedItems?: MenuItem[];
+}
+
+function AIRestaurantAssistant({
+  restaurantName,
+  restaurantPhone,
+  restaurantLocation,
+  openingTime,
+  closingTime,
+  menuItems,
+  onAddToCart,
+  lang,
+  onScrollToMap,
+}: {
+  restaurantName: string;
+  restaurantPhone?: string;
+  restaurantLocation?: string;
+  openingTime?: string;
+  closingTime?: string;
+  menuItems: MenuItem[];
+  onAddToCart: (itemId: number, quantity: number) => void;
+  lang: "en" | "al" | "mk";
+  onScrollToMap: () => void;
+}) {
+  const aiT: Record<string, any> = {
+    en: {
+      aiAssistant: "AI Assistant",
+      typing: "Thinking...",
+      placeholder: "Ask me anything...",
+      send: "Send",
+      addToCart: "Add",
+      added: "Added!",
+      greeting: `Hello! I'm your AI assistant for ${restaurantName}! 👋`,
+      canHelp:
+        "I can help you find dishes, show location, hours, or book a table!",
+    },
+    al: {
+      aiAssistant: "Asistenti AI",
+      typing: "Po mendon...",
+      placeholder: "Më pyet çfarë të duash...",
+      send: "Dërgo",
+      addToCart: "Shto",
+      added: "U shtua!",
+      greeting: `Përshëndetje! Unë jam asistenti juaj AI për ${restaurantName}! 👋`,
+      canHelp:
+        "Mund t'ju ndihmoj të gjeni pjata, të shihni vendndodhjen, orarin, ose të rezervoni tavolinë!",
+    },
+    mk: {
+      aiAssistant: "AI Асистент",
+      typing: "Размислува...",
+      placeholder: "Прашај ме што сакаш...",
+      send: "Испрати",
+      addToCart: "Додај",
+      added: "Додадено!",
+      greeting: `Здраво! Јас сум вашиот AI асистент за ${restaurantName}! 👋`,
+      canHelp:
+        "Можам да ви помогнам да најдете јадења, да ви покажам локација, работно време, или да резервирате маса!",
+    },
+  };
+
+  const t = aiT[lang];
+  const { toast } = useToast();
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<AIMessage[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+
+  const actionButtons = {
+    en: {
+      menu: [
+        { label: "Popular Dishes", action: "popular" },
+        { label: "Dietary Options", action: "dietary" },
+        { label: "Drinks & Desserts", action: "drinks" },
+    
+      ],
+      restaurant: [
+        { label: "Location", action: "location" },
+        { label: "Opening Hours", action: "hours" },
+        { label: "Book Table", action: "book" },
+      ],
+    },
+    al: {
+      menu: [
+        { label: "Pjatat Popullore", action: "popular" },
+        { label: "Opsionet Dietike", action: "dietary" },
+        { label: "Pije & Ëmbëlsira", action: "drinks" },
+      ],
+      restaurant: [
+        { label: "Vendndodhja", action: "location" },
+        { label: "Orari i Punës", action: "hours" },
+        { label: "Rezervo Tavolinë", action: "book" },
+      ],
+    },
+    mk: {
+      menu: [
+        { label: "Популарни Јадења", action: "popular" },
+        { label: "Диететски Опции", action: "dietary" },
+        { label: "Пијалоци & Десерти", action: "drinks" },
+      
+      ],
+      restaurant: [
+        { label: "Локација", action: "location" },
+        { label: "Работно Време", action: "hours" },
+        { label: "Резервирај Маса", action: "book" },
+      ],
+    },
+  };
+
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      setMessages([
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `${t.greeting}\n\n${t.canHelp}`,
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [isOpen]);
+
+  const executeAction = (action: string) => {
+    let response: AIMessage;
+
+    switch (action) {
+      case "popular":
+        const popular = menuItems
+          .filter((i) => i.active && i.category === "Mains")
+          .sort(() => Math.random() - 0.5) // shuffle
+          .slice(0, 6);
+
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? "⭐ Here are our most popular main dishes:"
+              : lang === "al"
+                ? "⭐ Këtu janë pjatat tona kryesore më popullore:"
+                : "⭐ Еве ги нашите најпопуларни главни јадења:",
+          timestamp: new Date(),
+          recommendedItems: popular,
+        };
+        break;
+
+      case "dietary":
+        const veg = menuItems
+          .filter((i) => i.isVegetarian || i.isVegan)
+          .slice(0, 3);
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? "🌱 Our vegetarian & vegan options:"
+              : lang === "al"
+                ? "🌱 Opsionet tona vegjetariane & vegane:"
+                : "🌱 Нашите вегетаријански и вегански опции:",
+          timestamp: new Date(),
+          recommendedItems:
+            veg.length > 0
+              ? veg
+              : menuItems.filter((i) => i.active).slice(0, 3),
+        };
+        break;
+
+      case "drinks":
+        const drinks = menuItems
+          .filter((i) => i.category.toLowerCase().includes("drink"))
+          .slice(0, 3);
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? "🥤 Our drinks & desserts:"
+              : lang === "al"
+                ? "🥤 Pijet & ëmbëlsirat tona:"
+                : "🥤 Нашите пијалоци и десерти:",
+          timestamp: new Date(),
+          recommendedItems:
+            drinks.length > 0
+              ? drinks
+              : menuItems.filter((i) => i.active).slice(0, 3),
+        };
+        break;
+
+      case "prices":
+        const cheap = [...menuItems]
+          .filter((i) => i.active)
+          .sort((a, b) => {
+            const priceA = parseInt(a.price.replace(/[^0-9]/g, "")) || 0;
+            const priceB = parseInt(b.price.replace(/[^0-9]/g, "")) || 0;
+            return priceA - priceB;
+          })
+          .slice(0, 3);
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? "💰 Best value options:"
+              : lang === "al"
+                ? "💰 Opsionet më të përballueshme:"
+                : "💰 Најдобри вредности:",
+          timestamp: new Date(),
+          recommendedItems: cheap,
+        };
+        break;
+
+      case "location":
+        const loc =
+          restaurantLocation ||
+          (lang === "en"
+            ? "Location not available"
+            : lang === "al"
+              ? "Vendndodhja nuk është e disponueshme"
+              : "Локацијата не е достапна");
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? `📍 Our location: ${loc}${
+                  restaurantPhone ? `\n📞 ${restaurantPhone}` : ""
+                }`
+              : lang === "al"
+                ? `📍 Lokacioni ynë: ${loc}${
+                    restaurantPhone ? `\n📞 ${restaurantPhone}` : ""
+                  }`
+                : `📍 Наша локација: ${loc}${
+                    restaurantPhone ? `\n📞 ${restaurantPhone}` : ""
+                  }`,
+          timestamp: new Date(),
+        };
+        setTimeout(() => onScrollToMap(), 500);
+        break;
+
+      case "hours":
+        const hours =
+          openingTime && closingTime
+            ? `${openingTime} - ${closingTime}`
+            : lang === "en"
+              ? "Contact us for hours"
+              : lang === "al"
+                ? "Na kontaktoni për orarin"
+                : "Контактирајте не за работно време";
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? `⏰ Opening hours: ${openingTime} - ${closingTime}`
+              : lang === "al"
+                ? `⏰ Orari: ${openingTime} - ${closingTime}`
+                : `⏰ Работно време: ${openingTime} - ${closingTime}`,
+          timestamp: new Date(),
+        };
+        break;
+
+      case "book":
+        if (restaurantPhone) {
+          const bookingMessage =
+            lang === "en"
+              ? `Hello! I would like to book a table at ${restaurantName}.\n\nMy details:\n• Date & Time: \n• Number of guests: \n• Name: \n\nThank you!`
+              : lang === "al"
+                ? `Përshëndetje! Dëshiroj të rezervoj tavolinë në ${restaurantName}.\n\nDetajet:\n• Data & Ora: \n• Numri i mysafirëve: \n• Emri: \n\nFaleminderit!`
+                : `Здраво! Сакам да резервирB�м маса во ${restaurantName}.\n\nМои дет  l���ли:\n• Датум и време: \n• Број на гости: \n• Име: \n\nБлагодарам!`;
+
+          window.open(
+            `https://wa.me/${restaurantPhone.replace(/\D/g, "")}?text=${encodeURIComponent(bookingMessage)}`,
+            "_blank",
+          );
+        }
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? "📱 Opening WhatsApp to book your table..."
+              : lang === "al"
+                ? "📱 Duke hapur WhatsApp për të rezervuar tavolinë..."
+                : "📱 Се отвора WhatsApp за резервација...",
+          timestamp: new Date(),
+        };
+        break;
+
+      default:
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? "How can I help you?"
+              : lang === "al"
+                ? "Si mund t'ju ndihmoj?"
+                : "Како можам да помогнам?",
+          timestamp: new Date(),
+        };
+    }
+
+    setMessages((prev) => [...prev, response]);
+  };
+
+  const handleSendMessage = () => {
+    if (!inputValue.trim()) return;
+
+    const userMessage: AIMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: inputValue,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputValue("");
+    setIsTyping(true);
+
+    setTimeout(() => {
+      const query = inputValue.toLowerCase();
+      let response: AIMessage;
+
+      if (/popular|best|recommend/i.test(query)) {
+        executeAction("popular");
+      } else if (/vegetarian|vegan|diet/i.test(query)) {
+        executeAction("dietary");
+      } else if (/drink|beverage|desert/i.test(query)) {
+        executeAction("drinks");
+      } else if (/cheap|price|afford/i.test(query)) {
+        executeAction("prices");
+      } else if (/location|where|address/i.test(query)) {
+        executeAction("location");
+      } else if (/hours|open|close|time/i.test(query)) {
+        executeAction("hours");
+      } else if (/book|reserve|table/i.test(query)) {
+        executeAction("book");
+      } else {
+        response = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            lang === "en"
+              ? "I can help you with menu recommendations, location, hours, and bookings. What would you like to know?"
+              : lang === "al"
+                ? "Mund t'ju ndihmoj me rekomandime menuje, vendndodhje, orarin, dhe rezervime. Çfarë dëshironi të dini?"
+                : "Можам да ви помогнам со препораки за мени, локација, работно време и резервации. Што сакате да знаете?",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, response]);
+      }
+      setIsTyping(false);
+    }, 1000);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button className="fixed bottom-28 right-6 h-14 w-14 rounded-full shadow-2xl hover:scale-110 transition-transform z-40 bg-gradient-to-r from-primary to-primary/80">
+          <Bot className="h-6 w-6" />
+          <Sparkles className="h-3 w-3 absolute -top-1 -right-1 text-yellow-400 animate-pulse" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md h-[80vh] flex flex-col p-0 gap-0 bg-gradient-to-b from-white to-stone-50 dark:from-stone-900 dark:to-stone-950">
+        <DialogHeader className="p-6 pb-4 border-b dark:border-stone-700">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+              <Bot className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-lg dark:text-stone-100">
+                {t.aiAssistant}
+              </DialogTitle>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-semibold text-stone-600 dark:text-stone-400">
+              🍽️{" "}
+              {lang === "en"
+                ? "Më pyetni për:"
+                : lang === "al"
+                  ? "Më pyetni për:"
+                  : "Прашајте ме за:"}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {actionButtons[lang].menu.map((btn, i) => (
+                <Button
+                  key={i}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 justify-start"
+                  onClick={() => executeAction(btn.action)}
+                >
+                  {btn.label}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs font-semibold text-stone-600 dark:text-stone-400 pt-2">
+              📍{" "}
+              {lang === "en"
+                ? "Info restorant:"
+                : lang === "al"
+                  ? "Info restorant:"
+                  : "Инфо ресторан:"}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {actionButtons[lang].restaurant.map((btn, i) => (
+                <Button
+                  key={i}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 justify-start"
+                  onClick={() => executeAction(btn.action)}
+                >
+                  {btn.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </DialogHeader>
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
+            <AnimatePresence>
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-white dark:bg-stone-800 border dark:border-stone-700 text-stone-900 dark:text-stone-100"}`}
+                  >
+                    <p className="text-sm whitespace-pre-line">
+                      {message.content}
+                    </p>
+                    {message.recommendedItems &&
+                      message.recommendedItems.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          {message.recommendedItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="bg-stone-50 dark:bg-stone-700/50 rounded-xl p-3 border dark:border-stone-600"
+                            >
+                              <div className="flex items-center gap-3">
+                                {item.imageUrl && (
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="w-12 h-12 rounded-lg object-cover"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm text-stone-900 dark:text-stone-100 truncate">
+                                    {item.name}
+                                  </p>
+                                  <p className="text-xs text-stone-500 dark:text-stone-400 truncate">
+                                    {item.description}
+                                  </p>
+                                  <p className="text-sm font-bold text-primary mt-1">
+                                    {item.price}
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    onAddToCart(item.id, 1);
+                                    toast({ title: `${item.name} ${t.added}` });
+                                  }}
+                                  className="flex-shrink-0 h-8"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  {t.addToCart}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            {isTyping && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex justify-start"
+              >
+                <div className="bg-white dark:bg-stone-800 border dark:border-stone-700 rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-stone-600 dark:text-stone-300">
+                      {t.typing}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </ScrollArea>
+        <div className="p-4 border-t dark:border-stone-700 bg-white dark:bg-stone-900">
+          <div className="flex gap-2">
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              placeholder={t.placeholder}
+              className="flex-1 rounded-full dark:bg-stone-800 dark:text-stone-100"
+              disabled={isTyping}
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isTyping}
+              size="icon"
+              className="rounded-full h-10 w-10"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+// ========== END OF AI ASSISTANT ==========
+
 export default function PublicMenu() {
   const { slug } = useParams<{ slug: string }>();
   const [lang] = useState<"en" | "al" | "mk">(() => {
@@ -912,7 +1446,12 @@ export default function PublicMenu() {
 
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // Save order to history
+  const scrollToMap = () => {
+    const mapSection = document.getElementById("map-section");
+    if (mapSection) {
+      mapSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -966,6 +1505,19 @@ export default function PublicMenu() {
           <X className="h-5 w-5 text-stone-700 dark:text-stone-300" />
         </Button>
       </Link>
+
+      {/* AI ASSISTANT - ADDED HERE */}
+      <AIRestaurantAssistant
+        restaurantName={restaurant.name}
+        restaurantPhone={restaurant.phoneNumber ?? undefined}
+        restaurantLocation={restaurant.location || undefined}
+        openingTime={restaurant.openingTime || undefined}
+        closingTime={restaurant.closingTime || undefined}
+        menuItems={restaurant.menuItems || []}
+        onAddToCart={(itemId, quantity) => updateCart(itemId, quantity)}
+        lang={lang}
+        onScrollToMap={scrollToMap}
+      />
 
       <header className="relative bg-stone-900 dark:bg-stone-950 overflow-hidden">
         {restaurant.photoUrl ? (
@@ -1284,6 +1836,7 @@ export default function PublicMenu() {
         )}
 
         <motion.section
+          id="map-section"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
