@@ -11,39 +11,53 @@ export function DarkModeToggle({
   isDark,
   toggleDarkMode,
 }: DarkModeToggleProps) {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true);
 
-  // Show button after scrolling down 60px
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 60) {
-        setShow(true);
-      } else {
-        setShow(false);
-      }
+      const scrollTop = window.scrollY;
+      const docHeight =
+        document.documentElement.scrollHeight -
+        document.documentElement.clientHeight;
+
+      const scrollPercent = (scrollTop / docHeight) * 100;
+
+      // Shfaq vetëm në 3% e parë
+      setShow(scrollPercent <= 6);
     };
 
-    // Initialize visibility based on current scroll position
     handleScroll();
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  if (!show) return null; // hide before scrolling
 
   return (
     <Button
       variant="ghost"
       size="icon"
       onClick={toggleDarkMode}
-      className="fixed top-6 right-6 z-50 bg-white/90 dark:bg-stone-800/90 backdrop-blur-lg hover:bg-stone-100 dark:hover:bg-stone-700 shadow-lg rounded-full h-11 w-11 border border-stone-200 dark:border-stone-700/50 transition-all hover:scale-105"
       aria-label="Toggle dark mode"
+      className={`fixed top-4 right-6 z-50
+        h-11 w-11
+        rounded-full
+        bg-white/90 dark:bg-stone-800/90
+        backdrop-blur-2xl
+        shadow-[0_8px_30px_rgba(0,0,0,0.15)]
+        border border-stone-200 dark:border-stone-700/50
+        transition-all duration-300 ease-out
+        hover:scale-110 hover:shadow-[0_12px_40px_rgba(0,0,0,0.2)]
+        ${
+          show
+            ? "opacity-100 scale-100"
+            : "opacity-0 scale-75 pointer-events-none"
+        }
+      `}
     >
       {isDark ? (
-        <Sun className="h-5 w-5 text-yellow-500 transition-transform rotate-0" />
+        <Sun className="h-5 w-5 text-yellow-500 transition-transform duration-300" />
       ) : (
-        <Moon className="h-5 w-5 text-stone-700 transition-transform rotate-0" />
+        <Moon className="h-5 w-5 text-stone-700 dark:text-stone-300 transition-transform duration-300" />
       )}
     </Button>
   );
