@@ -11,7 +11,7 @@ export function DarkModeToggle({
   isDark,
   toggleDarkMode,
 }: DarkModeToggleProps) {
-  const [show, setShow] = useState(true);
+  const [show, setShow] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -19,15 +19,13 @@ export function DarkModeToggle({
       const docHeight =
         document.documentElement.scrollHeight -
         document.documentElement.clientHeight;
-
       const scrollPercent = (scrollTop / docHeight) * 100;
 
-      // Shfaq vetëm në 3% e parë
-      setShow(scrollPercent <= 6);
+      // Shfaqet në 2% dhe fshihet në 6%
+      setShow(scrollPercent >= 2 && scrollPercent <= 6);
     };
 
-    handleScroll();
-
+    handleScroll(); // Check initial state
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
