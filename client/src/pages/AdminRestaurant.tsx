@@ -632,13 +632,19 @@ const MenuItemCard = memo(function MenuItemCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex justify-between gap-2 mb-1">
-            <h4 className="font-semibold text-sm truncate">{item.name}</h4>
+            <h4 className="font-semibold text-sm truncate">
+              {lang === "al" && item.nameAl ? item.nameAl : 
+               lang === "mk" && item.nameMk ? item.nameMk : 
+               item.name}
+            </h4>
             <span className="font-bold text-primary text-sm whitespace-nowrap">
               {item.price}
             </span>
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-            {item.description}
+            {lang === "al" && item.descriptionAl ? item.descriptionAl : 
+             lang === "mk" && item.descriptionMk ? item.descriptionMk : 
+             item.description}
           </p>
           <div className="flex gap-1 flex-wrap">
             <div
