@@ -328,6 +328,17 @@ export default function AdminDashboard() {
   const [qrColor, setQrColor] = useState("#000000");
   const [qrBgColor, setQrBgColor] = useState("#ffffff");
 
+  const updateRestaurantMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      const res = await apiRequest("PATCH", buildUrl(api.restaurants.update.path, { id }), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.restaurants.list.path] });
+      toast({ title: "QR Design Saved" });
+    },
+  });
+
   const generateQR = async (restaurant: any) => {
     try {
       const url = `${window.location.origin}/restaurant/${restaurant.slug}`;
@@ -840,6 +851,19 @@ export default function AdminDashboard() {
                               className="w-full text-xs"
                             >
                               Update QR Preview
+                            </Button>
+
+                            <Button 
+                              size="sm" 
+                              onClick={() => updateRestaurantMutation.mutate({ 
+                                id: activeRestaurant.id, 
+                                qrColor, 
+                                qrBgColor 
+                              })}
+                              disabled={updateRestaurantMutation.isPending}
+                              className="w-full text-xs bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                            >
+                              {updateRestaurantMutation.isPending ? "Saving..." : "Save Design to Restaurant"}
                             </Button>
 
                             {qrData ? (
