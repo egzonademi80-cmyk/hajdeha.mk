@@ -599,7 +599,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
               type="text" 
               value={formData.qrColor} 
               onChange={(e) => setFormData(p => ({ ...p, qrColor: e.target.value }))}
-              className="flex-1 h-9 font-mono text-xs uppercase"
+              className="flex-1 h-9 font-mono text-xs uppercase px-2"
             />
           </div>
         </div>
@@ -616,7 +616,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
               type="text" 
               value={formData.qrBgColor} 
               onChange={(e) => setFormData(p => ({ ...p, qrBgColor: e.target.value }))}
-              className="flex-1 h-9 font-mono text-xs uppercase"
+              className="flex-1 h-9 font-mono text-xs uppercase px-2"
             />
           </div>
         </div>
