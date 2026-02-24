@@ -2,18 +2,92 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
     react({
-      // ✅ Use automatic JSX runtime (smaller bundle)
       jsxRuntime: "automatic",
-      // ✅ No babel plugins needed
       babel: {
         plugins: [],
       },
     }),
     runtimeErrorOverlay(),
+
+    // ✅ PWA — install prompt + offline support
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.ico", "icon-192.png", "icon-512.png"],
+      manifest: {
+        name: "HAJDE HA",
+        short_name: "HAJDE HA",
+        description: "Platforma e Menusë Dixhitale e Tetovës",
+        theme_color: "#E8450A", // ← ndrysho me ngjyrën tënde primary
+        background_color: "#ffffff",
+        display: "standalone",
+        orientation: "portrait",
+        start_url: "/",
+        scope: "/",
+        lang: "sq",
+        icons: [
+          {
+            src: "/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+          {
+            src: "/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable",
+          },
+        ],
+      },
+      workbox: {
+        // Cache strategies
+        runtimeCaching: [
+          {
+            // Cache restaurant images from Unsplash / uploads
+            urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|webp|svg)$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "images-cache",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+          {
+            // Cache API calls — NetworkFirst so data is fresh but works offline
+            urlPattern: /^https?:\/\/.*\/api\/.*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "api-cache",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24, // 1 day
+              },
+              networkTimeoutSeconds: 10,
+            },
+          },
+          {
+            // Cache QR code API
+            urlPattern: /^https:\/\/api\.qrserver\.com\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "qr-cache",
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+              },
+            },
+          },
+        ],
+      },
+    }),
+
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -37,62 +111,36 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-
-    // ✅ Optimize minification
-    minify: "esbuild", // Faster than terser, still good compression
-
-    // ✅ Generate sourcemaps only in development
+    minify: "esbuild",
     sourcemap: process.env.NODE_ENV === "development",
-
-    // ✅ Optimize chunk size
     chunkSizeWarningLimit: 1000,
-
-    // ✅ Code splitting for better caching
     rollupOptions: {
       output: {
-        // Split vendor code into separate chunks
         manualChunks: {
-          // React core (changes rarely)
           "react-core": ["react", "react-dom"],
-
-          // Routing (changes rarely)
           router: ["wouter"],
-
-          // Data fetching (changes rarely)
           query: ["@tanstack/react-query"],
-
-          // UI libraries (changes rarely)
           "ui-icons": ["lucide-react"],
           "ui-motion": ["framer-motion"],
         },
-
-        // ✅ Better file naming for caching
         entryFileNames: "assets/[name].[hash].js",
         chunkFileNames: "assets/[name].[hash].js",
         assetFileNames: "assets/[name].[hash].[ext]",
       },
     },
-
-    // ✅ Target modern browsers (smaller bundle)
     target: "es2020",
-
-    // ✅ Optimize CSS
     cssCodeSplit: true,
     cssMinify: true,
   },
-
   server: {
     fs: {
       strict: true,
       deny: ["**/.*"],
     },
-    // ✅ Enable HMR for faster dev experience
     hmr: {
       overlay: true,
     },
   },
-
-    // ✅ Optimize dependency pre-bundling
   optimizeDeps: {
     include: [
       "react",
@@ -103,15 +151,9 @@ export default defineConfig({
       "framer-motion",
       "leaflet",
     ],
-    // ✅ No longer excluding leaflet for faster startup
   },
-
-  // ✅ Enable esbuild for faster builds
   esbuild: {
-    // Remove console.log in production
     drop: process.env.NODE_ENV === "production" ? ["console", "debugger"] : [],
-
-    // Optimize for modern syntax
     target: "es2020",
   },
 });
