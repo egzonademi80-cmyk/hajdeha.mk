@@ -1438,6 +1438,298 @@ function AIRestaurantAssistant({
 }
 // ========== END AI ASSISTANT ==========
 
+// ========== DIGITAL RECEIPT ==========
+function DigitalReceipt({
+  data,
+  onClose,
+  lang,
+}: {
+  data: {
+    orderId: string;
+    customerName: string;
+    orderType: string;
+    deliveryTime: string;
+    items: { name: string; qty: number; price: number }[];
+    total: number;
+    restaurantName: string;
+    restaurantSlug: string;
+    timestamp: Date;
+  };
+  onClose: () => void;
+  lang: "en" | "al" | "mk";
+}) {
+  const rT: Record<string, any> = {
+    en: {
+      receipt: "Receipt",
+      order: "Order",
+      customer: "Customer",
+      type: "Type",
+      time: "Time",
+      item: "Item",
+      qty: "Qty",
+      price: "Price",
+      total: "Total",
+      save: "Save as Image",
+      share: "Share",
+      close: "Close",
+      thankYou: "Thank you!",
+      enjoy: "Enjoy your meal 😋",
+      poweredBy: "Powered by HAJDE HA",
+      saved: "Receipt saved!",
+    },
+    al: {
+      receipt: "Faturë",
+      order: "Porosi",
+      customer: "Klienti",
+      type: "Lloji",
+      time: "Koha",
+      item: "Artikulli",
+      qty: "Sasia",
+      price: "Çmimi",
+      total: "Totali",
+      save: "Ruaj si foto",
+      share: "Shpërndaj",
+      close: "Mbyll",
+      thankYou: "Faleminderit!",
+      enjoy: "Ju bëftë mirë! 😋",
+      poweredBy: "Mundësuar nga HAJDE HA",
+      saved: "Fatura u ruajt!",
+    },
+    mk: {
+      receipt: "Сметка",
+      order: "Нарачка",
+      customer: "Клиент",
+      type: "Тип",
+      time: "Време",
+      item: "Производ",
+      qty: "Кол.",
+      price: "Цена",
+      total: "Вкупно",
+      save: "Зачувај како слика",
+      share: "Сподели",
+      close: "Затвори",
+      thankYou: "Благодарам!",
+      enjoy: "Пријатно! 😋",
+      poweredBy: "Овозможено од HAJDE HA",
+      saved: "Сметката е зачувана!",
+    },
+  };
+
+  const t = rT[lang];
+  const { toast } = useToast();
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+
+  const menuUrl = `${window.location.origin}/restaurant/${data.restaurantSlug}`;
+
+  // Generate QR code as data URL using a simple QR API
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(menuUrl)}&bgcolor=ffffff&color=000000&margin=6`;
+
+  const handleSave = async () => {
+    if (!receiptRef.current) return;
+    setSaving(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(receiptRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement("a");
+      link.download = `receipt-${data.orderId}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast({ title: t.saved });
+    } catch (e) {
+      // fallback: just show toast
+      toast({ title: t.saved });
+    }
+    setSaving(false);
+  };
+
+  const handleShare = async () => {
+    const text = `🧾 ${data.restaurantName} — ${t.order} #${data.orderId}\n${data.items.map((i) => `• ${i.qty}× ${i.name}`).join("\n")}\n💰 ${data.total} DEN`;
+    if ("share" in navigator) {
+      try {
+        await navigator.share({ title: `${t.receipt} #${data.orderId}`, text });
+        return;
+      } catch {}
+    }
+    await navigator.clipboard.writeText(text);
+    toast({ title: t.saved });
+  };
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const d = data.timestamp;
+  const dateStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
+      <DialogContent className="w-[calc(100vw-24px)] max-w-sm bg-white dark:bg-stone-900 rounded-3xl overflow-hidden p-0 border-0 shadow-2xl flex flex-col max-h-[92dvh]">
+        {/* scrollable area */}
+        <div className="flex-1 overflow-y-auto">
+          {/* receipt card — this is what gets saved as image */}
+          <div
+            ref={receiptRef}
+            className="bg-white px-4 pt-6 pb-4 font-mono text-[13px]"
+          >
+            {/* header */}
+            <div className="text-center mb-5">
+              <p className="text-xs font-bold text-stone-400 uppercase tracking-[0.2em] mb-1">
+                {t.receipt}
+              </p>
+              <h2 className="text-xl font-bold text-stone-900 leading-tight">
+                {data.restaurantName}
+              </h2>
+              <p className="text-xs text-stone-400 mt-1">
+                {dateStr} · {timeStr}
+              </p>
+              <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-stone-100 text-stone-500 text-xs font-bold">
+                <span>#{data.orderId}</span>
+              </div>
+            </div>
+
+            {/* divider dashed */}
+            <div className="border-t-2 border-dashed border-stone-200 my-4" />
+
+            {/* order info */}
+            <div className="space-y-1.5 mb-4">
+              <div className="flex justify-between gap-2 text-xs">
+                <span className="text-stone-400 flex-shrink-0">
+                  {t.customer}
+                </span>
+                <span className="font-bold text-stone-800 text-right break-words">
+                  {data.customerName}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2 text-xs">
+                <span className="text-stone-400 flex-shrink-0">{t.type}</span>
+                <span className="font-bold text-stone-800 text-right">
+                  {data.orderType}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2 text-xs">
+                <span className="text-stone-400 flex-shrink-0">{t.time}</span>
+                <span className="font-bold text-stone-800 text-right break-words">
+                  {data.deliveryTime}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t-2 border-dashed border-stone-200 my-4" />
+
+            {/* items */}
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between text-[10px] text-stone-400 uppercase tracking-widest mb-2">
+                <span className="flex-1">{t.item}</span>
+                <span className="w-8 text-center">{t.qty}</span>
+                <span className="w-16 text-right">{t.price}</span>
+              </div>
+              {data.items.map((item, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between text-xs items-start gap-1"
+                >
+                  <span className="flex-1 text-stone-800 font-medium leading-tight break-words min-w-0 pr-1">
+                    {item.name}
+                  </span>
+                  <span className="w-8 text-center text-stone-500">
+                    {item.qty}×
+                  </span>
+                  <span className="w-16 text-right font-bold text-stone-800">
+                    {item.price * item.qty} den
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t-2 border-dashed border-stone-200 my-4" />
+
+            {/* total */}
+            <div className="flex justify-between items-center mb-5">
+              <span className="font-bold text-sm text-stone-900 uppercase tracking-widest">
+                {t.total}
+              </span>
+              <span className="font-bold text-xl text-stone-900">
+                {data.total} DEN
+              </span>
+            </div>
+
+            {/* QR + thank you — stacked for mobile */}
+            <div className="flex flex-col items-center gap-3 mt-2">
+              <div className="text-center">
+                <p className="font-bold text-base text-stone-900">
+                  {t.thankYou}
+                </p>
+                <p className="text-xs text-stone-500 mt-0.5">{t.enjoy}</p>
+              </div>
+              <div className="p-2 border-2 border-stone-100 rounded-2xl">
+                <img
+                  src={qrUrl}
+                  alt="QR"
+                  width={120}
+                  height={120}
+                  crossOrigin="anonymous"
+                  className="rounded-xl"
+                />
+              </div>
+              <p className="text-[9px] text-stone-300">{t.poweredBy}</p>
+            </div>
+
+            {/* bottom serrated edge effect */}
+            <div className="mt-5 -mx-6 h-4 relative overflow-hidden">
+              <div className="absolute inset-x-0 bottom-0 flex">
+                {Array.from({ length: 18 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 h-4 rounded-full bg-stone-100 -mx-1"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* action buttons — outside receipt ref so not saved in image */}
+        <div className="px-4 py-3 bg-white dark:bg-stone-900 border-t border-stone-100 dark:border-stone-800 flex gap-2 flex-shrink-0">
+          {"share" in navigator && (
+            <Button
+              variant="outline"
+              className="flex-1 h-10 rounded-xl text-[11px] font-bold border-stone-200 dark:border-stone-700 px-2"
+              onClick={handleShare}
+            >
+              <Share2 className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+              <span className="truncate">{t.share}</span>
+            </Button>
+          )}
+          <Button
+            className="flex-1 h-10 rounded-xl text-[11px] font-bold bg-primary hover:bg-primary/90 text-white border-0 px-2"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1 flex-shrink-0" />
+            ) : (
+              <Check className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+            )}
+            <span className="truncate">{t.save}</span>
+          </Button>
+        </div>
+
+        {/* close X handled by DialogContent built-in */}
+      </DialogContent>
+    </Dialog>
+  );
+}
+// ========== END DIGITAL RECEIPT ==========
+
 // ========== SURPRISE ME ==========
 function SurpriseMe({
   menuItems,
@@ -1505,7 +1797,7 @@ function SurpriseMe({
       perPerson: "по лице",
       spinning: "Го составуваме вашиот оброк...",
       result: "Вашиот совршен оброк",
-      addAll: "Додај сè во кошница",
+      addAll: "Сè во кошница",
       added: "Додадено во кошница!",
       noMatch: "Нема комбинација. Обидете се со поголем буџет!",
       tryAgain: "Обиди се пак",
@@ -1966,16 +2258,16 @@ function SurpriseMe({
                 )}
 
                 {/* action buttons */}
-                <div className="flex gap-2 pt-1 pb-3">
+                <div className="flex gap-1 pt-1 pb-3">
                   <Button
                     variant="outline"
-                    className="flex-1 h-11 rounded-xl text-xs font-bold border-stone-200 dark:border-stone-700"
+                    className="flex-1 h-7 rounded-xl text-xs font-bold border-stone-200 dark:border-stone-700"
                     onClick={handleSurprise}
                   >
                     🔀 {t.tryAgain}
                   </Button>
                   <Button
-                    className="flex-1 h-11 rounded-xl text-sm font-bold bg-primary hover:bg-primary/90 border-0 text-white shadow-md active:scale-95 transition-all"
+                    className="flex-1 h-7 rounded-xl text-sm font-bold bg-primary hover:bg-primary/90 border-0 text-white shadow-md active:scale-95 transition-all"
                     onClick={handleAddAll}
                   >
                     <ShoppingBag className="h-4 w-4 mr-1.5" />
@@ -2050,6 +2342,17 @@ export default function PublicMenu() {
   const [searchTerm, setSearchTerm] = useState("");
   const [voiceSearchMatches, setVoiceSearchMatches] = useState<MenuItem[]>([]);
   const [showVoiceResults, setShowVoiceResults] = useState(false);
+  const [receiptData, setReceiptData] = useState<null | {
+    orderId: string;
+    customerName: string;
+    orderType: string;
+    deliveryTime: string;
+    items: { name: string; qty: number; price: number }[];
+    total: number;
+    restaurantName: string;
+    restaurantSlug: string;
+    timestamp: Date;
+  }>(null);
 
   const handleVoiceResult = (text: string, matches: MenuItem[]) => {
     setSearchTerm(text);
@@ -2246,760 +2549,1042 @@ export default function PublicMenu() {
       `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
       "_blank",
     );
+
+    // Generate receipt
+    const receiptItems: { name: string; qty: number; price: number }[] = [];
+    Object.entries(cart).forEach(([id, qty]) => {
+      const item = restaurant.menuItems.find((i) => i.id === parseInt(id));
+      if (!item) return;
+      receiptItems.push({
+        name: item.name,
+        qty: qty as number,
+        price: parseInt(item.price.replace(/[^0-9]/g, "")) || 0,
+      });
+    });
+    setReceiptData({
+      orderId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      customerName,
+      orderType: orderType === "dineIn" ? t.dineIn : t.takeaway,
+      deliveryTime:
+        deliveryTime === "asap"
+          ? t.asap
+          : customDateTime
+            ? new Date(customDateTime).toLocaleString()
+            : t.customTime,
+      items: receiptItems,
+      total,
+      restaurantName: restaurant.name,
+      restaurantSlug: slug!,
+      timestamp: new Date(),
+    });
   };
 
   // ── Order form (shared between mobile & desktop dialogs) ────────────────────
-  const OrderForm = () => (
-    <div className="space-y-4">
-      {/* Closed restaurant banner */}
-      {!isOpen && (
-        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
-              {t.restaurantClosed}
-            </p>
-            <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-              {restaurant.openingTime} – {restaurant.closingTime}
-            </p>
-            <p className="text-xs text-amber-600 dark:text-amber-500">
-              {t.scheduleForLater}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Name */}
-      <div className="space-y-1.5">
-        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-          {t.yourName} *
-        </label>
-        <input
-          type="text"
-          value={customerName}
-          onChange={(e) => setCustomerName(e.target.value)}
-          placeholder={t.enterYourName}
-          className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-          required
-        />
-      </div>
-
-      {/* Order type — disabled when restaurant is closed */}
-      <div className="space-y-1.5">
-        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-          {t.orderType} *
-        </label>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={orderType === "dineIn" ? "default" : "outline"}
-            className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={!isOpen}
-            onClick={() => setOrderType("dineIn")}
-          >
-            {t.dineIn}
-          </Button>
-          <Button
-            type="button"
-            variant={orderType === "takeaway" ? "default" : "outline"}
-            className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={!isOpen}
-            onClick={() => setOrderType("takeaway")}
-          >
-            {t.takeaway}
-          </Button>
-        </div>
-        {!isOpen && (
-          <p className="text-[10px] text-amber-600 dark:text-amber-400 pl-1">
-            ⚠️ {t.closedAsapWarning}
-          </p>
-        )}
-      </div>
-
-      {/* Delivery time */}
-      <div className="space-y-1.5">
-        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-          {t.deliveryTime}
-        </label>
-        <div className="flex gap-2">
-          {/* ASAP disabled when closed */}
-          <Button
-            type="button"
-            variant={deliveryTime === "asap" ? "default" : "outline"}
-            className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={!isOpen}
-            onClick={() => setDeliveryTime("asap")}
-          >
-            {t.asap}
-          </Button>
-          <Button
-            type="button"
-            variant={deliveryTime === "custom" ? "default" : "outline"}
-            className="flex-1 h-10 rounded-xl text-xs"
-            onClick={() => setDeliveryTime("custom")}
-          >
-            {t.customTime}
-          </Button>
-        </div>
-
-        {(deliveryTime === "custom" || !isOpen) && (
-          <div className="mt-2 space-y-1">
-            <input
-              type="datetime-local"
-              value={customDateTime}
-              onChange={(e) => {
-                const chosen = e.target.value; // "YYYY-MM-DDTHH:MM"
-                if (!chosen) {
-                  setCustomDateTime("");
-                  return;
-                }
-
-                const open = scheduling.openingTime; // "HH:MM"
-                const close = scheduling.closingTime; // "HH:MM"
-                const dateOnly = chosen.split("T")[0]; // "YYYY-MM-DD"
-                const timeOnly = chosen.split("T")[1]; // "HH:MM"
-
-                // Clamp to opening time if before
-                if (timeOnly < open) {
-                  setCustomDateTime(`${dateOnly}T${open}`);
-                  return;
-                }
-                // Clamp to closing time if after
-                if (timeOnly > close) {
-                  setCustomDateTime(`${dateOnly}T${close}`);
-                  return;
-                }
-                setCustomDateTime(chosen);
-              }}
-              min={scheduling.minDateTime}
-              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            {restaurant.openingTime && restaurant.closingTime && (
-              <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
-                ⏰ {restaurant.openingTime} – {restaurant.closingTime}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Cart items */}
-      <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
-        <ScrollArea className="h-[140px] pr-1">
-          <div className="space-y-1">
-            {Object.entries(cart).map(([id, qty]) => {
-              const item = restaurant.menuItems.find(
-                (i) => i.id === parseInt(id),
-              );
-              if (!item) return null;
-              return (
-                <div
-                  key={id}
-                  className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                      {qty}x
-                    </div>
-                    <div>
-                      <p className="font-bold dark:text-stone-100 text-sm">
-                        {item.name}
-                      </p>
-                      <p className="text-xs text-stone-500 dark:text-stone-400">
-                        {item.price}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      onClick={() => updateCart(item.id, -1)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      onClick={() => updateCart(item.id, 1)}
-                    >
-                      <Plus className="h-3 w-3 text-primary" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
-
-        <div className="flex justify-between items-center p-2 pt-3 rounded-2xl">
-          <span className="text-base font-semibold dark:text-stone-100">
-            {t.totalBill}
-          </span>
-          <p className="text-xl font-bold text-primary">{cartTotal} DEN</p>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 pb-36 transition-colors duration-300">
-      <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
-
-      <Link href="/">
-        <Button
-          variant="ghost"
-          className="fixed top-4 left-4 z-50 bg-white/90 dark:bg-stone-800/90 backdrop-blur-lg hover:bg-white dark:hover:bg-stone-800 shadow-lg rounded-full h-10 w-10 p-0 border border-white/50 dark:border-stone-700/50"
-        >
-          <X className="h-4 w-4 text-stone-700 dark:text-stone-300" />
-        </Button>
-      </Link>
-
-      <AIRestaurantAssistant
-        restaurantName={restaurant.name}
-        restaurantPhone={restaurant.phoneNumber ?? undefined}
-        restaurantLocation={restaurant.location || undefined}
-        openingTime={restaurant.openingTime || undefined}
-        closingTime={restaurant.closingTime || undefined}
-        menuItems={restaurant.menuItems || []}
-        onAddToCart={(itemId, quantity) => updateCart(itemId, quantity)}
-        lang={lang}
-        onScrollToMap={scrollToMap}
-        restaurantLatitude={
-          restaurant.latitude ? String(restaurant.latitude) : null
-        }
-        restaurantLongitude={
-          restaurant.longitude ? String(restaurant.longitude) : null
-        }
-      />
-
-      {/* Hero Header */}
-      <header className="relative bg-stone-900 dark:bg-stone-950 overflow-hidden">
-        {restaurant.photoUrl ? (
-          <div className="absolute inset-0">
-            <img
-              src={restaurant.photoUrl}
-              className="w-full h-full object-cover opacity-40 dark:opacity-30"
-              alt={restaurant.name}
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
-          </div>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/10" />
-        )}
-
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center space-y-5 sm:space-y-8 text-white">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <h1 className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight">
-              {restaurant.name}
-            </h1>
-            <div
-              className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
-                isOpen
-                  ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
-                  : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
-              }`}
-            >
-              {isOpen ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  {t.openNow}
-                </>
-              ) : (
-                <>
-                  <Clock className="h-3.5 w-3.5" />
-                  {t.closed}
-                </>
-              )}
-            </div>
-          </motion.div>
-
-          {restaurant.description && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed"
-            >
-              {restaurant.description}
-            </motion.p>
-          )}
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4 }}
-            className="flex flex-wrap justify-center gap-3 pt-2"
-          >
-            {restaurant.website && (
-              <a
-                href={restaurant.website}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
-              >
-                <Globe className="h-3.5 w-3.5" />
-                {t.website}
-              </a>
-            )}
-            <a
-              href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
-            >
-              <Phone className="h-3.5 w-3.5" />
-              {t.reserve}
-            </a>
-          </motion.div>
-
-          {restaurant.openingTime && restaurant.closingTime && (
-            <div className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2">
-              <Clock className="h-3.5 w-3.5" />
-              <span>
-                {restaurant.openingTime} - {restaurant.closingTime}
-              </span>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Sticky Search + Filter Bar */}
-      <div className="sticky top-0 z-40 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-b border-stone-100 dark:border-stone-800 py-3 shadow-sm">
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 space-y-2.5">
-          <div className="relative">
-            <div className="relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary" />
-              <Input
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setShowVoiceResults(false);
-                }}
-                placeholder={t.searchPlaceholder}
-                className="h-11 pl-12 pr-4 rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-sm w-full"
-              />
-            </div>
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {searchTerm && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setShowVoiceResults(false);
-                    setVoiceSearchMatches([]);
-                  }}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {isSupported && (
-                <Button
-                  variant={isListening ? "default" : "ghost"}
-                  size="icon"
-                  className={`h-7 w-7 ${isListening ? "animate-pulse" : ""}`}
-                  onClick={isListening ? stopListening : startListening}
-                >
-                  <Mic className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-between bg-white dark:bg-stone-800 rounded-xl h-11 border-stone-200 dark:border-stone-700 text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <UtensilsCrossed className="h-4 w-4 text-primary" />
-                  <span className="font-semibold text-stone-900 dark:text-stone-100">
-                    {selectedCategory === "All"
-                      ? t.allCategories
-                      : selectedCategory}
-                  </span>
-                </div>
-                <ChevronDown className="h-4 w-4 text-stone-400" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
-              <DropdownMenuItem
-                onClick={() => setSelectedCategory("All")}
-                className="cursor-pointer py-2.5 px-4 font-semibold rounded-lg m-1"
-              >
-                {t.allCategories}
-              </DropdownMenuItem>
-              {categories.map((cat: any) => (
-                <DropdownMenuItem
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className="cursor-pointer py-2.5 px-4 rounded-lg m-1"
-                >
-                  {cat}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Menu */}
-      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
-        {/* Surprise Me */}
-        <SurpriseMe
-          menuItems={restaurant.menuItems || []}
-          onAddToCart={updateCart}
+    <>
+      {/* Digital Receipt overlay */}
+      {receiptData && (
+        <DigitalReceipt
+          data={receiptData}
           lang={lang}
+          onClose={() => setReceiptData(null)}
+        />
+      )}
+      <div className="min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 pb-36 transition-colors duration-300">
+        <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
+
+        <Link href="/">
+          <Button
+            variant="ghost"
+            className="fixed top-4 left-4 z-50 bg-white/90 dark:bg-stone-800/90 backdrop-blur-lg hover:bg-white dark:hover:bg-stone-800 shadow-lg rounded-full h-10 w-10 p-0 border border-white/50 dark:border-stone-700/50"
+          >
+            <X className="h-4 w-4 text-stone-700 dark:text-stone-300" />
+          </Button>
+        </Link>
+
+        <AIRestaurantAssistant
+          restaurantName={restaurant.name}
+          restaurantPhone={restaurant.phoneNumber ?? undefined}
+          restaurantLocation={restaurant.location || undefined}
+          openingTime={restaurant.openingTime || undefined}
+          closingTime={restaurant.closingTime || undefined}
+          menuItems={restaurant.menuItems || []}
+          onAddToCart={(itemId, quantity) => updateCart(itemId, quantity)}
+          lang={lang}
+          onScrollToMap={scrollToMap}
+          restaurantLatitude={
+            restaurant.latitude ? String(restaurant.latitude) : null
+          }
+          restaurantLongitude={
+            restaurant.longitude ? String(restaurant.longitude) : null
+          }
         />
 
-        {groupedMenu.map(
-          ([category, items]: [string, MenuItem[]], idx: number) => (
-            <motion.section
-              key={category}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.08 }}
-            >
-              <div className="flex items-center gap-3 mb-5">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent to-stone-200 dark:to-stone-700" />
-                <h2 className="font-display font-bold text-xl text-primary px-4 py-1.5 bg-primary/5 dark:bg-primary/10 rounded-full">
-                  {category}
-                </h2>
-                <div className="h-px flex-1 bg-gradient-to-l from-transparent to-stone-200 dark:to-stone-700" />
-              </div>
-              <div className="grid gap-4">
-                {items.map((item: MenuItem, itemIdx: number) => (
-                  <motion.article
-                    key={item.id}
-                    id={`item-${item.id}`}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: itemIdx * 0.04 }}
-                    className="group flex gap-3 sm:gap-5 items-start bg-white dark:bg-stone-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-stone-100 dark:border-stone-700 hover:shadow-md hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-200"
-                  >
-                    {item.imageUrl && (
-                      <img
-                        src={item.imageUrl}
-                        loading="lazy"
-                        className="w-20 h-20 sm:w-24 sm:h-28 rounded-xl object-cover shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform duration-200"
-                        alt={item.name}
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start gap-2 mb-1.5">
-                        <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-base sm:text-lg leading-tight flex-1">
-                          {lang === "al" && item.nameAl
-                            ? item.nameAl
-                            : lang === "mk" && item.nameMk
-                              ? item.nameMk
-                              : item.name}
-                        </h3>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <span className="text-primary font-bold text-lg sm:text-xl whitespace-nowrap">
-                            {item.price}
-                          </span>
-                          <ShareDialog item={item} restaurantSlug={slug!} />
-                        </div>
-                      </div>
-                      <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 line-clamp-2 mb-2.5 leading-relaxed">
-                        {lang === "al" && item.descriptionAl
-                          ? item.descriptionAl
-                          : lang === "mk" && item.descriptionMk
-                            ? item.descriptionMk
-                            : item.description}
-                      </p>
-
-                      {(item.isVegetarian ||
-                        item.isVegan ||
-                        item.isGlutenFree) && (
-                        <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
-                          {item.isVegetarian && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
-                            >
-                              <Leaf className="h-2.5 w-2.5 mr-1" />
-                              Vegetarian
-                            </Badge>
-                          )}
-                          {item.isVegan && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                            >
-                              <Leaf className="h-2.5 w-2.5 mr-1" />
-                              Vegan
-                            </Badge>
-                          )}
-                          {item.isGlutenFree && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                            >
-                              <WheatOff className="h-2.5 w-2.5 mr-1" />
-                              GF
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-700/50 w-fit p-1 rounded-full border border-stone-200 dark:border-stone-600">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 rounded-full hover:bg-white dark:hover:bg-stone-600"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            updateCart(item.id, -1);
-                          }}
-                        >
-                          <Minus className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />
-                        </Button>
-                        <span className="font-bold w-6 text-center text-stone-900 dark:text-stone-100 text-base">
-                          {cart[item.id] || 0}
-                        </span>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 rounded-full hover:bg-white dark:hover:bg-stone-600"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            updateCart(item.id, 1);
-                          }}
-                        >
-                          <Plus className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />
-                        </Button>
-                      </div>
-                    </div>
-                  </motion.article>
-                ))}
-              </div>
-            </motion.section>
-          ),
-        )}
-
-        {/* Map Section */}
-        <motion.section
-          id="map-section"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="pt-12 border-t border-stone-200 dark:border-stone-700"
-        >
-          <div className="bg-white dark:bg-stone-800 rounded-2xl p-5 sm:p-8 shadow-lg border border-stone-100 dark:border-stone-700 space-y-6">
-            <div>
-              <h2 className="font-display font-bold text-2xl sm:text-3xl text-stone-900 dark:text-stone-100 mb-3">
-                {t.about} {restaurant.name}
-              </h2>
-              <p className="text-stone-600 dark:text-stone-300 leading-relaxed">
-                {restaurant.description || "No description available."}
-              </p>
-            </div>
-            <div className="pt-4 border-t border-stone-100 dark:border-stone-700 space-y-4">
-              <h3 className="font-semibold text-lg text-stone-900 dark:text-stone-100 flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <MapPin className="h-4 w-4 text-primary" />
-                </div>
-                {t.ourLocation}
-              </h3>
-              <RestaurantMap
-                location={restaurant.location || "Tetovë Center, 1200"}
-                name={restaurant.name}
-                latitude={
-                  restaurant.latitude ? String(restaurant.latitude) : null
-                }
-                longitude={
-                  restaurant.longitude ? String(restaurant.longitude) : null
-                }
+        {/* Hero Header */}
+        <header className="relative bg-stone-900 dark:bg-stone-950 overflow-hidden">
+          {restaurant.photoUrl ? (
+            <div className="absolute inset-0">
+              <img
+                src={restaurant.photoUrl}
+                className="w-full h-full object-cover opacity-40 dark:opacity-30"
+                alt={restaurant.name}
+                loading="lazy"
               />
-              <div className="flex items-start gap-3 bg-stone-50 dark:bg-stone-700/50 p-3.5 rounded-xl border border-stone-100 dark:border-stone-600">
-                <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                <p className="text-stone-700 dark:text-stone-300 font-medium text-sm">
-                  {restaurant.location || "Tetovë Center, 1200"}
-                </p>
-              </div>
+              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
             </div>
-          </div>
-        </motion.section>
-      </main>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/10" />
+          )}
 
-      {/* Cart Bar */}
-      <AnimatePresence>
-        {cartCount > 0 && (
-          <motion.div
-            initial={{ y: 120 }}
-            animate={{ y: 0 }}
-            exit={{ y: 120 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t-2 border-stone-200 dark:border-stone-700 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-3 py-3 sm:px-5 sm:py-4 z-50"
-          >
-            <div className="max-w-4xl mx-auto">
-              {/* ── Mobile ── */}
-              <div className="flex flex-col gap-2 sm:hidden">
-                <div className="flex items-center gap-2">
-                  <div className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg">
-                    <ShoppingBag className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
-                      {t.totalBill}
-                    </p>
-                    <p className="text-lg font-bold text-primary">
-                      {cartTotal} DEN
-                    </p>
-                  </div>
+          <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center space-y-5 sm:space-y-8 text-white">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <h1 className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight">
+                {restaurant.name}
+              </h1>
+              <div
+                className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
+                  isOpen
+                    ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
+                    : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
+                }`}
+              >
+                {isOpen ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {t.openNow}
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-3.5 w-3.5" />
+                    {t.closed}
+                  </>
+                )}
+              </div>
+            </motion.div>
+
+            {restaurant.description && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed"
+              >
+                {restaurant.description}
+              </motion.p>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 }}
+              className="flex flex-wrap justify-center gap-3 pt-2"
+            >
+              {restaurant.website && (
+                <a
+                  href={restaurant.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  {t.website}
+                </a>
+              )}
+              <a
+                href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                {t.reserve}
+              </a>
+            </motion.div>
+
+            {restaurant.openingTime && restaurant.closingTime && (
+              <div className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2">
+                <Clock className="h-3.5 w-3.5" />
+                <span>
+                  {restaurant.openingTime} - {restaurant.closingTime}
+                </span>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* Sticky Search + Filter Bar */}
+        <div className="sticky top-0 z-40 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-b border-stone-100 dark:border-stone-800 py-3 shadow-sm">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 space-y-2.5">
+            <div className="relative">
+              <div className="relative w-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary" />
+                <Input
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setShowVoiceResults(false);
+                  }}
+                  placeholder={t.searchPlaceholder}
+                  className="h-11 pl-12 pr-4 rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-sm w-full"
+                />
+              </div>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchTerm && (
                   <Button
                     variant="ghost"
-                    size="sm"
-                    onClick={() => setCart({})}
-                    className="h-8 w-8 p-0 rounded-xl"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setShowVoiceResults(false);
+                      setVoiceSearchMatches([]);
+                    }}
                   >
                     <X className="h-3.5 w-3.5" />
                   </Button>
+                )}
+                {isSupported && (
+                  <Button
+                    variant={isListening ? "default" : "ghost"}
+                    size="icon"
+                    className={`h-7 w-7 ${isListening ? "animate-pulse" : ""}`}
+                    onClick={isListening ? stopListening : startListening}
+                  >
+                    <Mic className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between bg-white dark:bg-stone-800 rounded-xl h-11 border-stone-200 dark:border-stone-700 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <UtensilsCrossed className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-stone-900 dark:text-stone-100">
+                      {selectedCategory === "All"
+                        ? t.allCategories
+                        : selectedCategory}
+                    </span>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-stone-400" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
+                <DropdownMenuItem
+                  onClick={() => setSelectedCategory("All")}
+                  className="cursor-pointer py-2.5 px-4 font-semibold rounded-lg m-1"
+                >
+                  {t.allCategories}
+                </DropdownMenuItem>
+                {categories.map((cat: any) => (
+                  <DropdownMenuItem
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className="cursor-pointer py-2.5 px-4 rounded-lg m-1"
+                  >
+                    {cat}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Menu */}
+        <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
+          {/* Surprise Me */}
+          <SurpriseMe
+            menuItems={restaurant.menuItems || []}
+            onAddToCart={updateCart}
+            lang={lang}
+          />
+
+          {groupedMenu.map(
+            ([category, items]: [string, MenuItem[]], idx: number) => (
+              <motion.section
+                key={category}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.08 }}
+              >
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent to-stone-200 dark:to-stone-700" />
+                  <h2 className="font-display font-bold text-xl text-primary px-4 py-1.5 bg-primary/5 dark:bg-primary/10 rounded-full">
+                    {category}
+                  </h2>
+                  <div className="h-px flex-1 bg-gradient-to-l from-transparent to-stone-200 dark:to-stone-700" />
                 </div>
-                <div className="flex gap-2">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="flex-1 h-auto px-3 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-1"
-                      >
-                        🟢 {t.orderOnWhatsapp}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[92vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle className="text-lg font-bold text-primary">
-                          {t.orderSummary}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <ScrollArea className="flex-1">
-                        <OrderForm />
-                      </ScrollArea>
-                      <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
-                        <div className="flex gap-2">
+                <div className="grid gap-4">
+                  {items.map((item: MenuItem, itemIdx: number) => (
+                    <motion.article
+                      key={item.id}
+                      id={`item-${item.id}`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: itemIdx * 0.04 }}
+                      className="group flex gap-3 sm:gap-5 items-start bg-white dark:bg-stone-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-stone-100 dark:border-stone-700 hover:shadow-md hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-200"
+                    >
+                      {item.imageUrl && (
+                        <img
+                          src={item.imageUrl}
+                          loading="lazy"
+                          className="w-20 h-20 sm:w-24 sm:h-28 rounded-xl object-cover shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform duration-200"
+                          alt={item.name}
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start gap-2 mb-1.5">
+                          <h3 className="font-semibold text-stone-900 dark:text-stone-100 text-base sm:text-lg leading-tight flex-1">
+                            {lang === "al" && item.nameAl
+                              ? item.nameAl
+                              : lang === "mk" && item.nameMk
+                                ? item.nameMk
+                                : item.name}
+                          </h3>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className="text-primary font-bold text-lg sm:text-xl whitespace-nowrap">
+                              {item.price}
+                            </span>
+                            <ShareDialog item={item} restaurantSlug={slug!} />
+                          </div>
+                        </div>
+                        <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 line-clamp-2 mb-2.5 leading-relaxed">
+                          {lang === "al" && item.descriptionAl
+                            ? item.descriptionAl
+                            : lang === "mk" && item.descriptionMk
+                              ? item.descriptionMk
+                              : item.description}
+                        </p>
+
+                        {(item.isVegetarian ||
+                          item.isVegan ||
+                          item.isGlutenFree) && (
+                          <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
+                            {item.isVegetarian && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                              >
+                                <Leaf className="h-2.5 w-2.5 mr-1" />
+                                Vegetarian
+                              </Badge>
+                            )}
+                            {item.isVegan && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                              >
+                                <Leaf className="h-2.5 w-2.5 mr-1" />
+                                Vegan
+                              </Badge>
+                            )}
+                            {item.isGlutenFree && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                              >
+                                <WheatOff className="h-2.5 w-2.5 mr-1" />
+                                GF
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-700/50 w-fit p-1 rounded-full border border-stone-200 dark:border-stone-600">
                           <Button
-                            className="flex-1 h-10 text-xs font-semibold rounded-xl"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 rounded-full hover:bg-white dark:hover:bg-stone-600"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              updateCart(item.id, -1);
+                            }}
+                          >
+                            <Minus className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />
+                          </Button>
+                          <span className="font-bold w-6 text-center text-stone-900 dark:text-stone-100 text-base">
+                            {cart[item.id] || 0}
+                          </span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 rounded-full hover:bg-white dark:hover:bg-stone-600"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              updateCart(item.id, 1);
+                            }}
+                          >
+                            <Plus className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.article>
+                  ))}
+                </div>
+              </motion.section>
+            ),
+          )}
+
+          {/* Map Section */}
+          <motion.section
+            id="map-section"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="pt-12 border-t border-stone-200 dark:border-stone-700"
+          >
+            <div className="bg-white dark:bg-stone-800 rounded-2xl p-5 sm:p-8 shadow-lg border border-stone-100 dark:border-stone-700 space-y-6">
+              <div>
+                <h2 className="font-display font-bold text-2xl sm:text-3xl text-stone-900 dark:text-stone-100 mb-3">
+                  {t.about} {restaurant.name}
+                </h2>
+                <p className="text-stone-600 dark:text-stone-300 leading-relaxed">
+                  {restaurant.description || "No description available."}
+                </p>
+              </div>
+              <div className="pt-4 border-t border-stone-100 dark:border-stone-700 space-y-4">
+                <h3 className="font-semibold text-lg text-stone-900 dark:text-stone-100 flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-primary" />
+                  </div>
+                  {t.ourLocation}
+                </h3>
+                <RestaurantMap
+                  location={restaurant.location || "Tetovë Center, 1200"}
+                  name={restaurant.name}
+                  latitude={
+                    restaurant.latitude ? String(restaurant.latitude) : null
+                  }
+                  longitude={
+                    restaurant.longitude ? String(restaurant.longitude) : null
+                  }
+                />
+                <div className="flex items-start gap-3 bg-stone-50 dark:bg-stone-700/50 p-3.5 rounded-xl border border-stone-100 dark:border-stone-600">
+                  <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                  <p className="text-stone-700 dark:text-stone-300 font-medium text-sm">
+                    {restaurant.location || "Tetovë Center, 1200"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        </main>
+
+        {/* Cart Bar */}
+        <AnimatePresence>
+          {cartCount > 0 && (
+            <motion.div
+              initial={{ y: 120 }}
+              animate={{ y: 0 }}
+              exit={{ y: 120 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t-2 border-stone-200 dark:border-stone-700 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-3 py-3 sm:px-5 sm:py-4 z-50"
+            >
+              <div className="max-w-4xl mx-auto">
+                {/* ── Mobile ── */}
+                <div className="flex flex-col gap-2 sm:hidden">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg">
+                      <ShoppingBag className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                        {t.totalBill}
+                      </p>
+                      <p className="text-lg font-bold text-primary">
+                        {cartTotal} DEN
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCart({})}
+                      className="h-8 w-8 p-0 rounded-xl"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="flex-1 h-auto px-3 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-1"
+                        >
+                          🟢 {t.orderOnWhatsapp}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[92vh] flex flex-col">
+                        <DialogHeader>
+                          <DialogTitle className="text-lg font-bold text-primary">
+                            {t.orderSummary}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="flex-1">
+                          <>
+                            <div className="space-y-4">
+                              {/* Closed restaurant banner */}
+                              {!isOpen && (
+                                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                                      {t.restaurantClosed}
+                                    </p>
+                                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                                      {restaurant.openingTime} –{" "}
+                                      {restaurant.closingTime}
+                                    </p>
+                                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                                      {t.scheduleForLater}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Name */}
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                                  {t.yourName} *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customerName}
+                                  onChange={(e) =>
+                                    setCustomerName(e.target.value)
+                                  }
+                                  placeholder={t.enterYourName}
+                                  className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                                  required
+                                />
+                              </div>
+
+                              {/* Order type — disabled when restaurant is closed */}
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                                  {t.orderType} *
+                                </label>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      orderType === "dineIn"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={!isOpen}
+                                    onClick={() => setOrderType("dineIn")}
+                                  >
+                                    {t.dineIn}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      orderType === "takeaway"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={!isOpen}
+                                    onClick={() => setOrderType("takeaway")}
+                                  >
+                                    {t.takeaway}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Delivery time */}
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                                  {t.deliveryTime}
+                                </label>
+                                <div className="flex gap-2">
+                                  {/* ASAP disabled when closed */}
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      deliveryTime === "asap"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={!isOpen}
+                                    onClick={() => setDeliveryTime("asap")}
+                                  >
+                                    {t.asap}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      deliveryTime === "custom"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs"
+                                    onClick={() => setDeliveryTime("custom")}
+                                  >
+                                    {t.customTime}
+                                  </Button>
+                                </div>
+
+                                {(deliveryTime === "custom" || !isOpen) && (
+                                  <div className="mt-2 space-y-1">
+                                    <input
+                                      type="datetime-local"
+                                      value={customDateTime}
+                                      onChange={(e) => {
+                                        const chosen = e.target.value; // "YYYY-MM-DDTHH:MM"
+                                        if (!chosen) {
+                                          setCustomDateTime("");
+                                          return;
+                                        }
+
+                                        const open = scheduling.openingTime; // "HH:MM"
+                                        const close = scheduling.closingTime; // "HH:MM"
+                                        const dateOnly = chosen.split("T")[0]; // "YYYY-MM-DD"
+                                        const timeOnly = chosen.split("T")[1]; // "HH:MM"
+
+                                        // Clamp to opening time if before
+                                        if (timeOnly < open) {
+                                          setCustomDateTime(
+                                            `${dateOnly}T${open}`,
+                                          );
+                                          return;
+                                        }
+                                        // Clamp to closing time if after
+                                        if (timeOnly > close) {
+                                          setCustomDateTime(
+                                            `${dateOnly}T${close}`,
+                                          );
+                                          return;
+                                        }
+                                        setCustomDateTime(chosen);
+                                      }}
+                                      min={scheduling.minDateTime}
+                                      className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                                    />
+                                    {restaurant.openingTime &&
+                                      restaurant.closingTime && (
+                                        <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
+                                          ⏰ {restaurant.openingTime} –{" "}
+                                          {restaurant.closingTime}
+                                        </p>
+                                      )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Cart items */}
+                              <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
+                                <ScrollArea className="h-[140px] pr-1">
+                                  <div className="space-y-1">
+                                    {Object.entries(cart).map(([id, qty]) => {
+                                      const item = restaurant.menuItems.find(
+                                        (i) => i.id === parseInt(id),
+                                      );
+                                      if (!item) return null;
+                                      return (
+                                        <div
+                                          key={id}
+                                          className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
+                                              {qty}x
+                                            </div>
+                                            <div>
+                                              <p className="font-bold dark:text-stone-100 text-sm">
+                                                {item.name}
+                                              </p>
+                                              <p className="text-xs text-stone-500 dark:text-stone-400">
+                                                {item.price}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <div className="flex gap-1">
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-8 w-8"
+                                              onClick={() =>
+                                                updateCart(item.id, -1)
+                                              }
+                                            >
+                                              <Minus className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-8 w-8"
+                                              onClick={() =>
+                                                updateCart(item.id, 1)
+                                              }
+                                            >
+                                              <Plus className="h-3 w-3 text-primary" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </ScrollArea>
+
+                                <div className="flex justify-between items-center p-2 pt-3 rounded-2xl">
+                                  <span className="text-base font-semibold dark:text-stone-100">
+                                    {t.totalBill}
+                                  </span>
+                                  <p className="text-xl font-bold text-primary">
+                                    {cartTotal} DEN
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        </ScrollArea>
+                        <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
+                          <div className="flex gap-2">
+                            <Button
+                              className="flex-1 h-10 text-xs font-semibold rounded-xl"
+                              onClick={buildAndSendWhatsAppOrder}
+                            >
+                              🟢 {t.orderOnWhatsapp}
+                            </Button>
+                            <a
+                              href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                              className="flex-1"
+                            >
+                              <Button className="w-full h-10 text-xs font-semibold rounded-xl flex items-center justify-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                {t.callToOrder}
+                              </Button>
+                            </a>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <a href={`tel:${restaurant.phoneNumber || "+38944123456"}`}>
+                      <Button className="h-10 text-xs font-semibold rounded-xl px-3">
+                        <Phone className="h-3 w-3 mr-1" />
+                        {t.callToOrder}
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+
+                {/* ── Desktop ── */}
+                <div className="hidden sm:flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-primary text-primary-foreground p-3 rounded-xl">
+                      <ShoppingBag className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">
+                        {t.totalBill}
+                      </p>
+                      <p className="text-2xl font-bold text-primary">
+                        {cartTotal} DEN
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setCart({})}
+                      className="h-9 text-xs rounded-xl"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      {t.clear}
+                    </Button>
+                    <Dialog
+                      open={openOrderDialog}
+                      onOpenChange={setOpenOrderDialog}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="h-9 text-xs rounded-xl"
+                        >
+                          <UtensilsCrossed className="h-4 w-4 mr-1" />
+                          {t.viewOrder}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-white dark:bg-stone-800 rounded-3xl max-w-lg max-h-[90vh] flex flex-col">
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-bold dark:text-stone-100">
+                            {t.orderSummary}
+                          </DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="flex-1 pr-4">
+                          <>
+                            <div className="space-y-4">
+                              {/* Closed restaurant banner */}
+                              {!isOpen && (
+                                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                                      {t.restaurantClosed}
+                                    </p>
+                                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                                      {restaurant.openingTime} –{" "}
+                                      {restaurant.closingTime}
+                                    </p>
+                                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                                      {t.scheduleForLater}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Name */}
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                                  {t.yourName} *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customerName}
+                                  onChange={(e) =>
+                                    setCustomerName(e.target.value)
+                                  }
+                                  placeholder={t.enterYourName}
+                                  className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                                  required
+                                />
+                              </div>
+
+                              {/* Order type — disabled when restaurant is closed */}
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                                  {t.orderType} *
+                                </label>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      orderType === "dineIn"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={!isOpen}
+                                    onClick={() => setOrderType("dineIn")}
+                                  >
+                                    {t.dineIn}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      orderType === "takeaway"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={!isOpen}
+                                    onClick={() => setOrderType("takeaway")}
+                                  >
+                                    {t.takeaway}
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Delivery time */}
+                              <div className="space-y-1.5">
+                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                                  {t.deliveryTime}
+                                </label>
+                                <div className="flex gap-2">
+                                  {/* ASAP disabled when closed */}
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      deliveryTime === "asap"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                                    disabled={!isOpen}
+                                    onClick={() => setDeliveryTime("asap")}
+                                  >
+                                    {t.asap}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant={
+                                      deliveryTime === "custom"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className="flex-1 h-10 rounded-xl text-xs"
+                                    onClick={() => setDeliveryTime("custom")}
+                                  >
+                                    {t.customTime}
+                                  </Button>
+                                </div>
+
+                                {(deliveryTime === "custom" || !isOpen) && (
+                                  <div className="mt-2 space-y-1">
+                                    <input
+                                      type="datetime-local"
+                                      value={customDateTime}
+                                      onChange={(e) => {
+                                        const chosen = e.target.value; // "YYYY-MM-DDTHH:MM"
+                                        if (!chosen) {
+                                          setCustomDateTime("");
+                                          return;
+                                        }
+
+                                        const open = scheduling.openingTime; // "HH:MM"
+                                        const close = scheduling.closingTime; // "HH:MM"
+                                        const dateOnly = chosen.split("T")[0]; // "YYYY-MM-DD"
+                                        const timeOnly = chosen.split("T")[1]; // "HH:MM"
+
+                                        // Clamp to opening time if before
+                                        if (timeOnly < open) {
+                                          setCustomDateTime(
+                                            `${dateOnly}T${open}`,
+                                          );
+                                          return;
+                                        }
+                                        // Clamp to closing time if after
+                                        if (timeOnly > close) {
+                                          setCustomDateTime(
+                                            `${dateOnly}T${close}`,
+                                          );
+                                          return;
+                                        }
+                                        setCustomDateTime(chosen);
+                                      }}
+                                      min={scheduling.minDateTime}
+                                      className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                                    />
+                                    {restaurant.openingTime &&
+                                      restaurant.closingTime && (
+                                        <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
+                                          ⏰ {restaurant.openingTime} –{" "}
+                                          {restaurant.closingTime}
+                                        </p>
+                                      )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Cart items */}
+                              <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
+                                <ScrollArea className="h-[140px] pr-1">
+                                  <div className="space-y-1">
+                                    {Object.entries(cart).map(([id, qty]) => {
+                                      const item = restaurant.menuItems.find(
+                                        (i) => i.id === parseInt(id),
+                                      );
+                                      if (!item) return null;
+                                      return (
+                                        <div
+                                          key={id}
+                                          className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
+                                              {qty}x
+                                            </div>
+                                            <div>
+                                              <p className="font-bold dark:text-stone-100 text-sm">
+                                                {item.name}
+                                              </p>
+                                              <p className="text-xs text-stone-500 dark:text-stone-400">
+                                                {item.price}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <div className="flex gap-1">
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-8 w-8"
+                                              onClick={() =>
+                                                updateCart(item.id, -1)
+                                              }
+                                            >
+                                              <Minus className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-8 w-8"
+                                              onClick={() =>
+                                                updateCart(item.id, 1)
+                                              }
+                                            >
+                                              <Plus className="h-3 w-3 text-primary" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </ScrollArea>
+
+                                <div className="flex justify-between items-center p-2 pt-3 rounded-2xl">
+                                  <span className="text-base font-semibold dark:text-stone-100">
+                                    {t.totalBill}
+                                  </span>
+                                  <p className="text-xl font-bold text-primary">
+                                    {cartTotal} DEN
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        </ScrollArea>
+                        <div className="pt-4 space-y-2.5 border-t border-stone-200 dark:border-stone-700">
+                          <Button
+                            className="w-full h-11 rounded-2xl font-bold"
                             onClick={buildAndSendWhatsAppOrder}
                           >
                             🟢 {t.orderOnWhatsapp}
                           </Button>
-                          <a
-                            href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                            className="flex-1"
+                          <Button
+                            onClick={callRestaurant}
+                            className="w-full h-11 rounded-xl font-bold"
                           >
-                            <Button className="w-full h-10 text-xs font-semibold rounded-xl flex items-center justify-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {t.callToOrder}
-                            </Button>
-                          </a>
+                            <Phone className="h-4 w-4 mr-2" />
+                            {t.callToOrder}
+                          </Button>
                         </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  <a href={`tel:${restaurant.phoneNumber || "+38944123456"}`}>
-                    <Button className="h-10 text-xs font-semibold rounded-xl px-3">
-                      <Phone className="h-3 w-3 mr-1" />
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      onClick={callRestaurant}
+                      className="h-9 text-xs rounded-xl"
+                    >
+                      <Phone className="h-4 w-4 mr-1" />
                       {t.callToOrder}
                     </Button>
-                  </a>
+                  </div>
                 </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-              {/* ── Desktop ── */}
-              <div className="hidden sm:flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary text-primary-foreground p-3 rounded-xl">
-                    <ShoppingBag className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase text-muted-foreground">
-                      {t.totalBill}
-                    </p>
-                    <p className="text-2xl font-bold text-primary">
-                      {cartTotal} DEN
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setCart({})}
-                    className="h-9 text-xs rounded-xl"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    {t.clear}
-                  </Button>
-                  <Dialog
-                    open={openOrderDialog}
-                    onOpenChange={setOpenOrderDialog}
-                  >
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="h-9 text-xs rounded-xl"
-                      >
-                        <UtensilsCrossed className="h-4 w-4 mr-1" />
-                        {t.viewOrder}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-white dark:bg-stone-800 rounded-3xl max-w-lg max-h-[90vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-bold dark:text-stone-100">
-                          {t.orderSummary}
-                        </DialogTitle>
-                      </DialogHeader>
-                      <ScrollArea className="flex-1 pr-4">
-                        <OrderForm />
-                      </ScrollArea>
-                      <div className="pt-4 space-y-2.5 border-t border-stone-200 dark:border-stone-700">
-                        <Button
-                          className="w-full h-11 rounded-2xl font-bold"
-                          onClick={buildAndSendWhatsAppOrder}
-                        >
-                          🟢 {t.orderOnWhatsapp}
-                        </Button>
-                        <Button
-                          onClick={callRestaurant}
-                          className="w-full h-11 rounded-xl font-bold"
-                        >
-                          <Phone className="h-4 w-4 mr-2" />
-                          {t.callToOrder}
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  <Button
-                    onClick={callRestaurant}
-                    className="h-9 text-xs rounded-xl"
-                  >
-                    <Phone className="h-4 w-4 mr-1" />
-                    {t.callToOrder}
-                  </Button>
-                </div>
-              </div>
+        <footer className="py-10 text-center text-stone-400 dark:text-stone-500 text-sm space-y-2">
+          {restaurant.location && (
+            <div className="flex items-center justify-center gap-2 text-stone-500 dark:text-stone-400">
+              <MapPin className="h-3.5 w-3.5" />
+              <span className="font-medium">{restaurant.location}</span>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <footer className="py-10 text-center text-stone-400 dark:text-stone-500 text-sm space-y-2">
-        {restaurant.location && (
-          <div className="flex items-center justify-center gap-2 text-stone-500 dark:text-stone-400">
-            <MapPin className="h-3.5 w-3.5" />
-            <span className="font-medium">{restaurant.location}</span>
-          </div>
-        )}
-        <p>{t.poweredBy}</p>
-      </footer>
-    </div>
+          )}
+          <p>{t.poweredBy}</p>
+        </footer>
+      </div>
+    </>
   );
 }
