@@ -77,6 +77,7 @@ const translations: Record<string, any> = {
     poweredBy: "Powered by HAJDE HA",
     howToUse: "How to Use HAJDE HA?",
     sortByDistance: "Sort by nearest",
+    clearLocation: "Clear location",
     openNow: "Open now",
     gettingLocation: "Getting location...",
     locationError: "Location access denied",
@@ -141,6 +142,7 @@ const translations: Record<string, any> = {
     poweredBy: "Mundësuar nga HAJDE HA",
     howToUse: "Si ta përdorni këtë platformë?",
     sortByDistance: "Rendit sipas distancës",
+    clearLocation: "Fshi lokacionin",
     openNow: "Hapur tani",
     gettingLocation: "Duke marrë vendndodhjen...",
     locationError: "Qasja në vendndodhje u refuzua",
@@ -204,6 +206,7 @@ const translations: Record<string, any> = {
     poweredBy: "Овозможено од HAJDE HA",
     howToUse: "Како да ја користите оваа платформа?",
     sortByDistance: "Сортирај според оддалеченост",
+    clearLocation: "Исчисти локација",
     openNow: "Отворено сега",
     gettingLocation: "Преземање локација...",
     locationError: "Пристапот до локација е одбиен",
@@ -229,6 +232,24 @@ function IsOpen(openingTime?: string, closingTime?: string) {
   return currentTime >= openingTime && currentTime <= closingTime;
 }
 
+// ── Persist location in localStorage so it survives navigation ──
+function loadSavedLocation(): { lat: number; lng: number } | null {
+  try {
+    const saved = localStorage.getItem("hajdeha-location");
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocation(loc: { lat: number; lng: number } | null) {
+  if (loc) {
+    localStorage.setItem("hajdeha-location", JSON.stringify(loc));
+  } else {
+    localStorage.removeItem("hajdeha-location");
+  }
+}
+
 export default function Home() {
   const { isDark, toggleDarkMode } = useDarkMode();
   const [lang, setLang] = useState<"en" | "al" | "mk">(() => {
@@ -238,25 +259,40 @@ export default function Home() {
 
   const t = translations[lang];
 
+  // ── Load location from localStorage on mount ──
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
-  } | null>(null);
+  } | null>(loadSavedLocation);
+
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState(false);
 
   const handleGetLocation = () => {
+    // If already have location, clear it (toggle off)
+    if (userLocation) {
+      setUserLocation(null);
+      saveLocation(null);
+      return;
+    }
+
     setIsGettingLocation(true);
+    setLocationError(false);
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          const loc = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          setUserLocation(loc);
+          saveLocation(loc); // persist so back-navigation keeps it
           setIsGettingLocation(false);
         },
         () => {
           setIsGettingLocation(false);
+          setLocationError(true);
         },
       );
     } else {
@@ -344,7 +380,7 @@ export default function Home() {
     }
 
     return result;
-  }, [restaurants, searchTerm, userLocation]);
+  }, [restaurants, searchTerm, userLocation, showOpenOnly]);
 
   function shuffleArray<T>(array: T[]): T[] {
     const arr = [...array];
@@ -450,17 +486,26 @@ export default function Home() {
                   : t.explore}
               </p>
 
+              {/* Location button — active state shows it's ON, click again to clear */}
               <Button
-                variant="outline"
+                variant={userLocation ? "default" : "outline"}
                 size="sm"
                 className="rounded-full gap-2"
                 onClick={handleGetLocation}
                 disabled={isGettingLocation}
               >
-                <MapPin
-                  className={`h-4 w-4 ${userLocation ? "text-primary" : ""}`}
-                />
-                {isGettingLocation ? t.gettingLocation : t.sortByDistance}
+                {isGettingLocation ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MapPin className="h-4 w-4" />
+                )}
+                {isGettingLocation
+                  ? t.gettingLocation
+                  : locationError
+                    ? t.locationError
+                    : userLocation
+                      ? t.clearLocation
+                      : t.sortByDistance}
               </Button>
 
               <Button
@@ -609,31 +654,24 @@ export default function Home() {
       {/* How to Use Section */}
       <section className="py-20 px-4 bg-gradient-to-b from-white to-orange-50 dark:from-stone-900 dark:to-stone-800/50 transition-colors duration-300">
         <div className="max-w-6xl mx-auto">
-          {/* Section Title */}
           <div className="text-center mb-16">
             <h2 className="text-4xl font-display font-bold mb-4 text-stone-800 dark:text-stone-100 transition-colors duration-300">
               {t.howToUse}
             </h2>
           </div>
 
-          {/* Steps Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             {[1, 2, 3, 4].map((num) => (
               <div
                 key={num}
                 className="bg-white dark:bg-stone-900 p-8 rounded-2xl border border-orange-100 dark:border-orange-700 shadow-lg hover:shadow-xl transition-shadow space-y-4"
               >
-                {/* Step Number Circle */}
                 <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-md">
                   {num}
                 </div>
-
-                {/* Step Title */}
                 <h3 className="text-xl font-bold font-display text-stone-800 dark:text-stone-100 transition-colors duration-300">
                   {t[`step${num}` as keyof typeof t]}
                 </h3>
-
-                {/* Step Description */}
                 <p className="text-stone-600 dark:text-stone-300 text-sm leading-relaxed transition-colors duration-300">
                   {t[`step${num}Desc` as keyof typeof t]}
                 </p>
@@ -646,7 +684,6 @@ export default function Home() {
       {/* Why Us Section */}
       <section className="py-24 px-4 bg-gradient-to-b from-white to-orange-50 dark:from-stone-900 dark:to-stone-800/50 transition-colors duration-300">
         <div className="max-w-6xl mx-auto">
-          {/* Section Header */}
           <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-display font-bold mb-4 text-stone-800 dark:text-stone-100 transition-colors duration-300">
               {t.whyUs}
@@ -656,9 +693,7 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Features Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-16">
-            {/* Feature 1 */}
             <div className="text-center space-y-5 group">
               <div className="bg-primary/10 dark:bg-primary/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto text-primary transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-105">
                 <Utensils className="h-10 w-10" />
@@ -671,7 +706,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Feature 2 */}
             <div className="text-center space-y-5 group">
               <div className="bg-primary/10 dark:bg-primary/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto text-primary transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-105">
                 <span className="text-3xl font-bold font-display">DEN</span>
@@ -684,7 +718,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Feature 3 */}
             <div className="text-center space-y-5 group">
               <div className="bg-primary/10 dark:bg-primary/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto text-primary transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-105">
                 <Globe className="h-10 w-10" />
@@ -722,7 +755,6 @@ export default function Home() {
                     Contact Information
                   </h3>
                   <div className="space-y-8">
-                    {/* Email */}
                     <div className="flex items-start gap-4">
                       <Mail className="h-6 w-6 text-primary-foreground dark:text-stone-100 transition-colors duration-300" />
                       <div>
@@ -735,7 +767,6 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Phone */}
                     <div className="flex items-start gap-4">
                       <Phone className="h-6 w-6 text-primary-foreground dark:text-stone-100 transition-colors duration-300" />
                       <div>
@@ -759,19 +790,7 @@ export default function Home() {
               </div>
 
               {/* Contact Form */}
-              <div
-                className="
-                md:col-span-3
-                p-8 md:p-12
-                bg-white
-                text-stone-900
-                dark:bg-stone-900
-                dark:text-stone-100
-                rounded-2xl
-                transition-colors
-                duration-300
-              "
-              >
+              <div className="md:col-span-3 p-8 md:p-12 bg-white text-stone-900 dark:bg-stone-900 dark:text-stone-100 rounded-2xl transition-colors duration-300">
                 <form
                   className="space-y-6"
                   action="https://formspree.io/f/xykkalgq"
