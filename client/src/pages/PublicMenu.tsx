@@ -3044,9 +3044,6 @@ export default function PublicMenu() {
                                       {restaurant.openingTime} –{" "}
                                       {restaurant.closingTime}
                                     </p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-500">
-                                      {t.scheduleForLater}
-                                    </p>
                                   </div>
                                 </div>
                               )}
@@ -3175,10 +3172,6 @@ export default function PublicMenu() {
                                     />
                                     {restaurant.openingTime &&
                                       restaurant.closingTime && (
-                                        <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
-                                          ⏰ {restaurant.openingTime} –{" "}
-                                          {restaurant.closingTime}
-                                        </p>
                                       )}
                                   </div>
                                 )}
@@ -3186,7 +3179,7 @@ export default function PublicMenu() {
 
                               {/* Cart items */}
                               <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
-                                <ScrollArea className="h-[140px] pr-1">
+                                <ScrollArea className="h-[120px] pr-1">
                                   <div className="space-y-1">
                                     {Object.entries(cart).map(([id, qty]) => {
                                       const item = restaurant.menuItems.find(
