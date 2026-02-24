@@ -52,6 +52,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -2015,6 +2016,15 @@ function SurpriseMe({
       >
         {/* ── Header ── */}
         <div className="relative bg-primary px-5 pt-6 pb-10 sm:pt-8 sm:pb-12 flex-shrink-0">
+          <DialogClose asChild>
+            <button
+              className="absolute right-4 top-4 z-50 rounded-full p-2 
+                         text-white/90 hover:text-white 
+                         hover:bg-white/20 transition-all focus:outline-none"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </DialogClose>
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"
             style={{
