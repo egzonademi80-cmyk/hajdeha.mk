@@ -330,7 +330,11 @@ export default function AdminDashboard() {
 
   const updateRestaurantMutation = useMutation({
     mutationFn: async ({ id, ...data }: any) => {
-      const res = await apiRequest("PATCH", buildUrl(api.restaurants.update.path, { id }), data);
+      const res = await apiRequest(
+        "PATCH",
+        buildUrl(api.restaurants.update.path, { id }),
+        data,
+      );
       return res.json();
     },
     onSuccess: () => {
@@ -344,7 +348,7 @@ export default function AdminDashboard() {
       const url = `${window.location.origin}/restaurant/${restaurant.slug}`;
       const colorDark = restaurant.qrColor || qrColor;
       const colorLight = restaurant.qrBgColor || qrBgColor;
-      
+
       const qrImage = await QRCode.toDataURL(url, {
         width: 1024,
         margin: 2,
@@ -803,67 +807,76 @@ export default function AdminDashboard() {
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[400px]">
-                          <DialogHeader className="pb-4 border-b">
-                            <DialogTitle>{t.qrTitle}</DialogTitle>
-                          </DialogHeader>
                           <div className="flex flex-col items-center justify-center space-y-6 py-6">
                             <div className="grid grid-cols-2 gap-4 w-full px-1">
                               <div className="space-y-2">
-                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">QR Color</Label>
+                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                  QR Color
+                                </Label>
                                 <div className="flex gap-2">
-                                  <Input 
-                                    type="color" 
-                                    value={qrColor} 
+                                  <Input
+                                    type="color"
+                                    value={qrColor}
                                     onChange={(e) => setQrColor(e.target.value)}
                                     className="w-10 h-10 p-1 cursor-pointer"
                                   />
-                                  <Input 
-                                    type="text" 
-                                    value={qrColor} 
+                                  <Input
+                                    type="text"
+                                    value={qrColor}
                                     onChange={(e) => setQrColor(e.target.value)}
                                     className="flex-1 h-10 font-mono text-[10px] uppercase px-2"
                                   />
                                 </div>
                               </div>
                               <div className="space-y-2">
-                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Background</Label>
+                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                  Background
+                                </Label>
                                 <div className="flex gap-2">
-                                  <Input 
-                                    type="color" 
-                                    value={qrBgColor} 
-                                    onChange={(e) => setQrBgColor(e.target.value)}
+                                  <Input
+                                    type="color"
+                                    value={qrBgColor}
+                                    onChange={(e) =>
+                                      setQrBgColor(e.target.value)
+                                    }
                                     className="w-10 h-10 p-1 cursor-pointer"
                                   />
-                                  <Input 
-                                    type="text" 
-                                    value={qrBgColor} 
-                                    onChange={(e) => setQrBgColor(e.target.value)}
+                                  <Input
+                                    type="text"
+                                    value={qrBgColor}
+                                    onChange={(e) =>
+                                      setQrBgColor(e.target.value)
+                                    }
                                     className="flex-1 h-10 font-mono text-[10px] uppercase px-2"
                                   />
                                 </div>
                               </div>
                             </div>
 
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => generateQR(activeRestaurant)}
                               className="w-full text-xs"
                             >
                               Update QR Preview
                             </Button>
 
-                            <Button 
-                              size="sm" 
-                              onClick={() => updateRestaurantMutation.mutate({ 
-                                id: activeRestaurant.id, 
-                                qrColor, 
-                                qrBgColor 
-                              })}
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                updateRestaurantMutation.mutate({
+                                  id: activeRestaurant.id,
+                                  qrColor,
+                                  qrBgColor,
+                                })
+                              }
                               disabled={updateRestaurantMutation.isPending}
                               className="w-full text-xs bg-secondary text-secondary-foreground hover:bg-secondary/80"
                             >
-                              {updateRestaurantMutation.isPending ? "Saving..." : "Save Design to Restaurant"}
+                              {updateRestaurantMutation.isPending
+                                ? "Saving..."
+                                : "Save Design to Restaurant"}
                             </Button>
 
                             {qrData ? (
