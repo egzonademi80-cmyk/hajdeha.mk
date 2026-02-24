@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { TrendingUp } from "lucide-react";
-import { Search } from "lucide-react"; // <-- IMPORT
+import { Search } from "lucide-react";
 import {
   Loader2,
   UtensilsCrossed,
@@ -32,6 +32,7 @@ import {
   Sparkles,
   Bot,
   Send,
+  AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { type MenuItem } from "@shared/schema";
@@ -110,6 +111,12 @@ const translations: Record<string, any> = {
     copyLink: "Copy Link",
     linkCopied: "Link copied!",
     searchPlaceholder: "  Search menu items...",
+    restaurantClosed: "Restaurant is currently closed",
+    closedAsapWarning:
+      "The restaurant is closed. ASAP orders are not available right now.",
+    scheduleForLater: "Schedule for later",
+    outsideHours: "Selected time is outside working hours",
+    selectWithinHours: "Please select a time within opening hours",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -161,6 +168,12 @@ const translations: Record<string, any> = {
     copyLink: "Kopjo lidhjen",
     linkCopied: "Lidhja u kopjua!",
     searchPlaceholder: "  Kërko në menu...",
+    restaurantClosed: "Restoranti aktualisht është i mbyllur",
+    closedAsapWarning:
+      "Restoranti është i mbyllur. Porositë menjëherë nuk janë të disponueshme.",
+    scheduleForLater: "Planifiko për më vonë",
+    outsideHours: "Koha e zgjedhur është jashtë orarit të punës",
+    selectWithinHours: "Ju lutemi zgjidhni një kohë brenda orarit të hapjes",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
@@ -192,8 +205,8 @@ const translations: Record<string, any> = {
     glutenFree: "Без глутен",
     yourName: "Вашето име",
     enterYourName: "Внесете го вашето име",
-    pleaseEnterName: "Ве молиме внесете го вашето име",
-    customerName: "Име",
+    pleaseEnterName: "Ве молиме внесете го вашето ime",
+    customerName: "Ime",
     orderType: "Тип на нарачка",
     dineIn: "Јадење тука",
     takeaway: "За понесување",
@@ -212,6 +225,12 @@ const translations: Record<string, any> = {
     copyLink: "Копирај линк",
     linkCopied: "Линкот е копиран!",
     searchPlaceholder: "  Пребарај во менито...",
+    restaurantClosed: "Ресторанот е тековно затворен",
+    closedAsapWarning:
+      "Ресторанот е затворен. Нарачките веднаш не се достапни.",
+    scheduleForLater: "Закажи за подоцна",
+    outsideHours: "Избраното време е надвор од работното време",
+    selectWithinHours: "Изберете време во рамките на работното време",
   },
 };
 
@@ -224,7 +243,8 @@ const leafletStyles = `
   }
 `;
 
-// AI-Powered Fuzzy Matching Utility
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function levenshteinDistance(str1: string, str2: string): number {
   const matrix: number[][] = [];
   for (let i = 0; i <= str2.length; i++) matrix[i] = [i];
@@ -300,7 +320,67 @@ function findBestMatches(
     .map((s) => s.item);
 }
 
-// Voice Search Hook
+function IsOpen(openingTime?: string, closingTime?: string) {
+  if (!openingTime || !closingTime) return true;
+  const d = new Date();
+  const currentTime = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  return currentTime >= openingTime && currentTime <= closingTime;
+}
+
+/**
+ * Returns the minimum datetime string for scheduling:
+ * - If restaurant is currently open → now (can order ASAP or later today)
+ * - If closed → tomorrow at opening time
+ * Also returns the closing time string for validation.
+ */
+function getSchedulingConstraints(
+  openingTime?: string,
+  closingTime?: string,
+): { minDateTime: string; openingTime: string; closingTime: string } {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const now = new Date();
+
+  const open = openingTime || "08:00";
+  const close = closingTime || "23:00";
+
+  const isCurrentlyOpen = IsOpen(openingTime, closingTime);
+
+  let baseDate: Date;
+  if (isCurrentlyOpen) {
+    // Can schedule from now onwards (today)
+    baseDate = now;
+  } else {
+    // Must schedule from tomorrow
+    baseDate = new Date(now);
+    baseDate.setDate(baseDate.getDate() + 1);
+  }
+
+  const dateStr = `${baseDate.getFullYear()}-${pad(baseDate.getMonth() + 1)}-${pad(baseDate.getDate())}`;
+  const minDateTime = isCurrentlyOpen
+    ? `${dateStr}T${pad(now.getHours())}:${pad(now.getMinutes())}`
+    : `${dateStr}T${open}`;
+
+  return { minDateTime, openingTime: open, closingTime: close };
+}
+
+/**
+ * Validates that a chosen datetime-local value falls within opening hours.
+ */
+function isWithinOpeningHours(
+  dateTimeStr: string,
+  openingTime: string,
+  closingTime: string,
+): boolean {
+  if (!dateTimeStr) return false;
+  const chosen = new Date(dateTimeStr);
+  const h = chosen.getHours();
+  const m = chosen.getMinutes();
+  const timeStr = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  return timeStr >= openingTime && timeStr <= closingTime;
+}
+
+// ─── Voice Search Hook ─────────────────────────────────────────────────────────
+
 function useVoiceSearch(
   onResult: (text: string, matches: MenuItem[]) => void,
   allItems: MenuItem[],
@@ -352,7 +432,8 @@ function useVoiceSearch(
   };
 }
 
-// Share Dialog
+// ─── Share Dialog ──────────────────────────────────────────────────────────────
+
 function ShareDialog({
   item,
   restaurantSlug,
@@ -470,7 +551,8 @@ function ShareDialog({
   );
 }
 
-// People Also Ordered
+// ─── People Also Ordered ───────────────────────────────────────────────────────
+
 function PeopleAlsoOrdered({
   currentItemId,
   allItems,
@@ -546,7 +628,8 @@ function PeopleAlsoOrdered({
   );
 }
 
-// Inline Map for AI Assistant - lightweight embedded map
+// ─── Inline Map ────────────────────────────────────────────────────────────────
+
 function InlineMap({
   latitude,
   longitude,
@@ -614,7 +697,8 @@ function InlineMap({
   );
 }
 
-// Restaurant Map (full page section)
+// ─── Restaurant Map ────────────────────────────────────────────────────────────
+
 function RestaurantMap({
   location,
   name,
@@ -717,6 +801,8 @@ function RestaurantMap({
   );
 }
 
+// ─── Group items ───────────────────────────────────────────────────────────────
+
 const groupItems = (items: MenuItem[]) => {
   const groups: Record<string, MenuItem[]> = {};
   const order = ["Starters", "Mains", "Sides", "Desserts", "Drinks"];
@@ -734,13 +820,6 @@ const groupItems = (items: MenuItem[]) => {
     return a.localeCompare(b);
   });
 };
-
-function IsOpen(openingTime?: string, closingTime?: string) {
-  if (!openingTime || !closingTime) return true;
-  const d = new Date();
-  const currentTime = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-  return currentTime >= openingTime && currentTime <= closingTime;
-}
 
 // ========== AI ASSISTANT ==========
 interface AIMessage {
@@ -827,7 +906,6 @@ function AIRestaurantAssistant({
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom whenever messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -985,7 +1063,6 @@ function AIRestaurantAssistant({
               : lang === "al"
                 ? "Vendndodhja nuk është e disponueshme"
                 : "Локацијата не е достапна");
-          // Add message with inline map
           addMessage({
             id: Date.now().toString(),
             role: "assistant",
@@ -1004,7 +1081,6 @@ function AIRestaurantAssistant({
               location: restaurantLocation,
             },
           });
-          // Also scroll the main page map into view
           setTimeout(() => onScrollToMap(), 600);
           break;
         }
@@ -1058,7 +1134,7 @@ function AIRestaurantAssistant({
                 ? "How can I help you?"
                 : lang === "al"
                   ? "Si mund t'ju ndihmoj?"
-                  : "Како можам да помогнам?",
+                  : "Kako можам да помогнам?",
           });
       }
     },
@@ -1078,49 +1154,43 @@ function AIRestaurantAssistant({
   );
 
   const detectIntent = (query: string): string => {
-    // Popular / recommendations
     if (
       /popular|best|recommend|speciali|pjat.{0,10}(mir|popul)|popullar|специјал|препорач|најдобр/i.test(
         query,
       )
     )
       return "popular";
-    // Dietary
     if (
       /vegetarian|vegan|diet|vegjetarian|vegan|vegane|без\s*мес|вегет/i.test(
         query,
       )
     )
       return "dietary";
-    // Drinks & desserts
     if (
       /drink|beverage|desert|embëlsir|ëmbëlsir|pij[eë]|dezert|пијал|десерт/i.test(
         query,
       )
     )
       return "drinks";
-    // Prices
     if (/cheap|price|afford|çmim|lir[eë]|çmim|цена|евтин|цени/i.test(query))
       return "prices";
-    // Location / map
     if (
       /location|where|address|map|vendndodhj|adres[eë]|ku ndodh|hart[eë]|локац|адрес|каде/i.test(
         query,
       )
     )
       return "location";
-    // Hours
     if (
       /hours|open|close|time|orar|hap|mbyll|kur|работн|отвор|затвор|час/i.test(
         query,
       )
     )
       return "hours";
-    // Booking — EN + AL (rezerv*, tavolinë, book) + MK (резерв*, маса)
     if (/book|reserv|tavolinë|tavolina|rezerv|masa\b|маса|резерв/i.test(query))
       return "book";
     return "unknown";
   };
+
   const [showButton, setShowButton] = useState(false);
 
   useEffect(() => {
@@ -1129,12 +1199,8 @@ function AIRestaurantAssistant({
       const docHeight =
         document.documentElement.scrollHeight -
         document.documentElement.clientHeight;
-
-      const scrollPercent = (scrollTop / docHeight) * 100;
-
-      setShowButton(scrollPercent > 1);
+      setShowButton((scrollTop / docHeight) * 100 > 1);
     };
-
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -1182,11 +1248,7 @@ function AIRestaurantAssistant({
           hover:scale-110
           z-40 
           bg-gradient-to-r from-primary to-primary/80
-          ${
-            showButton
-              ? "opacity-100 scale-100"
-              : "opacity-0 scale-75 pointer-events-none"
-          }
+          ${showButton ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}
           `}
         >
           <Bot className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -1203,7 +1265,6 @@ function AIRestaurantAssistant({
         rounded-2xl
       "
       >
-        {/* Header with action buttons */}
         <DialogHeader className="p-4 pb-3 border-b dark:border-stone-700 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
@@ -1213,7 +1274,6 @@ function AIRestaurantAssistant({
               {t.aiAssistant}
             </DialogTitle>
           </div>
-          {/* Quick action buttons */}
           <div className="mt-3 space-y-2">
             <div className="grid grid-cols-3 gap-1.5">
               {actionButtons[lang].menu.map((btn, i) => (
@@ -1244,7 +1304,6 @@ function AIRestaurantAssistant({
           </div>
         </DialogHeader>
 
-        {/* Messages - scrollable area */}
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           <AnimatePresence>
             {messages.map((message) => (
@@ -1265,8 +1324,6 @@ function AIRestaurantAssistant({
                   <p className="text-sm whitespace-pre-line leading-relaxed">
                     {message.content}
                   </p>
-
-                  {/* Inline Map for location */}
                   {message.showMap && message.mapData && (
                     <InlineMap
                       latitude={message.mapData.latitude}
@@ -1275,8 +1332,6 @@ function AIRestaurantAssistant({
                       location={message.mapData.location}
                     />
                   )}
-
-                  {/* Recommended Items */}
                   {message.recommendedItems &&
                     message.recommendedItems.length > 0 && (
                       <div className="mt-3 space-y-2">
@@ -1354,12 +1409,9 @@ function AIRestaurantAssistant({
               </div>
             </motion.div>
           )}
-
-          {/* Scroll anchor */}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
         <div className="p-3 border-t dark:border-stone-700 bg-white dark:bg-stone-900 flex-shrink-0 rounded-b-2xl">
           <div className="flex gap-2">
             <Input
@@ -1415,9 +1467,7 @@ export default function PublicMenu() {
   const [openOrderDialog, setOpenOrderDialog] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [orderType, setOrderType] = useState<"dineIn" | "takeaway">("dineIn");
-  const [deliveryTime, setDeliveryTime] = useState<
-    "asap" | "15min" | "30min" | "45min" | "custom"
-  >("asap");
+  const [deliveryTime, setDeliveryTime] = useState<"asap" | "custom">("asap");
   const [customDateTime, setCustomDateTime] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [voiceSearchMatches, setVoiceSearchMatches] = useState<MenuItem[]>([]);
@@ -1542,6 +1592,253 @@ export default function PublicMenu() {
     restaurant.closingTime || undefined,
   );
 
+  // ── Scheduling constraints ──────────────────────────────────────────────────
+  const scheduling = getSchedulingConstraints(
+    restaurant.openingTime || undefined,
+    restaurant.closingTime || undefined,
+  );
+
+  // ── Shared WhatsApp order builder ───────────────────────────────────────────
+  const buildAndSendWhatsAppOrder = () => {
+    if (!restaurant?.phoneNumber) return;
+
+    if (!customerName.trim()) {
+      toast({ title: t.pleaseEnterName, variant: "destructive" });
+      return;
+    }
+
+    // Block ASAP dine-in when restaurant is closed
+    if (!isOpen && deliveryTime === "asap") {
+      toast({
+        title: t.restaurantClosed,
+        description: t.closedAsapWarning,
+        variant: "destructive",
+      });
+      setDeliveryTime("custom");
+      return;
+    }
+
+    // Validate custom time is within opening hours
+    if (deliveryTime === "custom") {
+      if (!customDateTime) {
+        toast({
+          title: t.selectWithinHours,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (
+        restaurant.openingTime &&
+        restaurant.closingTime &&
+        !isWithinOpeningHours(
+          customDateTime,
+          restaurant.openingTime,
+          restaurant.closingTime,
+        )
+      ) {
+        toast({
+          title: t.outsideHours,
+          description: `${restaurant.openingTime} – ${restaurant.closingTime}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const phone = restaurant.phoneNumber.replace(/\D/g, "");
+    let total = 0;
+    let message = `🧾 *${t.newOrder}*\n\n👤 *${t.customerName}*\n${customerName}\n\n🍽️ *${t.orderType}*\n${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n⏰ *${t.deliveryTime}*\n${
+      deliveryTime === "asap"
+        ? t.asap
+        : customDateTime
+          ? new Date(customDateTime).toLocaleString()
+          : t.customTime
+    }\n\n🛒 *${t.orderSummary}*\n`;
+
+    Object.entries(cart).forEach(([id, qty]) => {
+      const item = restaurant.menuItems.find((i) => i.id === parseInt(id));
+      if (!item) return;
+      const price = parseInt(item.price.replace(/[^0-9]/g, "")) || 0;
+      total += price * qty;
+      message += `• ${qty} × ${item.name} — ${price * qty} den\n`;
+    });
+
+    message += `\n💰 *${t.total}*: ${total} den`;
+    window.open(
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+      "_blank",
+    );
+  };
+
+  // ── Order form (shared between mobile & desktop dialogs) ────────────────────
+  const OrderForm = () => (
+    <div className="space-y-4">
+      {/* Closed restaurant banner */}
+      {!isOpen && (
+        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+              {t.restaurantClosed}
+            </p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+              {restaurant.openingTime} – {restaurant.closingTime}
+            </p>
+            <p className="text-xs text-amber-600 dark:text-amber-500">
+              {t.scheduleForLater}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Name */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          {t.yourName} *
+        </label>
+        <input
+          type="text"
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          placeholder={t.enterYourName}
+          className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+          required
+        />
+      </div>
+
+      {/* Order type — disabled when restaurant is closed */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          {t.orderType} *
+        </label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={orderType === "dineIn" ? "default" : "outline"}
+            className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!isOpen}
+            onClick={() => setOrderType("dineIn")}
+          >
+            {t.dineIn}
+          </Button>
+          <Button
+            type="button"
+            variant={orderType === "takeaway" ? "default" : "outline"}
+            className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!isOpen}
+            onClick={() => setOrderType("takeaway")}
+          >
+            {t.takeaway}
+          </Button>
+        </div>
+      </div>
+
+      {/* Delivery time */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          {t.deliveryTime}
+        </label>
+        <div className="flex gap-2">
+          {/* ASAP disabled when closed */}
+          <Button
+            type="button"
+            variant={deliveryTime === "asap" ? "default" : "outline"}
+            className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!isOpen}
+            onClick={() => setDeliveryTime("asap")}
+          >
+            {t.asap}
+          </Button>
+          <Button
+            type="button"
+            variant={deliveryTime === "custom" ? "default" : "outline"}
+            className="flex-1 h-10 rounded-xl text-xs"
+            onClick={() => setDeliveryTime("custom")}
+          >
+            {t.customTime}
+          </Button>
+        </div>
+
+        {(deliveryTime === "custom" || !isOpen) && (
+          <div className="mt-2 space-y-1">
+            <input
+              type="datetime-local"
+              value={customDateTime}
+              onChange={(e) => setCustomDateTime(e.target.value)}
+              min={scheduling.minDateTime}
+              max={(() => {
+                // Build max = same date as min but at closing time
+                const pad = (n: number) => n.toString().padStart(2, "0");
+                const minDate = scheduling.minDateTime.split("T")[0];
+                return `${minDate}T${scheduling.closingTime}`;
+              })()}
+              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Cart items */}
+      <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
+        <ScrollArea className="h-[140px] pr-1">
+          <div className="space-y-1">
+            {Object.entries(cart).map(([id, qty]) => {
+              const item = restaurant.menuItems.find(
+                (i) => i.id === parseInt(id),
+              );
+              if (!item) return null;
+              return (
+                <div
+                  key={id}
+                  className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
+                      {qty}x
+                    </div>
+                    <div>
+                      <p className="font-bold dark:text-stone-100 text-sm">
+                        {item.name}
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">
+                        {item.price}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => updateCart(item.id, -1)}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => updateCart(item.id, 1)}
+                    >
+                      <Plus className="h-3 w-3 text-primary" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+
+        <div className="flex justify-between items-center p-2 pt-3 rounded-2xl">
+          <span className="text-base font-semibold dark:text-stone-100">
+            {t.totalBill}
+          </span>
+          <p className="text-xl font-bold text-primary">{cartTotal} DEN</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 pb-36 transition-colors duration-300">
       <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
@@ -1555,7 +1852,6 @@ export default function PublicMenu() {
         </Button>
       </Link>
 
-      {/* AI Assistant - now with latitude/longitude passed */}
       <AIRestaurantAssistant
         restaurantName={restaurant.name}
         restaurantPhone={restaurant.phoneNumber ?? undefined}
@@ -1671,7 +1967,6 @@ export default function PublicMenu() {
       {/* Sticky Search + Filter Bar */}
       <div className="sticky top-0 z-40 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-b border-stone-100 dark:border-stone-800 py-3 shadow-sm">
         <div className="max-w-4xl mx-auto px-3 sm:px-4 space-y-2.5">
-          {/* Search */}
           <div className="relative">
             <div className="relative w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary" />
@@ -1713,7 +2008,6 @@ export default function PublicMenu() {
             </div>
           </div>
 
-          {/* Category Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -1845,7 +2139,6 @@ export default function PublicMenu() {
                         </div>
                       )}
 
-                      {/* Cart Controls */}
                       <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-700/50 w-fit p-1 rounded-full border border-stone-200 dark:border-stone-600">
                         <Button
                           size="icon"
@@ -1898,7 +2191,6 @@ export default function PublicMenu() {
                 {restaurant.description || "No description available."}
               </p>
             </div>
-
             <div className="pt-4 border-t border-stone-100 dark:border-stone-700 space-y-4">
               <h3 className="font-semibold text-lg text-stone-900 dark:text-stone-100 flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -1938,7 +2230,7 @@ export default function PublicMenu() {
             className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t-2 border-stone-200 dark:border-stone-700 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-3 py-3 sm:px-5 sm:py-4 z-50"
           >
             <div className="max-w-4xl mx-auto">
-              {/* Mobile */}
+              {/* ── Mobile ── */}
               <div className="flex flex-col gap-2 sm:hidden">
                 <div className="flex items-center gap-2">
                   <div className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg">
@@ -1966,241 +2258,35 @@ export default function PublicMenu() {
                     <DialogTrigger asChild>
                       <Button
                         variant="outline"
-                        className="flex-1 h-auto px-3 py-1 text-xs font-semibold rounded-xl flex items-center justify-center"
+                        className="flex-1 h-auto px-3 py-2 text-xs font-semibold rounded-xl flex items-center justify-center gap-1"
                       >
                         🟢 {t.orderOnWhatsapp}
                       </Button>
                     </DialogTrigger>
-
-                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[110vh] flex flex-col">
+                    <DialogContent className="bg-white dark:bg-stone-800 border-none rounded-3xl max-w-[100vw] max-h-[92vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="text-lg font-bold text-primary">
                           {t.orderSummary}
                         </DialogTitle>
                       </DialogHeader>
-
                       <ScrollArea className="flex-1">
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                              {t.yourName || "Your Name"} *
-                            </label>
-                            <input
-                              type="text"
-                              value={customerName}
-                              onChange={(e) => setCustomerName(e.target.value)}
-                              placeholder={t.enterYourName || "Enter your name"}
-                              className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none"
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                              {t.orderType || "Order Type"} *
-                            </label>
-                            <div className="flex gap-2">
-                              <Button
-                                type="button"
-                                variant={
-                                  orderType === "dineIn" ? "default" : "outline"
-                                }
-                                className="flex-1 h-10 rounded-xl text-xs"
-                                onClick={() => setOrderType("dineIn")}
-                              >
-                                {t.dineIn || "Dine In"}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={
-                                  orderType === "takeaway"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className="flex-1 h-10 rounded-xl text-xs"
-                                onClick={() => setOrderType("takeaway")}
-                              >
-                                {t.takeaway || "Takeaway"}
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                              {t.deliveryTime || "Delivery Time"}
-                            </label>
-                            <div className="grid grid-cols-3 gap-2">
-                              <Button
-                                type="button"
-                                variant={
-                                  deliveryTime === "asap"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className="h-10 rounded-xl text-xs"
-                                onClick={() => setDeliveryTime("asap")}
-                              >
-                                {t.asap}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={
-                                  deliveryTime === "custom"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className="h-10 rounded-xl text-xs col-span-2"
-                                onClick={() => setDeliveryTime("custom")}
-                              >
-                                {t.customTime}
-                              </Button>
-                            </div>
-                            {deliveryTime === "custom" && (
-                              <input
-                                type="datetime-local"
-                                value={customDateTime}
-                                onChange={(e) =>
-                                  setCustomDateTime(e.target.value)
-                                }
-                                min={new Date().toISOString().slice(0, 16)}
-                                className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary mt-2"
-                              />
-                            )}
-                          </div>
-
-                          <div className="pt-2 border-stone-200 dark:border-stone-700">
-                            <ScrollArea className="h-[140px] pr-1">
-                              <div className="space-y-1">
-                                {Object.entries(cart).map(([id, qty]) => {
-                                  const item = restaurant.menuItems.find(
-                                    (i) => i.id === parseInt(id),
-                                  );
-                                  if (!item) return null;
-
-                                  return (
-                                    <div
-                                      key={id}
-                                      className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                                          {qty}x
-                                        </div>
-                                        <div>
-                                          <p className="font-bold dark:text-stone-100 text-sm">
-                                            {item.name}
-                                          </p>
-                                          <p className="text-xs text-stone-500 dark:text-stone-400">
-                                            {item.price}
-                                          </p>
-                                        </div>
-                                      </div>
-
-                                      <div className="flex gap-1">
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-8 w-8"
-                                          onClick={() =>
-                                            updateCart(item.id, -1)
-                                          }
-                                        >
-                                          <Minus className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-8 w-8"
-                                          onClick={() => updateCart(item.id, 1)}
-                                        >
-                                          <Plus className="h-3 w-3 text-primary" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </ScrollArea>
-
-                            <div className="flex justify-between items-center p-2 pt-4 pb-1 rounded-2xl">
-                              <span className="text-base font-semibold dark:text-stone-100">
-                                {t.totalBill}
-                              </span>
-                              <p className="text-xl font-bold text-primary">
-                                {cartTotal} DEN
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                        <OrderForm />
                       </ScrollArea>
-
-                      <div className="pt-4 border-stone-200 dark:border-stone-700">
-                        <div className="flex gap-1">
+                      <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
+                        <div className="flex">
                           <Button
-                            className="flex-1 h-auto px-3 py-1 text-xs font-semibold rounded-xl flex items-center justify-center"
-                            onClick={() => {
-                              if (!restaurant?.phoneNumber) return;
-
-                              if (!customerName.trim()) {
-                                alert(
-                                  t.pleaseEnterName || "Please enter your name",
-                                );
-                                return;
-                              }
-
-                              const phone = restaurant.phoneNumber.replace(
-                                /\D/g,
-                                "",
-                              );
-                              let total = 0;
-                              let message = `🧾 *${t.newOrder || "New Order"}*\n`;
-                              message += `${t.customerName || "Name"}\n`;
-                              message += `*${customerName}*\n`;
-                              message += `${t.orderType || "Order Type"}\n`;
-                              message += `*${orderType === "dineIn" ? t.dineIn : t.takeaway}*\n`;
-
-                              const timeMap: Record<string, string> = {
-                                asap: t.asap,
-                                custom: customDateTime
-                                  ? new Date(customDateTime).toLocaleString()
-                                  : t.customTime,
-                              };
-
-                              message += `${t.deliveryTime || "Delivery Time"}\n`;
-                              message += `*${timeMap[deliveryTime]}*\n\n`;
-                              message += `🛒 *${t.orderSummary || "Order Details"}*\n`;
-
-                              Object.entries(cart).forEach(([id, qty]) => {
-                                const item = restaurant.menuItems.find(
-                                  (i) => i.id === parseInt(id),
-                                );
-                                if (!item) return;
-
-                                const price = parseInt(item.price);
-                                const itemTotal = price * qty;
-                                total += itemTotal;
-
-                                message += `• ${qty} × ${item.name} — ${itemTotal} den\n`;
-                              });
-
-                              message += `\n💰 *${t.total || "Total"}*: ${total} den`;
-
-                              window.open(
-                                `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                                "_blank",
-                              );
-                            }}
+                            className="flex-1 h-7 text-xs font-semibold rounded-xl"
+                            onClick={buildAndSendWhatsAppOrder}
                           >
                             🟢 {t.orderOnWhatsapp}
                           </Button>
-
                           <a
                             href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
                             className="flex-1"
                           >
-                            <Button className="w-full h-auto px-3 py-1 text-xs font-semibold rounded-xl flex items-center justify-center gap-1">
+                            <Button className="w-full h-7 text-xs font-semibold rounded-xl flex items-center justify-center gap-1">
                               <Phone className="h-3 w-3" />
-                              {t.callToOrder || "Call to Order"}
+                              {t.callToOrder}
                             </Button>
                           </a>
                         </div>
@@ -2216,7 +2302,7 @@ export default function PublicMenu() {
                 </div>
               </div>
 
-              {/* Desktop */}
+              {/* ── Desktop ── */}
               <div className="hidden sm:flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="bg-primary text-primary-foreground p-3 rounded-xl">
@@ -2260,180 +2346,12 @@ export default function PublicMenu() {
                         </DialogTitle>
                       </DialogHeader>
                       <ScrollArea className="flex-1 pr-4">
-                        <div className="space-y-4">
-                          <div>
-                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                              {t.yourName} *
-                            </label>
-                            <input
-                              type="text"
-                              value={customerName}
-                              onChange={(e) => setCustomerName(e.target.value)}
-                              placeholder={t.enterYourName}
-                              className="w-full mt-1.5 px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                              {t.orderType} *
-                            </label>
-                            <div className="flex gap-2 mt-1.5">
-                              <Button
-                                type="button"
-                                variant={
-                                  orderType === "dineIn" ? "default" : "outline"
-                                }
-                                className="flex-1 h-10 rounded-xl"
-                                onClick={() => setOrderType("dineIn")}
-                              >
-                                {t.dineIn}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={
-                                  orderType === "takeaway"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className="flex-1 h-10 rounded-xl"
-                                onClick={() => setOrderType("takeaway")}
-                              >
-                                {t.takeaway}
-                              </Button>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                              {t.deliveryTime}
-                            </label>
-                            <div className="flex gap-2 mt-1.5">
-                              <Button
-                                type="button"
-                                variant={
-                                  deliveryTime === "asap"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className="flex-1 h-10 rounded-xl"
-                                onClick={() => setDeliveryTime("asap")}
-                              >
-                                {t.asap}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={
-                                  deliveryTime === "custom"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className="flex-1 h-10 rounded-xl"
-                                onClick={() => setDeliveryTime("custom")}
-                              >
-                                {t.customTime}
-                              </Button>
-                            </div>
-                            {deliveryTime === "custom" && (
-                              <input
-                                type="datetime-local"
-                                value={customDateTime}
-                                onChange={(e) =>
-                                  setCustomDateTime(e.target.value)
-                                }
-                                min={new Date().toISOString().slice(0, 16)}
-                                className="w-full mt-2 px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 focus:outline-none focus:ring-2 focus:ring-primary"
-                              />
-                            )}
-                          </div>
-                          <div className="pt-3 border-t border-stone-200 dark:border-stone-700">
-                            <ScrollArea className="h-52 pr-2">
-                              <div className="space-y-2.5">
-                                {Object.entries(cart).map(([id, qty]) => {
-                                  const item = restaurant.menuItems.find(
-                                    (i) => i.id === parseInt(id),
-                                  );
-                                  if (!item) return null;
-                                  return (
-                                    <div
-                                      key={id}
-                                      className="flex items-center gap-3 p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
-                                    >
-                                      <div className="h-9 w-9 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                                        {qty}x
-                                      </div>
-                                      <div className="flex-1">
-                                        <p className="font-bold dark:text-stone-100 text-sm">
-                                          {item.name}
-                                        </p>
-                                        <p className="text-xs text-stone-500">
-                                          {item.price}
-                                        </p>
-                                      </div>
-                                      <div className="flex gap-1">
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() =>
-                                            updateCart(item.id, -1)
-                                          }
-                                        >
-                                          <Minus className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => updateCart(item.id, 1)}
-                                        >
-                                          <Plus className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </ScrollArea>
-                            <div className="flex justify-between items-center p-3 mt-3 rounded-2xl bg-stone-100 dark:bg-stone-700">
-                              <span className="font-semibold dark:text-stone-100">
-                                {t.totalBill}
-                              </span>
-                              <p className="text-2xl font-bold text-primary">
-                                {cartTotal} DEN
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                        <OrderForm />
                       </ScrollArea>
                       <div className="pt-4 space-y-2.5 border-t border-stone-200 dark:border-stone-700">
                         <Button
                           className="w-full h-11 rounded-2xl font-bold"
-                          onClick={() => {
-                            if (
-                              !restaurant?.phoneNumber ||
-                              !customerName.trim()
-                            ) {
-                              alert(t.pleaseEnterName);
-                              return;
-                            }
-                            const phone = restaurant.phoneNumber.replace(
-                              /\D/g,
-                              "",
-                            );
-                            let total = 0;
-                            let message = `🧾 *${t.newOrder}*\n\n👤 *${t.customerName}*\n${customerName}\n\n🍽️ *${t.orderType}*\n${orderType === "dineIn" ? t.dineIn : t.takeaway}\n\n⏰ *${t.deliveryTime}*\n${deliveryTime === "asap" ? t.asap : customDateTime ? new Date(customDateTime).toLocaleString() : t.customTime}\n\n🛒 *${t.orderSummary}*\n`;
-                            Object.entries(cart).forEach(([id, qty]) => {
-                              const item = restaurant.menuItems.find(
-                                (i) => i.id === parseInt(id),
-                              );
-                              if (!item) return;
-                              const price = parseInt(item.price);
-                              total += price * qty;
-                              message += `• ${qty} × ${item.name} — ${price * qty} den\n`;
-                            });
-                            message += `\n💰 *${t.total}*: ${total} den`;
-                            window.open(
-                              `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
-                              "_blank",
-                            );
-                          }}
+                          onClick={buildAndSendWhatsAppOrder}
                         >
                           🟢 {t.orderOnWhatsapp}
                         </Button>
