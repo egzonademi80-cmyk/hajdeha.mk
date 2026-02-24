@@ -1438,6 +1438,584 @@ function AIRestaurantAssistant({
 }
 // ========== END AI ASSISTANT ==========
 
+// ========== SURPRISE ME ==========
+function SurpriseMe({
+  menuItems,
+  onAddToCart,
+  lang,
+}: {
+  menuItems: MenuItem[];
+  onAddToCart: (itemId: number, delta: number) => void;
+  lang: "en" | "al" | "mk";
+}) {
+  const sT: Record<string, any> = {
+    en: {
+      title: "Surprise Me!",
+      subtitle: "We'll build your perfect meal",
+      budgetLabel: "Total budget",
+      personsLabel: "Persons",
+      perPerson: "per person",
+      spinning: "Building your meal...",
+      result: "Your perfect meal",
+      addAll: "Add all to cart",
+      added: "Added to cart!",
+      noMatch: "No combo found. Try a higher budget!",
+      tryAgain: "Try again",
+      changeBudget: "Change budget",
+      categories: {
+        starter: "Starter",
+        main: "Main",
+        dessert: "Dessert",
+        drink: "Drink",
+      },
+      withinBudget: "within budget",
+      den: "DEN",
+      hint: "Set your budget, pick persons, and we'll find the perfect meal!",
+      tapHint: "Tap to set budget & persons",
+    },
+    al: {
+      title: "më Surprizo!",
+      subtitle: "Ndërtojmë vaktin tuaj të përsosur",
+      budgetLabel: "Buxheti total",
+      personsLabel: "Persona",
+      perPerson: "për person",
+      spinning: "Po ndërtojmë vaktin tuaj...",
+      result: "Vakti juaj i përsosur",
+      addAll: "Shto të gjitha në shportë",
+      added: "U shtua në shportë!",
+      noMatch: "Nuk u gjet kombinim. Provo buxhet më të lartë!",
+      tryAgain: "Provo sërish",
+      changeBudget: "Ndrysho buxhetin",
+      categories: {
+        starter: "Paragjellë",
+        main: "Gjellë kryesore",
+        dessert: "Ëmbëlsirë",
+        drink: "Pije",
+      },
+      withinBudget: "brenda buxhetit",
+      den: "DEN",
+      hint: "Vendos buxhetin, zgjidh personat dhe ne gjejmë vaktin e përsosur!",
+      tapHint: "Kliko për të vendosur buxhetin",
+    },
+    mk: {
+      title: "Изненади ме!",
+      subtitle: "Ќе го составиме вашиот совршен оброк",
+      budgetLabel: "Вкупен буџет",
+      personsLabel: "Лица",
+      perPerson: "по лице",
+      spinning: "Го составуваме вашиот оброк...",
+      result: "Вашиот совршен оброк",
+      addAll: "Додај сè во кошница",
+      added: "Додадено во кошница!",
+      noMatch: "Нема комбинација. Обидете се со поголем буџет!",
+      tryAgain: "Обиди се пак",
+      changeBudget: "Промени буџет",
+      categories: {
+        starter: "Предјадење",
+        main: "Главно јадење",
+        dessert: "Десерт",
+        drink: "Пијалок",
+      },
+      withinBudget: "во рамките на буџетот",
+      den: "DEN",
+      hint: "Внесете буџет, изберете лица и ние бираме совршен оброк!",
+      tapHint: "Допри за да го поставите буџетот",
+    },
+  };
+
+  const t = sT[lang];
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [budget, setBudget] = useState("");
+  const [persons, setPersons] = useState(2);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [result, setResult] = useState<{
+    starter?: MenuItem;
+    main?: MenuItem;
+    dessert?: MenuItem;
+    drink?: MenuItem;
+    total: number;
+    perPerson: number;
+  } | null>(null);
+  const [noMatch, setNoMatch] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const getByCategory = (keywords: string[]) =>
+    menuItems.filter(
+      (i) =>
+        i.active && keywords.some((k) => i.category.toLowerCase().includes(k)),
+    );
+
+  const pickRandom = (arr: MenuItem[]) =>
+    arr.length > 0 ? arr[Math.floor(Math.random() * arr.length)] : undefined;
+
+  const parsePrice = (item: MenuItem) =>
+    parseInt(item.price.replace(/[^0-9]/g, "")) || 0;
+
+  // Budget per person
+  const budgetPerPerson = parseInt(budget)
+    ? Math.floor(parseInt(budget) / persons)
+    : 0;
+
+  const buildCombo = (budgetPP: number) => {
+    const starters = getByCategory([
+      "starter",
+      "appetizer",
+      "paragjell",
+      "предјад",
+    ]);
+    const mains = getByCategory(["main", "kryesor", "gjell", "главн"]);
+    const desserts = getByCategory([
+      "dessert",
+      "embëlsir",
+      "ëmbëlsir",
+      "десерт",
+      "sweet",
+    ]);
+    const drinks = getByCategory(["drink", "pij", "пијал", "beverage"]);
+    const allActive = menuItems.filter((i) => i.active);
+    const mainPool = mains.length > 0 ? mains : allActive;
+
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const main = pickRandom(mainPool);
+      if (!main) break;
+      let total = parsePrice(main);
+      if (total > budgetPP) continue;
+
+      const starter = pickRandom(
+        starters.filter((i) => parsePrice(i) + total <= budgetPP),
+      );
+      if (starter) total += parsePrice(starter);
+
+      const drink = pickRandom(
+        drinks.filter((i) => parsePrice(i) + total <= budgetPP),
+      );
+      if (drink) total += parsePrice(drink);
+
+      const dessert = pickRandom(
+        desserts.filter((i) => parsePrice(i) + total <= budgetPP),
+      );
+      if (dessert) total += parsePrice(dessert);
+
+      return {
+        starter,
+        main,
+        dessert,
+        drink,
+        perPerson: total,
+        total: total * persons,
+      };
+    }
+    return null;
+  };
+
+  const handleSurprise = () => {
+    if (!budgetPerPerson || budgetPerPerson <= 0) {
+      inputRef.current?.focus();
+      return;
+    }
+    setIsSpinning(true);
+    setResult(null);
+    setNoMatch(false);
+    setTimeout(() => {
+      const combo = buildCombo(budgetPerPerson);
+      setIsSpinning(false);
+      if (!combo) setNoMatch(true);
+      else setResult(combo);
+    }, 1500);
+  };
+
+  const handleAddAll = () => {
+    if (!result) return;
+    // Add items * persons count
+    [result.starter, result.main, result.dessert, result.drink].forEach(
+      (item) => {
+        if (item) {
+          for (let p = 0; p < persons; p++) onAddToCart(item.id, 1);
+        }
+      },
+    );
+    toast({ title: t.added });
+    setOpen(false);
+    setBudget("");
+    setResult(null);
+  };
+
+  const slots = result
+    ? [
+        {
+          key: "starter",
+          label: t.categories.starter,
+          item: result.starter,
+          emoji: "🥗",
+        },
+        {
+          key: "main",
+          label: t.categories.main,
+          item: result.main,
+          emoji: "🍽️",
+        },
+        {
+          key: "dessert",
+          label: t.categories.dessert,
+          item: result.dessert,
+          emoji: "🍰",
+        },
+        {
+          key: "drink",
+          label: t.categories.drink,
+          item: result.drink,
+          emoji: "🥤",
+        },
+      ]
+    : [];
+
+  const hasResult = result && !isSpinning;
+  const showHint = !isSpinning && !result && !noMatch;
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) {
+          setResult(null);
+          setNoMatch(false);
+        }
+      }}
+    >
+      {/* ── Trigger card ── */}
+      <DialogTrigger asChild>
+        <motion.button
+          whileHover={{ scale: 1.015 }}
+          whileTap={{ scale: 0.975 }}
+          className="w-full relative overflow-hidden rounded-2xl border-2 border-primary/20 bg-white dark:bg-stone-900 shadow-sm focus:outline-none"
+        >
+          <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-5">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-primary flex items-center justify-center shadow-md text-xl">
+                🎲
+              </div>
+              <div className="text-left min-w-0">
+                <p className="font-bold text-sm sm:text-base text-stone-900 dark:text-stone-100 leading-tight">
+                  {t.title}
+                </p>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                  {t.tapHint}
+                </p>
+              </div>
+            </div>
+            <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+          </div>
+        </motion.button>
+      </DialogTrigger>
+
+      {/* ── Dialog ── */}
+      <DialogContent
+        className="
+          w-[calc(100vw-32px)] max-w-md
+          max-h-[88dvh]
+          bg-white dark:bg-stone-900
+          rounded-3xl
+          overflow-hidden p-0 border-0 shadow-2xl
+          flex flex-col
+        "
+      >
+        {/* ── Header ── */}
+        <div className="relative bg-primary px-5 pt-6 pb-10 sm:pt-8 sm:pb-12 flex-shrink-0">
+          <div
+            className="absolute inset-0 opacity-10"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, white 1px, transparent 1px)",
+              backgroundSize: "22px 22px",
+            }}
+          />
+          <DialogHeader className="relative z-10 text-left">
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+              🎲 {t.title}
+            </DialogTitle>
+            <DialogDescription className="text-white/75 mt-1 text-xs sm:text-sm">
+              {t.subtitle}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* ── Budget + Persons card ── */}
+          <div className="relative z-10 mt-4 sm:mt-5 bg-white dark:bg-stone-800 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Budget row */}
+            <div className="px-4 pt-4 pb-3 border-b border-stone-100 dark:border-stone-700">
+              <label className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest block">
+                {t.budgetLabel}
+              </label>
+              <div className="flex items-center gap-2 mt-1.5">
+                <input
+                  ref={inputRef}
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={budget}
+                  onChange={(e) => {
+                    setBudget(e.target.value);
+                    setResult(null);
+                    setNoMatch(false);
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleSurprise()}
+                  placeholder="0"
+                  className="flex-1 text-2xl sm:text-3xl font-bold text-stone-900 dark:text-stone-100 bg-transparent outline-none placeholder:text-stone-300 dark:placeholder:text-stone-600 min-w-0"
+                />
+                <span className="text-base font-bold text-stone-300 dark:text-stone-600 flex-shrink-0">
+                  {t.den}
+                </span>
+              </div>
+              {/* per-person breakdown */}
+              {budgetPerPerson > 0 && (
+                <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1">
+                  ≈ {budgetPerPerson} {t.den} {t.perPerson}
+                </p>
+              )}
+            </div>
+
+            {/* Persons row */}
+            <div className="px-4 py-3 flex items-center justify-between">
+              <div>
+                <label className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest block">
+                  {t.personsLabel}
+                </label>
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                  {persons}{" "}
+                  {persons === 1
+                    ? lang === "en"
+                      ? "person"
+                      : lang === "al"
+                        ? "person"
+                        : "лице"
+                    : lang === "en"
+                      ? "persons"
+                      : lang === "al"
+                        ? "persona"
+                        : "лица"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setPersons((p) => Math.max(1, p - 1));
+                    setResult(null);
+                  }}
+                  className="h-9 w-9 rounded-xl border-2 border-stone-200 dark:border-stone-600 flex items-center justify-center text-stone-600 dark:text-stone-300 hover:border-primary hover:text-primary transition-colors font-bold text-lg active:scale-95"
+                >
+                  −
+                </button>
+                <span className="w-8 text-center font-bold text-lg text-stone-900 dark:text-stone-100">
+                  {persons}
+                </span>
+                <button
+                  onClick={() => {
+                    setPersons((p) => Math.min(20, p + 1));
+                    setResult(null);
+                  }}
+                  className="h-9 w-9 rounded-xl border-2 border-stone-200 dark:border-stone-600 flex items-center justify-center text-stone-600 dark:text-stone-300 hover:border-primary hover:text-primary transition-colors font-bold text-lg active:scale-95"
+                >
+                  +
+                </button>
+                {/* Go button */}
+                <Button
+                  onClick={handleSurprise}
+                  disabled={!budget || parseInt(budget) <= 0 || isSpinning}
+                  className="ml-1 h-9 px-4 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold border-0 disabled:opacity-40 active:scale-95 transition-all"
+                >
+                  {isSpinning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "🎲"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Results (scrollable) ── */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 -mt-3">
+          <AnimatePresence mode="wait">
+            {isSpinning && (
+              <motion.div
+                key="spin"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-12 gap-4"
+              >
+                <div className="relative">
+                  <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                  <motion.span
+                    className="absolute inset-0 flex items-center justify-center text-2xl"
+                    animate={{ rotate: [0, 15, -15, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  >
+                    🎲
+                  </motion.span>
+                </div>
+                <p className="text-sm text-stone-500 dark:text-stone-400 font-medium animate-pulse">
+                  {t.spinning}
+                </p>
+              </motion.div>
+            )}
+
+            {noMatch && !isSpinning && (
+              <motion.div
+                key="nomatch"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center justify-center py-10 gap-3 text-center"
+              >
+                <span className="text-5xl">😕</span>
+                <p className="text-sm text-stone-500 dark:text-stone-400 max-w-[220px]">
+                  {t.noMatch}
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-2 rounded-xl text-xs h-9 px-4 border-primary/30 text-primary"
+                  onClick={() => {
+                    setNoMatch(false);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  ✏️ {t.changeBudget}
+                </Button>
+              </motion.div>
+            )}
+
+            {hasResult && (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3"
+              >
+                {/* header */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                    {t.result}
+                  </p>
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+                      {result!.perPerson} {t.den} {t.perPerson}
+                    </span>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                      {result!.total} {t.den} · {persons}×
+                    </span>
+                  </div>
+                </div>
+
+                {/* item cards */}
+                <div className="space-y-2">
+                  {slots.map(({ key, label, item, emoji }, i) =>
+                    item ? (
+                      <motion.div
+                        key={key}
+                        initial={{ opacity: 0, x: -14 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.07 }}
+                        className="flex items-center gap-3 p-3 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-stone-100 dark:border-stone-700"
+                      >
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-2xl flex-shrink-0">
+                            {emoji}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[9px] font-bold text-primary uppercase tracking-widest leading-none mb-0.5">
+                            {label}
+                          </p>
+                          <p className="font-semibold text-sm text-stone-900 dark:text-stone-100 leading-tight line-clamp-2">
+                            {item.name}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 text-right ml-1">
+                          <p className="font-bold text-sm text-stone-700 dark:text-stone-300">
+                            {item.price}
+                          </p>
+                          {persons > 1 && (
+                            <p className="text-[10px] text-stone-400">
+                              ×{persons}
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    ) : null,
+                  )}
+                </div>
+
+                {/* total breakdown */}
+                {persons > 1 && (
+                  <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
+                    <span className="text-xs font-bold text-stone-600 dark:text-stone-300">
+                      {persons} × {result!.perPerson} {t.den}
+                    </span>
+                    <span className="text-sm font-bold text-primary">
+                      {result!.total} {t.den}
+                    </span>
+                  </div>
+                )}
+
+                {/* action buttons */}
+                <div className="flex gap-2 pt-1 pb-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-11 rounded-xl text-xs font-bold border-stone-200 dark:border-stone-700"
+                    onClick={handleSurprise}
+                  >
+                    🔀 {t.tryAgain}
+                  </Button>
+                  <Button
+                    className="flex-1 h-11 rounded-xl text-sm font-bold bg-primary hover:bg-primary/90 border-0 text-white shadow-md active:scale-95 transition-all"
+                    onClick={handleAddAll}
+                  >
+                    <ShoppingBag className="h-4 w-4 mr-1.5" />
+                    {t.addAll}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {showHint && (
+              <motion.div
+                key="hint"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center py-10 gap-3"
+              >
+                <motion.span
+                  className="text-5xl"
+                  animate={{ y: [0, -5, 0] }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                >
+                  🤔
+                </motion.span>
+                <p className="text-xs text-center text-stone-400 dark:text-stone-600 max-w-[210px]">
+                  {t.hint}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+// ========== END SURPRISE ME ==========
+
 export default function PublicMenu() {
   const { slug } = useParams<{ slug: string }>();
   const [lang] = useState<"en" | "al" | "mk">(
@@ -1731,6 +2309,11 @@ export default function PublicMenu() {
             {t.takeaway}
           </Button>
         </div>
+        {!isOpen && (
+          <p className="text-[10px] text-amber-600 dark:text-amber-400 pl-1">
+            ⚠️ {t.closedAsapWarning}
+          </p>
+        )}
       </div>
 
       {/* Delivery time */}
@@ -1764,16 +2347,38 @@ export default function PublicMenu() {
             <input
               type="datetime-local"
               value={customDateTime}
-              onChange={(e) => setCustomDateTime(e.target.value)}
+              onChange={(e) => {
+                const chosen = e.target.value; // "YYYY-MM-DDTHH:MM"
+                if (!chosen) {
+                  setCustomDateTime("");
+                  return;
+                }
+
+                const open = scheduling.openingTime; // "HH:MM"
+                const close = scheduling.closingTime; // "HH:MM"
+                const dateOnly = chosen.split("T")[0]; // "YYYY-MM-DD"
+                const timeOnly = chosen.split("T")[1]; // "HH:MM"
+
+                // Clamp to opening time if before
+                if (timeOnly < open) {
+                  setCustomDateTime(`${dateOnly}T${open}`);
+                  return;
+                }
+                // Clamp to closing time if after
+                if (timeOnly > close) {
+                  setCustomDateTime(`${dateOnly}T${close}`);
+                  return;
+                }
+                setCustomDateTime(chosen);
+              }}
               min={scheduling.minDateTime}
-              max={(() => {
-                // Build max = same date as min but at closing time
-                const pad = (n: number) => n.toString().padStart(2, "0");
-                const minDate = scheduling.minDateTime.split("T")[0];
-                return `${minDate}T${scheduling.closingTime}`;
-              })()}
               className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
             />
+            {restaurant.openingTime && restaurant.closingTime && (
+              <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
+                ⏰ {restaurant.openingTime} – {restaurant.closingTime}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -2048,6 +2653,13 @@ export default function PublicMenu() {
 
       {/* Menu */}
       <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
+        {/* Surprise Me */}
+        <SurpriseMe
+          menuItems={restaurant.menuItems || []}
+          onAddToCart={updateCart}
+          lang={lang}
+        />
+
         {groupedMenu.map(
           ([category, items]: [string, MenuItem[]], idx: number) => (
             <motion.section
@@ -2273,9 +2885,9 @@ export default function PublicMenu() {
                         <OrderForm />
                       </ScrollArea>
                       <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
-                        <div className="flex">
+                        <div className="flex gap-2">
                           <Button
-                            className="flex-1 h-7 text-xs font-semibold rounded-xl"
+                            className="flex-1 h-10 text-xs font-semibold rounded-xl"
                             onClick={buildAndSendWhatsAppOrder}
                           >
                             🟢 {t.orderOnWhatsapp}
@@ -2284,7 +2896,7 @@ export default function PublicMenu() {
                             href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
                             className="flex-1"
                           >
-                            <Button className="w-full h-7 text-xs font-semibold rounded-xl flex items-center justify-center gap-1">
+                            <Button className="w-full h-10 text-xs font-semibold rounded-xl flex items-center justify-center gap-1">
                               <Phone className="h-3 w-3" />
                               {t.callToOrder}
                             </Button>
