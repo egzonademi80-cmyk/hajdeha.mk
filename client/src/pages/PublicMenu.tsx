@@ -2015,16 +2015,6 @@ function SurpriseMe({
       >
         {/* ── Header ── */}
         <div className="relative bg-primary px-5 pt-6 pb-10 sm:pt-8 sm:pb-12 flex-shrink-0">
-          {/* ✅ ADD THIS HERE */}
-          <button
-            onClick={() => setOpen(false)}
-            className="absolute right-4 top-4 z-50 rounded-full p-2 
-                       text-white/80 hover:text-white 
-                       hover:bg-white/10 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"
             style={{
