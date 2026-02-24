@@ -632,19 +632,13 @@ const MenuItemCard = memo(function MenuItemCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex justify-between gap-2 mb-1">
-            <h4 className="font-semibold text-sm truncate">
-              {lang === "al" && item.nameAl ? item.nameAl : 
-               lang === "mk" && item.nameMk ? item.nameMk : 
-               item.name}
-            </h4>
+            <h4 className="font-semibold text-sm truncate">{item.name}</h4>
             <span className="font-bold text-primary text-sm whitespace-nowrap">
               {item.price}
             </span>
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-            {lang === "al" && item.descriptionAl ? item.descriptionAl : 
-             lang === "mk" && item.descriptionMk ? item.descriptionMk : 
-             item.description}
+            {item.description}
           </p>
           <div className="flex gap-1 flex-wrap">
             <div
@@ -728,21 +722,11 @@ function MenuItemDialog({
   const { mutate: update, isPending: isUpdating } = useUpdateMenuItem();
   const { toast } = useToast();
 
-  const [lang] = useState<"en" | "al" | "mk">(() => {
-    const saved = localStorage.getItem("hajdeha-lang");
-    return (saved as any) || "en";
-  });
-  const t = translations[lang];
-
   const form = useForm<InsertMenuItem>({
     resolver: zodResolver(insertMenuItemSchema),
     defaultValues: {
       name: "",
-      nameAl: "",
-      nameMk: "",
       description: "",
-      descriptionAl: "",
-      descriptionMk: "",
       price: "",
       category: "Mains",
       imageUrl: "",
@@ -752,19 +736,12 @@ function MenuItemDialog({
       isGlutenFree: false,
       restaurantId,
     },
-    values: initialData ? { 
-      ...initialData, 
-      restaurantId,
-      nameAl: initialData.nameAl || "",
-      nameMk: initialData.nameMk || "",
-      descriptionAl: initialData.descriptionAl || "",
-      descriptionMk: initialData.descriptionMk || ""
-    } : undefined,
+    values: initialData ? { ...initialData, restaurantId } : undefined,
   });
 
   const onSubmit = (data: InsertMenuItem) => {
     const onSuccess = () => {
-      toast({ title: initialData ? t.updated : "Added" });
+      toast({ title: initialData ? "Updated" : "Added" });
       onOpenChange(false);
       form.reset();
     };
@@ -778,77 +755,48 @@ function MenuItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData ? t.editItem : t.addMenuItem}</DialogTitle>
+          <DialogTitle>{initialData ? "Edit Item" : "Add Item"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div>
-                <Label className="text-sm">{t.name} (EN)</Label>
-                <Input {...form.register("name")} className="h-9" />
-              </div>
-              <div>
-                <Label className="text-sm">{t.nameAl}</Label>
-                <Input {...form.register("nameAl")} className="h-9" />
-              </div>
-              <div>
-                <Label className="text-sm">{t.nameMk}</Label>
-                <Input {...form.register("nameMk")} className="h-9" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-sm">{t.price}</Label>
-                  <Input
-                    {...form.register("price")}
-                    placeholder="350 DEN"
-                    className="h-9"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm">{t.category}</Label>
-                  <Select
-                    onValueChange={(val) => form.setValue("category", val)}
-                    defaultValue={form.getValues("category")}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+          <div>
+            <Label className="text-sm">Name</Label>
+            <Input {...form.register("name")} className="h-9" />
+          </div>
+          <div>
+            <Label className="text-sm">Description</Label>
+            <Textarea
+              {...form.register("description")}
+              className="h-20 resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-sm">Price</Label>
+              <Input
+                {...form.register("price")}
+                placeholder="350 DEN"
+                className="h-9"
+              />
             </div>
-
-            <div className="space-y-3">
-              <div>
-                <Label className="text-sm">{t.description} (EN)</Label>
-                <Textarea
-                  {...form.register("description")}
-                  className="h-20 resize-none"
-                />
-              </div>
-              <div>
-                <Label className="text-sm">{t.descriptionAl}</Label>
-                <Textarea
-                  {...form.register("descriptionAl")}
-                  className="h-20 resize-none"
-                />
-              </div>
-              <div>
-                <Label className="text-sm">{t.descriptionMk}</Label>
-                <Textarea
-                  {...form.register("descriptionMk")}
-                  className="h-20 resize-none"
-                />
-              </div>
+            <div>
+              <Label className="text-sm">Category</Label>
+              <Select
+                onValueChange={(val) => form.setValue("category", val)}
+                defaultValue={form.getValues("category")}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -897,13 +845,13 @@ function MenuItemDialog({
               size="sm"
               onClick={() => onOpenChange(false)}
             >
-              {t.cancel}
+              Cancel
             </Button>
             <Button type="submit" size="sm" disabled={isCreating || isUpdating}>
               {(isCreating || isUpdating) && (
                 <Loader2 className="mr-1 h-3 w-3 animate-spin" />
               )}
-              {t.save}
+              {initialData ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </form>

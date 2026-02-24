@@ -1627,9 +1627,7 @@ export default function PublicMenu() {
               transition={{ delay: 0.3 }}
               className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed"
             >
-              {lang === "al" && restaurant.descriptionAl ? restaurant.descriptionAl : 
-               lang === "mk" && restaurant.descriptionMk ? restaurant.descriptionMk : 
-               restaurant.description}
+              {restaurant.description}
             </motion.p>
           )}
 
