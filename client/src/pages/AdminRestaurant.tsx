@@ -423,8 +423,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
     active: restaurant.active ?? true,
     latitude: restaurant.latitude || "",
     longitude: restaurant.longitude || "",
-    qrColor: restaurant.qrColor || "#000000",
-    qrBgColor: restaurant.qrBgColor || "#ffffff",
   });
 
   useEffect(() => {
@@ -441,8 +439,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
       active: restaurant.active ?? true,
       latitude: restaurant.latitude || "",
       longitude: restaurant.longitude || "",
-      qrColor: restaurant.qrColor || "#000000",
-      qrBgColor: restaurant.qrBgColor || "#ffffff",
     });
   }, [restaurant]);
 
@@ -585,40 +581,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
             }
             className="h-9"
           />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm">QR Color</Label>
-          <div className="flex gap-2">
-            <Input 
-              type="color" 
-              value={formData.qrColor} 
-              onChange={(e) => setFormData(p => ({ ...p, qrColor: e.target.value }))}
-              className="w-10 h-9 p-1 cursor-pointer"
-            />
-            <Input 
-              type="text" 
-              value={formData.qrColor} 
-              onChange={(e) => setFormData(p => ({ ...p, qrColor: e.target.value }))}
-              className="flex-1 h-9 font-mono text-xs uppercase px-2"
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm">QR Background</Label>
-          <div className="flex gap-2">
-            <Input 
-              type="color" 
-              value={formData.qrBgColor} 
-              onChange={(e) => setFormData(p => ({ ...p, qrBgColor: e.target.value }))}
-              className="w-10 h-9 p-1 cursor-pointer"
-            />
-            <Input 
-              type="text" 
-              value={formData.qrBgColor} 
-              onChange={(e) => setFormData(p => ({ ...p, qrBgColor: e.target.value }))}
-              className="flex-1 h-9 font-mono text-xs uppercase px-2"
-            />
-          </div>
         </div>
       </div>
 

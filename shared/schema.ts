@@ -28,8 +28,6 @@ export const restaurants = pgTable("restaurants", {
   active: boolean("active").default(true).notNull(),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
-  qrColor: text("qr_color").default("#000000"),
-  qrBgColor: text("qr_bg_color").default("#ffffff"),
 }, (table) => {
   return {
     slugIdx: index("slug_idx").on(table.slug),

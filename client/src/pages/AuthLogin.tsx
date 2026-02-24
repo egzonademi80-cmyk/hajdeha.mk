@@ -237,7 +237,6 @@ export default function AuthLogin() {
       </div>
 
       {/* Right Panel - Login Form */}
-      {/* Right Panel - Login Form */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="flex items-center justify-between p-6 lg:p-8">

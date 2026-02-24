@@ -325,42 +325,20 @@ export default function AdminDashboard() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [activeRestaurant, setActiveRestaurant] = useState<any>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [qrColor, setQrColor] = useState("#000000");
-  const [qrBgColor, setQrBgColor] = useState("#ffffff");
-
-  const updateRestaurantMutation = useMutation({
-    mutationFn: async ({ id, ...data }: any) => {
-      const res = await apiRequest(
-        "PATCH",
-        buildUrl(api.restaurants.update.path, { id }),
-        data,
-      );
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.restaurants.list.path] });
-      toast({ title: "QR Design Saved" });
-    },
-  });
 
   const generateQR = async (restaurant: any) => {
     try {
       const url = `${window.location.origin}/restaurant/${restaurant.slug}`;
-      const colorDark = restaurant.qrColor || qrColor;
-      const colorLight = restaurant.qrBgColor || qrBgColor;
-
       const qrImage = await QRCode.toDataURL(url, {
         width: 1024,
         margin: 2,
         color: {
-          dark: colorDark,
-          light: colorLight,
+          dark: "#000000",
+          light: "#ffffff",
         },
       });
       setQrData(qrImage);
       setActiveRestaurant(restaurant);
-      setQrColor(colorDark);
-      setQrBgColor(colorLight);
     } catch (err) {
       toast({
         title: t.errorQR,
@@ -807,78 +785,10 @@ export default function AdminDashboard() {
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[400px]">
+                          <DialogHeader className="pb-4 border-b">
+                            <DialogTitle>{t.qrTitle}</DialogTitle>
+                          </DialogHeader>
                           <div className="flex flex-col items-center justify-center space-y-6 py-6">
-                            <div className="grid grid-cols-2 gap-4 w-full px-1">
-                              <div className="space-y-2">
-                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-                                  QR Color
-                                </Label>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="color"
-                                    value={qrColor}
-                                    onChange={(e) => setQrColor(e.target.value)}
-                                    className="w-10 h-10 p-1 cursor-pointer"
-                                  />
-                                  <Input
-                                    type="text"
-                                    value={qrColor}
-                                    onChange={(e) => setQrColor(e.target.value)}
-                                    className="flex-1 h-10 font-mono text-[10px] uppercase px-2"
-                                  />
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-                                  Background
-                                </Label>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type="color"
-                                    value={qrBgColor}
-                                    onChange={(e) =>
-                                      setQrBgColor(e.target.value)
-                                    }
-                                    className="w-10 h-10 p-1 cursor-pointer"
-                                  />
-                                  <Input
-                                    type="text"
-                                    value={qrBgColor}
-                                    onChange={(e) =>
-                                      setQrBgColor(e.target.value)
-                                    }
-                                    className="flex-1 h-10 font-mono text-[10px] uppercase px-2"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => generateQR(activeRestaurant)}
-                              className="w-full text-xs"
-                            >
-                              Update QR Preview
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                updateRestaurantMutation.mutate({
-                                  id: activeRestaurant.id,
-                                  qrColor,
-                                  qrBgColor,
-                                })
-                              }
-                              disabled={updateRestaurantMutation.isPending}
-                              className="w-full text-xs bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                            >
-                              {updateRestaurantMutation.isPending
-                                ? "Saving..."
-                                : "Save Design to Restaurant"}
-                            </Button>
-
                             {qrData ? (
                               <>
                                 <div className="bg-white p-6 rounded-2xl shadow-inner border">
