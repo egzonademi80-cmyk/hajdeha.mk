@@ -1773,7 +1773,7 @@ function SurpriseMe({
       perPerson: "për person",
       spinning: "Po ndërtojmë vaktin tuaj...",
       result: "Vakti juaj i përsosur",
-      addAll: "Shto të gjitha në shportë",
+      addAll: "Shto në shportë",
       added: "U shtua në shportë!",
       noMatch: "Nuk u gjet kombinim. Provo buxhet më të lartë!",
       tryAgain: "Provo sërish",
@@ -2015,8 +2015,18 @@ function SurpriseMe({
       >
         {/* ── Header ── */}
         <div className="relative bg-primary px-5 pt-6 pb-10 sm:pt-8 sm:pb-12 flex-shrink-0">
+          {/* ✅ ADD THIS HERE */}
+          <button
+            onClick={() => setOpen(false)}
+            className="absolute right-4 top-4 z-50 rounded-full p-2 
+                       text-white/80 hover:text-white 
+                       hover:bg-white/10 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
           <div
-            className="absolute inset-0 opacity-10"
+            className="absolute inset-0 opacity-10 pointer-events-none"
             style={{
               backgroundImage:
                 "radial-gradient(circle, white 1px, transparent 1px)",
