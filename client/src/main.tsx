@@ -41,9 +41,24 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET" || url.protocol === "chrome-extension:") return;
 
-  // API calls — always network (fresh data)
+  // API calls — network first, fallback to cache (offline support)
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(fetch(request).catch(() => new Response("Offline", { status: 503 })));
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        try {
+          const response = await fetch(request);
+          if (response.ok) cache.put(request, response.clone());
+          return response;
+        } catch {
+          const cached = await cache.match(request);
+          if (cached) return cached;
+          return new Response(JSON.stringify({ offline: true, message: "No internet connection" }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      })
+    );
     return;
   }
 
