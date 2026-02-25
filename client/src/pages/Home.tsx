@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { api } from "@shared/routes";
@@ -267,6 +267,51 @@ export default function Home() {
 
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState(false);
+
+  // ── PWA Install Prompt ──
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+
+  useEffect(() => {
+    // Detect iOS
+    const ios = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    const standalone = (window.navigator as any).standalone;
+    setIsIOS(ios);
+
+    // Show iOS guide if on iOS and not already installed
+    if (ios && !standalone) {
+      const dismissed = localStorage.getItem("hajdeha-ios-banner-dismissed");
+      if (!dismissed) setShowInstallBanner(true);
+    }
+
+    // Android/Desktop Chrome install prompt
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (isIOS) {
+      setShowIOSGuide(true);
+      return;
+    }
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") setShowInstallBanner(false);
+    setInstallPrompt(null);
+  };
+
+  const dismissBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem("hajdeha-ios-banner-dismissed", "1");
+  };
 
   const handleGetLocation = () => {
     // If already have location, clear it (toggle off)
@@ -930,6 +975,159 @@ export default function Home() {
       <footer className="py-12 border-t text-center text-stone-400 text-sm">
         <p>© 2026 HAJDE HA - Tetovë Digital Menu Platform</p>
       </footer>
+
+      {/* ── PWA Install Banner ── */}
+      {showInstallBanner && !showIOSGuide && (
+        <div className="fixed bottom-4 left-4 right-4 z-50 max-w-sm mx-auto">
+          <div className="bg-stone-900 dark:bg-stone-800 text-white rounded-2xl p-4 shadow-2xl border border-stone-700 flex items-center gap-3">
+            <div className="flex-shrink-0 w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-xl">
+              📲
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">HAJDE HA</p>
+              <p className="text-xs text-stone-400 mt-0.5">
+                {isIOS
+                  ? lang === "en"
+                    ? "Add to home screen"
+                    : lang === "al"
+                      ? "Shto në ekranin kryesor"
+                      : "Додај на почетен екран"
+                  : lang === "en"
+                    ? "Install the app"
+                    : lang === "al"
+                      ? "Instalo aplikacionin"
+                      : "Инсталирај ја апликацијата"}
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={dismissBanner}
+                className="px-2.5 py-1.5 rounded-lg bg-stone-700 text-xs text-stone-300 hover:bg-stone-600 transition-colors"
+              >
+                {lang === "en" ? "No" : lang === "al" ? "Jo" : "Не"}
+              </button>
+              <button
+                onClick={handleInstall}
+                className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors"
+              >
+                {isIOS
+                  ? lang === "en"
+                    ? "How?"
+                    : lang === "al"
+                      ? "Si?"
+                      : "Како?"
+                  : lang === "en"
+                    ? "Install"
+                    : lang === "al"
+                      ? "Instalo"
+                      : "Инсталирај"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── iOS Install Guide ── */}
+      {showIOSGuide && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-4">
+          <div className="bg-white dark:bg-stone-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="text-center mb-5">
+              <div className="text-4xl mb-2">📱</div>
+              <h3 className="font-bold text-lg text-stone-900 dark:text-stone-100">
+                {lang === "en"
+                  ? "Install HAJDE HA"
+                  : lang === "al"
+                    ? "Instalo HAJDE HA"
+                    : "Инсталирај HAJDE HA"}
+              </h3>
+              <p className="text-sm text-stone-500 dark:text-stone-400 mt-1">
+                {lang === "en"
+                  ? "Add to your iPhone home screen"
+                  : lang === "al"
+                    ? "Shto në ekranin kryesor të iPhone-it"
+                    : "Додај на почетниот екран на iPhone"}
+              </p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800">
+                <span className="text-xl flex-shrink-0">1️⃣</span>
+                <p className="text-sm text-stone-700 dark:text-stone-300">
+                  {lang === "en" ? (
+                    <>
+                      Tap the <strong>Share</strong> button (
+                      <span className="text-primary">□↑</span>) at the bottom of
+                      Safari
+                    </>
+                  ) : lang === "al" ? (
+                    <>
+                      Shtyp butonin <strong>Shpërnda</strong> (
+                      <span className="text-primary">□↑</span>) në fund të
+                      Safari
+                    </>
+                  ) : (
+                    <>
+                      Допри го копчето <strong>Сподели</strong> (
+                      <span className="text-primary">□↑</span>) на дното на
+                      Safari
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800">
+                <span className="text-xl flex-shrink-0">2️⃣</span>
+                <p className="text-sm text-stone-700 dark:text-stone-300">
+                  {lang === "en" ? (
+                    <>
+                      {" "}
+                      Select <strong>"Add to Home Screen"</strong>
+                    </>
+                  ) : lang === "al" ? (
+                    <>
+                      Zgjidh <strong>"Shto në Ekranin Kryesor"</strong>
+                    </>
+                  ) : (
+                    <>
+                      Избери <strong>"Додај на почетен екран"</strong>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800">
+                <span className="text-xl flex-shrink-0">3️⃣</span>
+                <p className="text-sm text-stone-700 dark:text-stone-300">
+                  {lang === "en" ? (
+                    <>
+                      Tap <strong>"Add"</strong> and done! 🎉
+                    </>
+                  ) : lang === "al" ? (
+                    <>
+                      Shtyp <strong>"Shto"</strong> dhe gati! 🎉
+                    </>
+                  ) : (
+                    <>
+                      Допри <strong>"Додај"</strong> и готово! 🎉
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setShowIOSGuide(false);
+                setShowInstallBanner(false);
+                localStorage.setItem("hajdeha-ios-banner-dismissed", "1");
+              }}
+              className="w-full mt-5 h-11 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-colors"
+            >
+              {lang === "en"
+                ? "Got it! ✓"
+                : lang === "al"
+                  ? "Kuptova! ✓"
+                  : "Разбрав! ✓"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
