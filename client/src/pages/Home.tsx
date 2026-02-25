@@ -277,11 +277,18 @@ export default function Home() {
   useEffect(() => {
     // Detect iOS
     const ios = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-    const standalone = (window.navigator as any).standalone;
+    const iosStandalone = (window.navigator as any).standalone === true;
+    const androidStandalone = window.matchMedia(
+      "(display-mode: standalone)",
+    ).matches;
+    const isInstalled = iosStandalone || androidStandalone;
     setIsIOS(ios);
 
+    // Don't show banner if already installed as PWA
+    if (isInstalled) return;
+
     // Show iOS guide if on iOS and not already installed
-    if (ios && !standalone) {
+    if (ios) {
       const dismissed = localStorage.getItem("hajdeha-ios-banner-dismissed");
       if (!dismissed) setShowInstallBanner(true);
     }
