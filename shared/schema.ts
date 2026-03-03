@@ -50,8 +50,6 @@ export const menuItems = pgTable("menu_items", {
   isVegetarian: boolean("is_vegetarian").default(false).notNull(),
   isVegan: boolean("is_vegan").default(false).notNull(),
   isGlutenFree: boolean("is_gluten_free").default(false).notNull(),
-  qrColor: text("qr_color").default("#000000").notNull(),
-  qrBgColor: text("qr_bg_color").default("#ffffff").notNull(),
 }, (table) => {
   return {
     restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),
@@ -86,11 +84,7 @@ export const insertRestaurantSchema = createInsertSchema(restaurants, {
   latitude: z.preprocess((val) => val === "" ? null : Number(val), z.number().nullable()),
   longitude: z.preprocess((val) => val === "" ? null : Number(val), z.number().nullable()),
 }).omit({ id: true });
-export const insertMenuItemSchema = createInsertSchema(menuItems, {
-  name: z.string().min(1),
-  nameAl: z.string().optional().nullable(),
-  nameMk: z.string().optional().nullable(),
-}).omit({ id: true });
+export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: true });
 
 // === EXPLICIT TYPES ===
 
