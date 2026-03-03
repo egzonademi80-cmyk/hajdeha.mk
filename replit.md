@@ -52,7 +52,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Design Decisions
 
-1. **Shared Type Safety**: Database schema and API contracts are defined in `shared/` directory, enabling full type safety between frontend and backend.
+- **QR Branding**: Preserved `qrColor` and `qrBgColor` in `menuItems` table for custom QR code generation per-item or inherited (per-restaurant branding also available).
+- **Dietary Flags**: Added `isSpicy` and `containsNuts` to `menuItems` with localized badges in English, Albanian, and Macedonian.
+- **Form Updates**: Admin interface updated to support new dietary toggles.
 
 2. **Mobile-First Design**: The UI is optimized for mobile devices since customers primarily scan QR codes on phones.
 

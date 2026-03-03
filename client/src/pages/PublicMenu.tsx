@@ -118,6 +118,8 @@ const translations: Record<string, any> = {
     scheduleForLater: "Schedule for later",
     outsideHours: "Selected time is outside working hours",
     selectWithinHours: "Please select a time within opening hours",
+    spicy: "Spicy",
+    containsNuts: "Contains Nuts",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -175,6 +177,8 @@ const translations: Record<string, any> = {
     scheduleForLater: "Planifiko për më vonë",
     outsideHours: "Koha e zgjedhur është jashtë orarit të punës",
     selectWithinHours: "Ju lutemi zgjidhni një kohë brenda orarit të hapjes",
+    spicy: "Pikante",
+    containsNuts: "Përmban arra",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
@@ -232,6 +236,8 @@ const translations: Record<string, any> = {
     scheduleForLater: "Закажи за подоцна",
     outsideHours: "Избраното време е надвор од работното време",
     selectWithinHours: "Изберете време во рамките на работното време",
+    spicy: "Луто",
+    containsNuts: "Содржи јаткасти плодови",
   },
 };
 
@@ -2894,6 +2900,22 @@ export default function PublicMenu() {
                               >
                                 <WheatOff className="h-2.5 w-2.5 mr-1" />
                                 GF
+                              </Badge>
+                            )}
+                            {item.isSpicy && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                              >
+                                🌶️ {t.spicy}
+                              </Badge>
+                            )}
+                            {item.containsNuts && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
+                              >
+                                🥜 {t.containsNuts}
                               </Badge>
                             )}
                           </div>

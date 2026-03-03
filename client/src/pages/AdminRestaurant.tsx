@@ -734,6 +734,8 @@ function MenuItemDialog({
       isVegetarian: false,
       isVegan: false,
       isGlutenFree: false,
+      isSpicy: false,
+      containsNuts: false,
       restaurantId,
     },
     values: initialData ? { ...initialData, restaurantId } : undefined,
@@ -835,6 +837,20 @@ function MenuItemDialog({
                 onCheckedChange={(c) => form.setValue("isGlutenFree", c)}
               />
               <Label className="text-xs">GF</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.watch("isSpicy")}
+                onCheckedChange={(c) => form.setValue("isSpicy", c)}
+              />
+              <Label className="text-xs">Spicy</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.watch("containsNuts")}
+                onCheckedChange={(c) => form.setValue("containsNuts", c)}
+              />
+              <Label className="text-xs">Nuts</Label>
             </div>
           </div>
 
