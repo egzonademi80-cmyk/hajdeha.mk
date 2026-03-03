@@ -50,8 +50,6 @@ export const menuItems = pgTable("menu_items", {
   isVegetarian: boolean("is_vegetarian").default(false).notNull(),
   isVegan: boolean("is_vegan").default(false).notNull(),
   isGlutenFree: boolean("is_gluten_free").default(false).notNull(),
-  isSpicy: boolean("is_spicy").default(false).notNull(),
-  containsNuts: boolean("contains_nuts").default(false).notNull(),
   qrColor: text("qr_color").default("#000000").notNull(),
   qrBgColor: text("qr_bg_color").default("#ffffff").notNull(),
 }, (table) => {
