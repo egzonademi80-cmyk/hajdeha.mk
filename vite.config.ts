@@ -6,15 +6,9 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
-    react({
-      jsxRuntime: "automatic",
-      babel: {
-        plugins: [],
-      },
-    }),
+    react({ jsxRuntime: "automatic" }),
     runtimeErrorOverlay(),
 
-    // ✅ PWA — install prompt + offline support
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "icon-192.png", "icon-512.png"],
@@ -22,7 +16,7 @@ export default defineConfig({
         name: "HAJDE HA",
         short_name: "HAJDE HA",
         description: "Platforma e Menusë Dixhitale e Tetovës",
-        theme_color: "#E8450A", // ← ndrysho me ngjyrën tënde primary
+        theme_color: "#E8450A",
         background_color: "#ffffff",
         display: "standalone",
         orientation: "portrait",
@@ -45,100 +39,69 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cache strategies
         runtimeCaching: [
           {
-            // Cache restaurant images from Unsplash / uploads
             urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|webp|svg)$/i,
             handler: "CacheFirst",
             options: {
               cacheName: "images-cache",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
           {
-            // Cache API calls — NetworkFirst so data is fresh but works offline
             urlPattern: /^https?:\/\/.*\/api\/.*/i,
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day
-              },
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
               networkTimeoutSeconds: 10,
             },
           },
           {
-            // Cache QR code API
             urlPattern: /^https:\/\/api\.qrserver\.com\/.*/i,
             handler: "CacheFirst",
             options: {
               cacheName: "qr-cache",
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-              },
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
         ],
       },
     }),
-
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@": path.resolve(import.meta.url, "../client/src"),
+      "@shared": path.resolve(import.meta.url, "../shared"),
     },
   },
-  root: path.resolve(import.meta.dirname, "client"),
-  publicDir: path.resolve(import.meta.dirname, "client", "public"),
+  root: path.resolve(import.meta.url, "../client"),
+  publicDir: path.resolve(import.meta.url, "../client/public"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(import.meta.url, "../dist/public"),
     emptyOutDir: true,
     minify: "esbuild",
     sourcemap: process.env.NODE_ENV === "development",
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 500, // catch big chunks earlier
+    target: "es2020",
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-core": ["react", "react-dom"],
-          router: ["wouter"],
-          query: ["@tanstack/react-query"],
-          "ui-icons": ["lucide-react"],
-          "ui-motion": ["framer-motion"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("react-dom"))
+              return "react-core";
+            if (id.includes("@tanstack/react-query")) return "query";
+            if (id.includes("wouter")) return "router";
+            if (id.includes("framer-motion")) return "ui-motion";
+            if (id.includes("lucide-react")) return "ui-icons";
+            return "vendor";
+          }
         },
         entryFileNames: "assets/[name].[hash].js",
         chunkFileNames: "assets/[name].[hash].js",
         assetFileNames: "assets/[name].[hash].[ext]",
       },
-    },
-    target: "es2020",
-    cssCodeSplit: true,
-    cssMinify: true,
-  },
-  server: {
-    fs: {
-      strict: true,
-      deny: ["**/.*"],
-    },
-    hmr: {
-      overlay: true,
     },
   },
   optimizeDeps: {
