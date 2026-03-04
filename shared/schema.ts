@@ -50,6 +50,8 @@ export const menuItems = pgTable("menu_items", {
   isVegetarian: boolean("is_vegetarian").default(false).notNull(),
   isVegan: boolean("is_vegan").default(false).notNull(),
   isGlutenFree: boolean("is_gluten_free").default(false).notNull(),
+  isSpicy: boolean("is_spicy").default(false).notNull(),
+  containsNuts: boolean("is_contains_nuts").default(false).notNull(),
 }, (table) => {
   return {
     restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),

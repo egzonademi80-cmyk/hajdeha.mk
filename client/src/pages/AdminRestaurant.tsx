@@ -734,6 +734,8 @@ function MenuItemDialog({
       isVegetarian: false,
       isVegan: false,
       isGlutenFree: false,
+      isSpicy: false,
+      containsNuts: false,
       restaurantId,
     },
     values: initialData ? { ...initialData, restaurantId } : undefined,
