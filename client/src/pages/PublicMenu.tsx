@@ -997,7 +997,7 @@ function OrderFormContent({
         <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
           {t.orderType} *
         </label>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {(["dineIn", "takeaway"] as const).map((type) => (
             <Button
               key={type}
@@ -1018,7 +1018,7 @@ function OrderFormContent({
         <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
           {t.deliveryTime}
         </label>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <Button
             type="button"
             variant={deliveryTime === "asap" ? "default" : "outline"}
@@ -1082,7 +1082,7 @@ function OrderFormContent({
 
       {/* Cart items */}
       <div className="pt-1 border-t border-stone-200 dark:border-stone-700 space-y-1">
-        <ScrollArea className="h-[110px] pr-1">
+        <ScrollArea className="h-[125px] pr-1">
           <div className="space-y-1">
             <AnimatePresence initial={false}>
               {Object.entries(cart).map(([id, qty]) => {
@@ -1146,8 +1146,8 @@ function OrderFormContent({
           </div>
         </ScrollArea>
 
-        <div className="flex justify-between items-center p-2 pt-1 pb-1 rounded-2xl">
-          <span className="text-base font-semibold dark:text-stone-100">
+        <div className="flex justify-between items-center p-2 pt-2 pb-1 rounded-2xl text-primary">
+          <span className="text-base font-semibold dark:text-stone-100 ">
             {t.totalBill}
           </span>
           <motion.p
