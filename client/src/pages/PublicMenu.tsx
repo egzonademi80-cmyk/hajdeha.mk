@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { TrendingUp } from "lucide-react";
 import { Search } from "lucide-react";
@@ -15,14 +15,11 @@ import {
   ShoppingBag,
   X,
   ChevronDown,
-  Filter,
   Leaf,
-  Beef,
   WheatOff,
   Clock,
   CheckCircle2,
   Mic,
-  MicOff,
   Share2,
   Facebook,
   Twitter,
@@ -60,6 +57,14 @@ import { useDarkMode } from "@/hooks/useDarkMode";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const LANG_KEY = "hajdeha-lang" as const;
+const DEFAULT_COORDS: [number, number] = [42.01, 20.97];
+const LEAFLET_CDN = "https://unpkg.com/leaflet@1.7.1/dist/images";
+
+// ─── Translations ─────────────────────────────────────────────────────────────
 
 const translations: Record<string, any> = {
   en: {
@@ -120,6 +125,7 @@ const translations: Record<string, any> = {
     scheduleForLater: "Schedule for later",
     outsideHours: "Selected time is outside working hours",
     selectWithinHours: "Please select a time within opening hours",
+    peopleAlsoOrdered: "People Also Ordered",
   },
   al: {
     orderOnWhatsapp: "Porosit në WhatsApp",
@@ -179,6 +185,7 @@ const translations: Record<string, any> = {
     scheduleForLater: "Planifiko për më vonë",
     outsideHours: "Koha e zgjedhur është jashtë orarit të punës",
     selectWithinHours: "Ju lutemi zgjidhni një kohë brenda orarit të hapjes",
+    peopleAlsoOrdered: "Të tjerë porositen edhe",
   },
   mk: {
     orderOnWhatsapp: "Нарачај на WhatsApp",
@@ -211,7 +218,7 @@ const translations: Record<string, any> = {
     spicy: "Луто",
     containsNuts: "Содржи јаткасти плодови",
     yourName: "Вашето име",
-    enterYourName: "Внесете го вашето име",
+    enterYourName: "Внесете го вашето ime",
     pleaseEnterName: "Ве молиме внесете го вашето ime",
     customerName: "Ime",
     orderType: "Тип на нарачка",
@@ -232,12 +239,13 @@ const translations: Record<string, any> = {
     copyLink: "Копирај линк",
     linkCopied: "Линкот е копиран!",
     searchPlaceholder: "  Пребарај во менито...",
-    restaurantClosed: "Ресторанi�т е тековно затворен",
+    restaurantClosed: "Ресторанот е тековно затворен",
     closedAsapWarning:
       "Ресторанот е затворен. Нарачките веднаш не се достапни.",
     scheduleForLater: "Закажи за подоцна",
     outsideHours: "Избраното време е надвор од работното време",
     selectWithinHours: "Изберете време во рамките на работното време",
+    peopleAlsoOrdered: "Другите нарачале и",
   },
 };
 
@@ -249,6 +257,35 @@ const leafletStyles = `
     z-index: 10;
   }
 `;
+
+// ─── Animation Variants ───────────────────────────────────────────────────────
+
+const heroVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12 } },
+};
+
+const heroItem = {
+  hidden: { opacity: 0, y: 32 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring" as const, stiffness: 280, damping: 24 },
+  },
+};
+
+const EASE_OUT_QUART = [0.25, 0.46, 0.45, 0.94] as const;
+
+// ─── Debounce Hook ────────────────────────────────────────────────────────────
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -327,52 +364,36 @@ function findBestMatches(
     .map((s) => s.item);
 }
 
-function IsOpen(openingTime?: string, closingTime?: string) {
+function IsOpen(openingTime?: string, closingTime?: string): boolean {
   if (!openingTime || !closingTime) return true;
   const d = new Date();
   const currentTime = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
   return currentTime >= openingTime && currentTime <= closingTime;
 }
 
-/**
- * Returns the minimum datetime string for scheduling:
- * - If restaurant is currently open → now (can order ASAP or later today)
- * - If closed → tomorrow at opening time
- * Also returns the closing time string for validation.
- */
 function getSchedulingConstraints(
   openingTime?: string,
   closingTime?: string,
 ): { minDateTime: string; openingTime: string; closingTime: string } {
   const pad = (n: number) => n.toString().padStart(2, "0");
   const now = new Date();
-
   const open = openingTime || "08:00";
   const close = closingTime || "23:00";
-
   const isCurrentlyOpen = IsOpen(openingTime, closingTime);
-
   let baseDate: Date;
   if (isCurrentlyOpen) {
-    // Can schedule from now onwards (today)
     baseDate = now;
   } else {
-    // Must schedule from tomorrow
     baseDate = new Date(now);
     baseDate.setDate(baseDate.getDate() + 1);
   }
-
   const dateStr = `${baseDate.getFullYear()}-${pad(baseDate.getMonth() + 1)}-${pad(baseDate.getDate())}`;
   const minDateTime = isCurrentlyOpen
     ? `${dateStr}T${pad(now.getHours())}:${pad(now.getMinutes())}`
     : `${dateStr}T${open}`;
-
   return { minDateTime, openingTime: open, closingTime: close };
 }
 
-/**
- * Validates that a chosen datetime-local value falls within opening hours.
- */
 function isWithinOpeningHours(
   dateTimeStr: string,
   openingTime: string,
@@ -395,44 +416,60 @@ function useVoiceSearch(
 ) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
-  const recognitionRef = useState<any>(null);
+  // ✅ Fixed: useRef instead of useState — instance persists across renders
+  const recognitionRef = useRef<any>(null);
+  // Keep latest onResult/allItems accessible without re-creating recognition
+  const onResultRef = useRef(onResult);
+  const allItemsRef = useRef(allItems);
+  useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
+  useEffect(() => {
+    allItemsRef.current = allItems;
+  }, [allItems]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
-      setIsSupported(!!SpeechRecognition);
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang =
-          { en: "en-US", al: "sq-AL", mk: "mk-MK" }[lang] || "en-US";
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          onResult(transcript, findBestMatches(transcript, allItems, lang));
-          setIsListening(false);
-        };
-        recognition.onerror = () => setIsListening(false);
-        recognition.onend = () => setIsListening(false);
-        recognitionRef[0] = recognition;
-      }
-    }
-  }, [onResult, allItems, lang]);
+    if (typeof window === "undefined") return;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    setIsSupported(!!SpeechRecognition);
+    if (!SpeechRecognition) return;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang =
+      { en: "en-US", al: "sq-AL", mk: "mk-MK" }[lang] ?? "en-US";
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      onResultRef.current(
+        transcript,
+        findBestMatches(transcript, allItemsRef.current, lang),
+      );
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.abort(); // ✅ cleanup on lang change
+    };
+  }, [lang]); // only re-init when lang changes
 
   return {
     isListening,
     isSupported,
     startListening: () => {
-      if (recognitionRef[0] && !isListening) {
-        recognitionRef[0].start();
+      if (recognitionRef.current && !isListening) {
+        recognitionRef.current.start();
         setIsListening(true);
       }
     },
     stopListening: () => {
-      if (recognitionRef[0] && isListening) {
-        recognitionRef[0].stop();
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
         setIsListening(false);
       }
     },
@@ -444,13 +481,12 @@ function useVoiceSearch(
 function ShareDialog({
   item,
   restaurantSlug,
+  lang,
 }: {
   item: MenuItem;
   restaurantSlug: string;
+  lang: "en" | "al" | "mk";
 }) {
-  const [lang] = useState<"en" | "al" | "mk">(
-    () => (localStorage.getItem("hajdeha-lang") as any) || "en",
-  );
   const t = translations[lang];
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -463,7 +499,9 @@ function ShareDialog({
       setCopied(true);
       toast({ title: t.linkCopied });
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {}
+    } catch (err) {
+      if (process.env.NODE_ENV === "development") console.error(err);
+    }
   };
 
   return (
@@ -564,16 +602,18 @@ function PeopleAlsoOrdered({
   currentItemId,
   allItems,
   onAddToCart,
+  lang,
 }: {
   currentItemId: number;
   allItems: MenuItem[];
   onAddToCart: (itemId: number) => void;
+  lang: "en" | "al" | "mk";
 }) {
-  const [lang] = useState<"en" | "al" | "mk">(
-    () => (localStorage.getItem("hajdeha-lang") as any) || "en",
-  );
   const t = translations[lang];
   const currentItem = allItems.find((item) => item.id === currentItemId);
+  // ✅ Fixed: stable shuffle seed so suggestions don't change on every render
+  const shuffleSeed = useRef(Math.random());
+
   const suggestions = useMemo(() => {
     if (!currentItem) return [];
     return allItems
@@ -583,11 +623,16 @@ function PeopleAlsoOrdered({
           i.category === currentItem.category &&
           i.active,
       )
-      .sort(() => Math.random() - 0.5)
+      .sort(
+        (a, b) =>
+          ((a.id * shuffleSeed.current) % 1) -
+          ((b.id * shuffleSeed.current) % 1),
+      )
       .slice(0, 3);
   }, [currentItemId, allItems, currentItem]);
 
   if (suggestions.length === 0) return null;
+
   return (
     <div className="mt-4 pt-4 border-t border-stone-200 dark:border-stone-700">
       <div className="flex items-center gap-2 mb-3">
@@ -635,71 +680,95 @@ function PeopleAlsoOrdered({
   );
 }
 
+// ─── Shared Leaflet loader (cached promise so CSS only imports once) ───────────
+let leafletPromise: Promise<any> | null = null;
+function loadLeaflet() {
+  if (!leafletPromise) {
+    leafletPromise = import("leaflet").then(async (L) => {
+      await import("leaflet/dist/leaflet.css");
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: `${LEAFLET_CDN}/marker-icon-2x.png`,
+        iconUrl: `${LEAFLET_CDN}/marker-icon.png`,
+        shadowUrl: `${LEAFLET_CDN}/marker-shadow.png`,
+      });
+      return L;
+    });
+  }
+  return leafletPromise;
+}
+
 // ─── Inline Map ────────────────────────────────────────────────────────────────
 
 function InlineMap({
   latitude,
   longitude,
   name,
-  location,
 }: {
   latitude?: string | null;
   longitude?: string | null;
   name: string;
-  location?: string;
 }) {
-  const [L, setL] = useState<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
+  const initedRef = useRef(false); // ← prevents double-init in StrictMode
+  const [isReady, setIsReady] = useState(false);
+
+  const position: [number, number] = useMemo(
+    () =>
+      latitude && longitude && !isNaN(+latitude) && !isNaN(+longitude)
+        ? [+latitude, +longitude]
+        : DEFAULT_COORDS,
+    [latitude, longitude],
+  );
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const leaflet = await import("leaflet");
-        await import("leaflet/dist/leaflet.css");
-        delete (leaflet.Icon.Default.prototype as any)._getIconUrl;
-        leaflet.Icon.Default.mergeOptions({
-          iconRetinaUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
-          iconUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-          shadowUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-        });
-        setL(leaflet);
-      } catch {}
+    // Guard: only ever init once per mount
+    if (initedRef.current) return;
+    initedRef.current = true;
+
+    let cancelled = false;
+
+    loadLeaflet()
+      .then((L) => {
+        if (cancelled || !containerRef.current) return;
+        const map = L.map(containerRef.current).setView(position, 15);
+        mapRef.current = map;
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap",
+        }).addTo(map);
+        L.marker(position).addTo(map).bindPopup(name).openPopup();
+        if (!cancelled) setIsReady(true);
+      })
+      .catch((err) => {
+        if (process.env.NODE_ENV === "development") console.error(err);
+      });
+
+    return () => {
+      cancelled = true;
+      mapRef.current?.remove();
+      mapRef.current = null;
+      // Reset so a future remount (real unmount/remount) re-inits correctly
+      initedRef.current = false;
     };
-    load();
-  }, []);
-
-  const position: [number, number] =
-    latitude &&
-    longitude &&
-    !isNaN(parseFloat(latitude)) &&
-    !isNaN(parseFloat(longitude))
-      ? [parseFloat(latitude), parseFloat(longitude)]
-      : [42.01, 20.97];
-
-  if (!L)
-    return (
-      <div className="w-full h-36 bg-stone-100 dark:bg-stone-700 animate-pulse rounded-xl flex items-center justify-center text-stone-400 text-xs">
-        Loading map...
-      </div>
-    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // empty — init once; position/name are stable on first render
 
   return (
-    <div className="w-full h-40 rounded-xl overflow-hidden border border-stone-200 dark:border-stone-600 mt-2">
+    <div className="w-full h-40 rounded-xl overflow-hidden border border-stone-200 dark:border-stone-600 mt-2 relative">
       <style>{leafletStyles}</style>
-      <div
-        ref={(el) => {
-          if (!el || !L || mapRef.current) return;
-          mapRef.current = L.map(el).setView(position, 15);
-          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: "&copy; OpenStreetMap",
-          }).addTo(mapRef.current);
-          L.marker(position).addTo(mapRef.current).bindPopup(name).openPopup();
-        }}
-        className="w-full h-full"
-      />
+      <AnimatePresence>
+        {!isReady && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-stone-100 dark:bg-stone-700 rounded-xl flex items-center justify-center text-stone-400 text-xs z-10"
+          >
+            Loading map...
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div ref={containerRef} className="w-full h-full" />
     </div>
   );
 }
@@ -707,7 +776,6 @@ function InlineMap({
 // ─── Restaurant Map ────────────────────────────────────────────────────────────
 
 function RestaurantMap({
-  location,
   name,
   latitude,
   longitude,
@@ -718,92 +786,109 @@ function RestaurantMap({
   longitude?: string | null;
 }) {
   const { slug } = useParams<{ slug: string }>();
-  const [L, setL] = useState<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const initedRef = useRef(false); // ← prevents double-init in StrictMode
+  const watchIdRef = useRef<number | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [slug]);
 
+  const position: [number, number] = useMemo(
+    () =>
+      latitude && longitude && !isNaN(+latitude) && !isNaN(+longitude)
+        ? [+latitude, +longitude]
+        : DEFAULT_COORDS,
+    [latitude, longitude],
+  );
+
   useEffect(() => {
-    const loadLeaflet = async () => {
-      try {
-        const leaflet = await import("leaflet");
-        await import("leaflet/dist/leaflet.css");
-        delete (leaflet.Icon.Default.prototype as any)._getIconUrl;
-        leaflet.Icon.Default.mergeOptions({
-          iconRetinaUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
-          iconUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-          shadowUrl:
-            "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-        });
-        setL(leaflet);
-      } catch (err) {}
+    // Guard: only ever init once per mount
+    if (initedRef.current) return;
+    initedRef.current = true;
+
+    let cancelled = false;
+
+    loadLeaflet()
+      .then((L) => {
+        if (cancelled || !containerRef.current) return;
+
+        const map = L.map(containerRef.current).setView(position, 15);
+        mapRef.current = map;
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors",
+        }).addTo(map);
+        L.marker(position).addTo(map).bindPopup(name).openPopup();
+
+        let userMarker: any = null;
+        if (navigator.geolocation) {
+          watchIdRef.current = navigator.geolocation.watchPosition(
+            (pos) => {
+              if (cancelled) return;
+              const userPos: [number, number] = [
+                pos.coords.latitude,
+                pos.coords.longitude,
+              ];
+              const userIcon = L.divIcon({
+                html: `<div style="width:16px;height:16px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(37,99,235,0.25);"></div>`,
+                className: "",
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+              });
+              if (!userMarker) {
+                userMarker = L.marker(userPos, { icon: userIcon })
+                  .addTo(map)
+                  .bindPopup("Your Location");
+                map.fitBounds(L.latLngBounds([position, userPos]), {
+                  padding: [40, 40],
+                });
+              } else {
+                userMarker.setLatLng(userPos);
+              }
+            },
+            () => {},
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 },
+          );
+        }
+
+        if (!cancelled) setIsReady(true);
+      })
+      .catch((err) => {
+        if (process.env.NODE_ENV === "development") console.error(err);
+      });
+
+    return () => {
+      cancelled = true;
+      if (watchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      mapRef.current?.remove();
+      mapRef.current = null;
+      // Reset so a future real remount re-inits correctly
+      initedRef.current = false;
     };
-    loadLeaflet();
-  }, []);
-
-  let position: [number, number] = [42.01, 20.97];
-  if (
-    latitude &&
-    longitude &&
-    !isNaN(parseFloat(latitude)) &&
-    !isNaN(parseFloat(longitude))
-  ) {
-    position = [parseFloat(latitude), parseFloat(longitude)];
-  }
-
-  if (!L)
-    return (
-      <div className="w-full h-full bg-stone-100 dark:bg-stone-800 animate-pulse rounded-2xl flex items-center justify-center text-stone-400 dark:text-stone-500">
-        Loading Map...
-      </div>
-    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // empty — init once; position/name stable on first render
 
   return (
     <div className="w-full h-64 sm:h-80 relative rounded-2xl overflow-hidden shadow-lg border border-stone-200 dark:border-stone-700">
       <style>{leafletStyles}</style>
-      <div
-        ref={(el) => {
-          if (!el || !L || el.innerHTML) return;
-          const map = L.map(el).setView(position, 15);
-          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: "&copy; OpenStreetMap contributors",
-          }).addTo(map);
-          L.marker(position).addTo(map).bindPopup(name).openPopup();
-          let userMarker: any = null;
-          if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(
-              (pos) => {
-                const userPos: [number, number] = [
-                  pos.coords.latitude,
-                  pos.coords.longitude,
-                ];
-                const userIcon = L.divIcon({
-                  html: `<div style="width:16px;height:16px;background:#2563eb;border:3px solid white;border-radius:50%;box-shadow:0 0 0 6px rgba(37,99,235,0.25);"></div>`,
-                  className: "",
-                  iconSize: [16, 16],
-                  iconAnchor: [8, 8],
-                });
-                if (!userMarker) {
-                  userMarker = L.marker(userPos, { icon: userIcon })
-                    .addTo(map)
-                    .bindPopup("Your Location");
-                  map.fitBounds(L.latLngBounds([position, userPos]), {
-                    padding: [40, 40],
-                  });
-                } else {
-                  userMarker.setLatLng(userPos);
-                }
-              },
-              () => {},
-              { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 },
-            );
-          }
-        }}
-        className="w-full h-full"
-      />
+      <AnimatePresence>
+        {!isReady && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-stone-100 dark:bg-stone-800 animate-pulse rounded-2xl flex items-center justify-center text-stone-400 dark:text-stone-500 z-10"
+          >
+            Loading Map...
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div ref={containerRef} className="w-full h-full" />
     </div>
   );
 }
@@ -828,6 +913,258 @@ const groupItems = (items: MenuItem[]) => {
   });
 };
 
+// ─── Order Form (shared between mobile & desktop) ─────────────────────────────
+
+interface OrderFormContentProps {
+  cart: Record<number, number>;
+  menuItems: MenuItem[];
+  customerName: string;
+  setCustomerName: (v: string) => void;
+  orderType: "dineIn" | "takeaway";
+  setOrderType: (v: "dineIn" | "takeaway") => void;
+  deliveryTime: "asap" | "custom";
+  setDeliveryTime: (v: "asap" | "custom") => void;
+  customDateTime: string;
+  setCustomDateTime: (v: string) => void;
+  isOpen: boolean;
+  scheduling: { minDateTime: string; openingTime: string; closingTime: string };
+  openingTime?: string;
+  closingTime?: string;
+  cartTotal: number;
+  t: any;
+  isDark: boolean;
+  updateCart: (itemId: number, delta: number) => void;
+}
+
+function OrderFormContent({
+  cart,
+  menuItems,
+  customerName,
+  setCustomerName,
+  orderType,
+  setOrderType,
+  deliveryTime,
+  setDeliveryTime,
+  customDateTime,
+  setCustomDateTime,
+  isOpen,
+  scheduling,
+  openingTime,
+  closingTime,
+  cartTotal,
+  t,
+  isDark,
+  updateCart,
+}: OrderFormContentProps) {
+  return (
+    <div className="space-y-4">
+      {/* Closed restaurant banner */}
+      <AnimatePresence>
+        {!isOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 overflow-hidden"
+          >
+            <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                {t.restaurantClosed}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Name */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          {t.yourName} *
+        </label>
+        <input
+          type="text"
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          placeholder={t.enterYourName}
+          className="w-full px-4 py-2 text-base rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+          required
+        />
+      </div>
+
+      {/* Order type */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          {t.orderType} *
+        </label>
+        <div className="flex gap-2">
+          {(["dineIn", "takeaway"] as const).map((type) => (
+            <Button
+              key={type}
+              type="button"
+              variant={orderType === type ? "default" : "outline"}
+              className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!isOpen}
+              onClick={() => setOrderType(type)}
+            >
+              {t[type]}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Delivery time */}
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          {t.deliveryTime}
+        </label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={deliveryTime === "asap" ? "default" : "outline"}
+            className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!isOpen}
+            onClick={() => setDeliveryTime("asap")}
+          >
+            {t.asap}
+          </Button>
+          <Button
+            type="button"
+            variant={deliveryTime === "custom" ? "default" : "outline"}
+            className="flex-1 h-10 rounded-xl text-xs"
+            onClick={() => setDeliveryTime("custom")}
+          >
+            {t.customTime}
+          </Button>
+        </div>
+
+        <AnimatePresence>
+          {(deliveryTime === "custom" || !isOpen) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-1 space-y-1">
+                <input
+                  type="datetime-local"
+                  value={customDateTime}
+                  style={{ colorScheme: isDark ? "dark" : "light" }}
+                  onChange={(e) => {
+                    const chosen = e.target.value;
+                    if (!chosen) {
+                      setCustomDateTime("");
+                      return;
+                    }
+                    const open = scheduling.openingTime;
+                    const close = scheduling.closingTime;
+                    const dateOnly = chosen.split("T")[0];
+                    const timeOnly = chosen.split("T")[1];
+                    if (timeOnly < open) {
+                      setCustomDateTime(`${dateOnly}T${open}`);
+                      return;
+                    }
+                    if (timeOnly > close) {
+                      setCustomDateTime(`${dateOnly}T${close}`);
+                      return;
+                    }
+                    setCustomDateTime(chosen);
+                  }}
+                  min={scheduling.minDateTime}
+                  className="w-full px-4 py-2 text-base rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Cart items */}
+      <div className="pt-1 border-t border-stone-200 dark:border-stone-700 space-y-1">
+        <ScrollArea className="h-[110px] pr-1">
+          <div className="space-y-1">
+            <AnimatePresence initial={false}>
+              {Object.entries(cart).map(([id, qty]) => {
+                const item = menuItems.find((i) => i.id === parseInt(id));
+                if (!item) return null;
+                return (
+                  <motion.div
+                    key={id}
+                    layout
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 12, height: 0 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 26 }}
+                    className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <motion.div
+                        key={qty}
+                        initial={{ scale: 1.3 }}
+                        animate={{ scale: 1 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 22,
+                        }}
+                        className="h-7 w-8 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary"
+                      >
+                        {qty}x
+                      </motion.div>
+                      <div>
+                        <p className="font-bold dark:text-stone-100 text-sm">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-stone-500 dark:text-stone-400">
+                          {item.price}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => updateCart(item.id, -1)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => updateCart(item.id, 1)}
+                      >
+                        <Plus className="h-3 w-3 text-primary" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </ScrollArea>
+
+        <div className="flex justify-between items-center p-2 pt-1 pb-1 rounded-2xl">
+          <span className="text-base font-semibold dark:text-stone-100">
+            {t.totalBill}
+          </span>
+          <motion.p
+            key={cartTotal}
+            initial={{ scale: 1.15, color: "var(--primary)" }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            className="text-xl font-bold text-primary"
+          >
+            {cartTotal} DEN
+          </motion.p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ========== AI ASSISTANT ==========
 interface AIMessage {
   id: string;
@@ -844,6 +1181,126 @@ interface AIMessage {
   };
 }
 
+// Builds the system prompt with full restaurant context — sent to Claude every request
+function buildSystemPrompt({
+  restaurantName,
+  restaurantPhone,
+  restaurantLocation,
+  openingTime,
+  closingTime,
+  menuItems,
+  cart,
+  lang,
+  restaurantLatitude,
+  restaurantLongitude,
+}: {
+  restaurantName: string;
+  restaurantPhone?: string;
+  restaurantLocation?: string;
+  openingTime?: string;
+  closingTime?: string;
+  menuItems: MenuItem[];
+  cart: Record<number, number>;
+  lang: "en" | "al" | "mk";
+  restaurantLatitude?: string | null;
+  restaurantLongitude?: string | null;
+}): string {
+  const now = new Date();
+  const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+  const isOpen = IsOpen(openingTime, closingTime);
+
+  // Minutes until closing
+  let minutesUntilClose: number | null = null;
+  if (closingTime && isOpen) {
+    const [ch, cm] = closingTime.split(":").map(Number);
+    const closeMinutes = ch * 60 + cm;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    minutesUntilClose = closeMinutes - nowMinutes;
+  }
+
+  // Cart summary
+  const cartItems = Object.entries(cart)
+    .map(([id, qty]) => {
+      const item = menuItems.find((i) => i.id === parseInt(id));
+      return item ? `  - ${qty}x ${item.name} (${item.price})` : null;
+    })
+    .filter(Boolean);
+
+  const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
+    const item = menuItems.find((i) => i.id === parseInt(id));
+    return (
+      sum + (parseInt(item?.price?.replace(/[^0-9]/g, "") || "0") || 0) * qty
+    );
+  }, 0);
+
+  // Menu grouped by category
+  const menuByCategory: Record<string, MenuItem[]> = {};
+  menuItems
+    .filter((i) => i.active)
+    .forEach((item) => {
+      if (!menuByCategory[item.category]) menuByCategory[item.category] = [];
+      menuByCategory[item.category].push(item);
+    });
+
+  const menuText = Object.entries(menuByCategory)
+    .map(
+      ([cat, items]) =>
+        `[${cat}]\n` +
+        items
+          .map((i) => {
+            const flags = [
+              i.isVegetarian ? "vegetarian" : "",
+              i.isVegan ? "vegan" : "",
+              i.isGlutenFree ? "gluten-free" : "",
+            ]
+              .filter(Boolean)
+              .join(", ");
+            return `  • ${i.name} — ${i.price}${i.description ? ` | ${i.description}` : ""}${flags ? ` [${flags}]` : ""}`;
+          })
+          .join("\n"),
+    )
+    .join("\n\n");
+
+  const langInstructions: Record<string, string> = {
+    en: "Always reply in English.",
+    al: "Gjithmonë përgjigju në shqip.",
+    mk: "Секогаш одговарај на македонски.",
+  };
+
+  return `You are a friendly, knowledgeable AI waiter assistant for "${restaurantName}".
+${langInstructions[lang]}
+
+## Restaurant Info
+- Name: ${restaurantName}
+- Location: ${restaurantLocation || "Not provided"}
+- Phone: ${restaurantPhone || "Not provided"}
+- Opening hours: ${openingTime || "N/A"} – ${closingTime || "N/A"}
+- Current time: ${currentTime}
+- Status: ${isOpen ? `OPEN${minutesUntilClose !== null && minutesUntilClose <= 30 ? ` ⚠️ Closing in ${minutesUntilClose} minutes! Urge the customer to order soon.` : ""}` : "CLOSED — tell the customer and suggest they schedule an order"}
+
+## Current Customer Cart
+${
+  cartItems.length > 0
+    ? `${cartItems.join("\n")}\nCart total: ${cartTotal} DEN`
+    : "Cart is empty"
+}
+
+## Full Menu
+${menuText}
+
+## Your behaviour rules
+1. You know EVERYTHING about this restaurant's menu — ingredients, dietary info, prices.
+2. When the customer asks for recommendations, suggest SPECIFIC dishes from the menu above with their prices.
+3. Be proactive about the cart: if they have items in cart but are missing a drink/dessert, mention it naturally.
+4. If the restaurant is closing soon (≤30 min), gently remind the customer to order quickly.
+5. For booking a table, guide them to call ${restaurantPhone || "the restaurant"} or use WhatsApp.
+6. Keep responses SHORT and conversational — max 3-4 sentences unless listing dishes.
+7. Use emojis naturally but don't overdo it.
+8. If asked about location/map, say you can show the map and include the text: [SHOW_MAP]
+9. NEVER make up dishes that aren't in the menu above.
+10. If cart has items and user seems done ordering, proactively offer to help them complete the order.`;
+}
+
 function AIRestaurantAssistant({
   restaurantName,
   restaurantPhone,
@@ -856,6 +1313,7 @@ function AIRestaurantAssistant({
   onScrollToMap,
   restaurantLatitude,
   restaurantLongitude,
+  cart,
 }: {
   restaurantName: string;
   restaurantPhone?: string;
@@ -868,40 +1326,41 @@ function AIRestaurantAssistant({
   onScrollToMap: () => void;
   restaurantLatitude?: string | null;
   restaurantLongitude?: string | null;
+  cart: Record<number, number>;
 }) {
   const aiT: Record<string, any> = {
     en: {
-      aiAssistant: "AI Assistant",
+      aiAssistant: "AI Waiter",
       typing: "Thinking...",
-      placeholder: "Ask me anything...",
+      placeholder: "Ask me anything about the menu...",
       send: "Send",
       addToCart: "Add",
       added: "Added!",
-      greeting: `Hello! I'm your AI assistant for ${restaurantName}! 👋`,
-      canHelp:
-        "I can help you find dishes, show location, hours, or book a table!",
+      greeting: `Hi! I'm your AI waiter for **${restaurantName}** 👋\n\nAsk me anything — I know the full menu, can suggest dishes for your mood, diet, or budget, and I'm watching your cart in real time!`,
+      errorMsg: "Sorry, I had a connection issue. Please try again!",
+      poweredBy: "Powered by Claude AI",
     },
     al: {
-      aiAssistant: "Asistenti AI",
+      aiAssistant: "Kamarieri AI",
       typing: "Po mendon...",
-      placeholder: "Më pyet çfarë të duash...",
+      placeholder: "Më pyet çfarë të duash për menunë...",
       send: "Dërgo",
       addToCart: "Shto",
       added: "U shtua!",
-      greeting: `Përshëndetje! Unë jam asistenti juaj AI për ${restaurantName}! 👋`,
-      canHelp:
-        "Mund t'ju ndihmoj të gjeni pjata, të shihni vendndodhjen, orarin, ose të rezervoni tavolinë!",
+      greeting: `Përshëndetje! Jam kamarieri tuaj AI për **${restaurantName}** 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
+      errorMsg: "Na vjen keq, pati një problem. Ju lutemi provoni sërish!",
+      poweredBy: "Mundësuar nga Claude AI",
     },
     mk: {
-      aiAssistant: "AI Асистент",
+      aiAssistant: "AI Келнер",
       typing: "Размислува...",
-      placeholder: "Прашај ме што сакаш...",
+      placeholder: "Прашај ме за менито...",
       send: "Испрати",
       addToCart: "Додај",
       added: "Додадено!",
-      greeting: `Здраво! Јас сум вашиот AI асистент за ${restaurantName}! 👋`,
-      canHelp:
-        "Можам да ви помогнам да најдете јадења, да ви покажам локација, работно време, или да резервирате маса!",
+      greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
+      errorMsg: "Се извинуваме, имаше проблем. Обидете се повторно!",
+      poweredBy: "Овозможено од Claude AI",
     },
   };
 
@@ -912,6 +1371,8 @@ function AIRestaurantAssistant({
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Track previous cart to detect changes
+  const prevCartRef = useRef<Record<number, number>>({});
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -919,287 +1380,277 @@ function AIRestaurantAssistant({
     }
   }, [messages, isTyping]);
 
+  // ── Cart awareness: proactively comment when cart changes ──
+  useEffect(() => {
+    if (!isOpen || messages.length === 0) return;
+
+    const prevCart = prevCartRef.current;
+    const newItems = Object.entries(cart).filter(
+      ([id, qty]) => (prevCart[+id] || 0) < qty,
+    );
+
+    if (newItems.length === 0) {
+      prevCartRef.current = { ...cart };
+      return;
+    }
+
+    prevCartRef.current = { ...cart };
+
+    // Find what was just added
+    const addedItem = menuItems.find((i) => i.id === +newItems[0][0]);
+    if (!addedItem) return;
+
+    // Ask Claude for a smart cart comment
+    const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
+      const item = menuItems.find((i) => i.id === parseInt(id));
+      return (
+        sum + (parseInt(item?.price?.replace(/[^0-9]/g, "") || "0") || 0) * qty
+      );
+    }, 0);
+
+    const hasCategory = (kw: string) =>
+      Object.entries(cart).some(([id]) => {
+        const item = menuItems.find((i) => i.id === +id);
+        return item?.category.toLowerCase().includes(kw);
+      });
+
+    const cartSuggestionPrompt =
+      lang === "en"
+        ? `The customer just added "${addedItem.name}" to their cart. Cart total is now ${cartTotal} DEN. ${!hasCategory("drink") ? "They have no drinks yet." : ""} ${!hasCategory("dessert") ? "They have no dessert yet." : ""} Give a very short (1 sentence max), friendly, natural comment or suggestion. Don't be pushy.`
+        : lang === "al"
+          ? `Klienti sapo shtoi "${addedItem.name}" në shportë. Totali tani është ${cartTotal} DEN. ${!hasCategory("drink") ? "Nuk ka pije akoma." : ""} ${!hasCategory("dessert") ? "Nuk ka ëmbëlsirë akoma." : ""} Jep një koment shumë të shkurtër (max 1 fjali), miqësor dhe natyral. Mos u bëj i ngutshëm.`
+          : `Клиентот штотуку додаде "${addedItem.name}" во кошничката. Вкупно е сега ${cartTotal} DEN. ${!hasCategory("drink") ? "Нема пијалок уште." : ""} ${!hasCategory("dessert") ? "Нема десерт уште." : ""} Дај многу краток (макс 1 реченица), пријателски и природен коментар. Не биди напорен.`;
+
+    // Short timeout so it feels natural, not instant
+    const timer = setTimeout(async () => {
+      try {
+        const systemPrompt = buildSystemPrompt({
+          restaurantName,
+          restaurantPhone,
+          restaurantLocation,
+          openingTime,
+          closingTime,
+          menuItems,
+          cart,
+          lang,
+          restaurantLatitude,
+          restaurantLongitude,
+        });
+
+        const response = await fetch("/api/ai-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system: systemPrompt,
+            max_tokens: 120,
+            messages: [{ role: "user", content: cartSuggestionPrompt }],
+          }),
+        });
+
+        const data = await response.json();
+        const text = data.text?.trim();
+        if (!text) return;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: text,
+            timestamp: new Date(),
+          },
+        ]);
+      } catch {
+        // Silent fail — cart comments are optional
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, isOpen]);
+
+  // ── Quick action buttons ──
   const actionButtons = {
     en: {
       menu: [
-        { label: "Popular Dishes", action: "popular" },
-        { label: "Dietary Options", action: "dietary" },
-        { label: "Drinks & Desserts", action: "drinks" },
+        { label: "⭐ Popular", prompt: "What are your most popular dishes?" },
+        {
+          label: "🌱 Vegan/Veg",
+          prompt: "Show me vegetarian and vegan options.",
+        },
+        {
+          label: "💰 Budget picks",
+          prompt: "What are the cheapest dishes on the menu?",
+        },
       ],
       restaurant: [
-        { label: "📍 Location", action: "location" },
-        { label: "Opening Hours", action: "hours" },
-        { label: "Book Table", action: "book" },
+        { label: "📍 Location", prompt: "Show me the restaurant location." },
+        { label: "⏰ Hours", prompt: "What are your opening hours?" },
+        { label: "📅 Book table", prompt: "I want to book a table." },
       ],
     },
     al: {
       menu: [
-        { label: "Pjatat Popullore", action: "popular" },
-        { label: "Opsionet Dietike", action: "dietary" },
-        { label: "Pije & Ëmbëlsira", action: "drinks" },
+        {
+          label: "⭐ Popullore",
+          prompt: "Cilat janë pjatat tuaja më popullore?",
+        },
+        {
+          label: "🌱 Vegan/Veg",
+          prompt: "Tregomë opsionet vegjetariane dhe vegane.",
+        },
+        { label: "💰 Çmim i mirë", prompt: "Cilat janë pjatat më të lira?" },
       ],
       restaurant: [
-        { label: "📍 Vendndodhja", action: "location" },
-        { label: "Orari i Punës", action: "hours" },
-        { label: "Rezervo Tavolinë", action: "book" },
+        {
+          label: "📍 Vendndodhja",
+          prompt: "Tregomë vendndodhjen e restorantit.",
+        },
+        { label: "⏰ Orari", prompt: "Cilët janë oraret e hapjes?" },
+        { label: "📅 Rezervo", prompt: "Dua të rezervoj tavolinë." },
       ],
     },
     mk: {
       menu: [
-        { label: "Популарни Јадења", action: "popular" },
-        { label: "Диететски Опции", action: "dietary" },
-        { label: "Пијалоци & Десерти", action: "drinks" },
+        { label: "⭐ Популарни", prompt: "Кои се вашите најпопуларни јадења?" },
+        {
+          label: "🌱 Веган/Вег",
+          prompt: "Покажи ми вегетаријански и вегански опции.",
+        },
+        { label: "💰 Евтино", prompt: "Кои се најевтините јадења?" },
       ],
       restaurant: [
-        { label: "📍 Локација", action: "location" },
-        { label: "Работно Време", action: "hours" },
-        { label: "Резервирај Маса", action: "book" },
+        {
+          label: "📍 Локација",
+          prompt: "Покажи ми ја локацијата на ресторанот.",
+        },
+        { label: "⏰ Работно време", prompt: "Кое е работното време?" },
+        { label: "📅 Резервација", prompt: "Сакам да резервирам маса." },
       ],
     },
   };
 
+  // ── Greeting on first open ──
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       setMessages([
         {
           id: Date.now().toString(),
           role: "assistant",
-          content: `${t.greeting}\n\n${t.canHelp}`,
+          content: t.greeting,
           timestamp: new Date(),
         },
       ]);
     }
   }, [isOpen]);
 
-  const addMessage = useCallback((msg: AIMessage) => {
-    setMessages((prev) => [...prev, msg]);
-  }, []);
+  // ── Core: send message to Claude API ──
+  const sendToClaude = useCallback(
+    async (userText: string) => {
+      setIsTyping(true);
 
-  const executeAction = useCallback(
-    (action: string) => {
-      switch (action) {
-        case "popular": {
-          const popular = menuItems
-            .filter((i) => i.active && i.category === "Mains")
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 6);
-          addMessage({
+      // Build conversation history for Claude (exclude map/item metadata — text only)
+      const history = messages
+        .filter((m) => m.content.trim())
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      const systemPrompt = buildSystemPrompt({
+        restaurantName,
+        restaurantPhone,
+        restaurantLocation,
+        openingTime,
+        closingTime,
+        menuItems,
+        cart,
+        lang,
+        restaurantLatitude,
+        restaurantLongitude,
+      });
+
+      try {
+        const response = await fetch("/api/ai-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system: systemPrompt,
+            max_tokens: 600,
+            messages: [...history, { role: "user", content: userText }],
+          }),
+        });
+
+        const data = await response.json();
+        const rawText: string = data.text || t.errorMsg;
+
+        // Check if Claude wants to show the map
+        const showMap = rawText.includes("[SHOW_MAP]");
+        const cleanText = rawText.replace("[SHOW_MAP]", "").trim();
+
+        // Try to find recommended items mentioned by name in the response
+        const mentionedItems = menuItems
+          .filter(
+            (item) =>
+              item.active &&
+              cleanText.toLowerCase().includes(item.name.toLowerCase()),
+          )
+          .slice(0, 4);
+
+        setMessages((prev) => [
+          ...prev,
+          {
             id: Date.now().toString(),
             role: "assistant",
+            content: cleanText,
             timestamp: new Date(),
-            content:
-              lang === "en"
-                ? "⭐ Here are our most popular main dishes:"
-                : lang === "al"
-                  ? "⭐ Këtu janë pjatat tona kryesore më popullore:"
-                  : "⭐ Еве ги нашите најпопуларни главни јадења:",
-            recommendedItems: popular,
-          });
-          break;
-        }
-        case "dietary": {
-          const veg = menuItems
-            .filter((i) => i.isVegetarian || i.isVegan)
-            .slice(0, 3);
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            timestamp: new Date(),
-            content:
-              lang === "en"
-                ? "🌱 Our vegetarian & vegan options:"
-                : lang === "al"
-                  ? "🌱 Opsionet tona vegjetariane & vegane:"
-                  : "🌱 Нашите вегетаријански и вегански опции:",
             recommendedItems:
-              veg.length > 0
-                ? veg
-                : menuItems.filter((i) => i.active).slice(0, 3),
-          });
-          break;
-        }
-        case "drinks": {
-          const drinks = menuItems
-            .filter((i) => i.category.toLowerCase().includes("drink"))
-            .slice(0, 3);
-          addMessage({
+              mentionedItems.length > 0 ? mentionedItems : undefined,
+            showMap,
+            mapData: showMap
+              ? {
+                  latitude: restaurantLatitude,
+                  longitude: restaurantLongitude,
+                  name: restaurantName,
+                  location: restaurantLocation,
+                }
+              : undefined,
+          },
+        ]);
+
+        if (showMap) setTimeout(() => onScrollToMap(), 600);
+      } catch (err: any) {
+        const errText = err?.message || String(err) || "unknown";
+        setMessages((prev) => [
+          ...prev,
+          {
             id: Date.now().toString(),
             role: "assistant",
+            content: `${t.errorMsg}
+
+_(debug: ${errText})_`,
             timestamp: new Date(),
-            content:
-              lang === "en"
-                ? "🥤 Our drinks & desserts:"
-                : lang === "al"
-                  ? "🥤 Pijet & ëmbëlsirat tona:"
-                  : "🥤 Нашите пијалоци и десерти:",
-            recommendedItems:
-              drinks.length > 0
-                ? drinks
-                : menuItems.filter((i) => i.active).slice(0, 3),
-          });
-          break;
-        }
-        case "prices": {
-          const cheap = [...menuItems]
-            .filter((i) => i.active)
-            .sort(
-              (a, b) =>
-                (parseInt(a.price.replace(/[^0-9]/g, "")) || 0) -
-                (parseInt(b.price.replace(/[^0-9]/g, "")) || 0),
-            )
-            .slice(0, 3);
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            timestamp: new Date(),
-            content:
-              lang === "en"
-                ? "💰 Best value options:"
-                : lang === "al"
-                  ? "💰 Opsionet më të përballueshme:"
-                  : "💰 Најдобри вредности:",
-            recommendedItems: cheap,
-          });
-          break;
-        }
-        case "location": {
-          const loc =
-            restaurantLocation ||
-            (lang === "en"
-              ? "Location not available"
-              : lang === "al"
-                ? "Vendndodhja nuk është e disponueshme"
-                : "Локацијата не е достапна");
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            timestamp: new Date(),
-            content:
-              lang === "en"
-                ? `📍 Our location: ${loc}${restaurantPhone ? `\n📞 ${restaurantPhone}` : ""}`
-                : lang === "al"
-                  ? `📍 Lokacioni ynë: ${loc}${restaurantPhone ? `\n📞 ${restaurantPhone}` : ""}`
-                  : `📍 Наша локација: ${loc}${restaurantPhone ? `\n📞 ${restaurantPhone}` : ""}`,
-            showMap: true,
-            mapData: {
-              latitude: restaurantLatitude,
-              longitude: restaurantLongitude,
-              name: restaurantName,
-              location: restaurantLocation,
-            },
-          });
-          setTimeout(() => onScrollToMap(), 600);
-          break;
-        }
-        case "hours": {
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            timestamp: new Date(),
-            content:
-              lang === "en"
-                ? `⏰ Opening hours: ${openingTime || "N/A"} - ${closingTime || "N/A"}`
-                : lang === "al"
-                  ? `⏰ Orari: ${openingTime || "N/A"} - ${closingTime || "N/A"}`
-                  : `⏰ Работно време: ${openingTime || "N/A"} - ${closingTime || "N/A"}`,
-          });
-          break;
-        }
-        case "book": {
-          if (restaurantPhone) {
-            const bookingMessage =
-              lang === "en"
-                ? `Hello! I would like to book a table at ${restaurantName}.\n\nMy details:\n• Date & Time: \n• Number of guests: \n• Name: \n\nThank you!`
-                : lang === "al"
-                  ? `Përshëndetje! Dëshiroj të rezervoj tavolinë në ${restaurantName}.\n\nDetajet:\n• Data & Ora: \n• Numri i mysafirëve: \n• Emri: \n\nFaleminderit!`
-                  : `Здраво! Сакам да резервирам маса во ${restaurantName}.\n\nМои детали:\n• Датум и време: \n• Број на гости: \n• Име: \n\nБлагодарам!`;
-            window.open(
-              `https://wa.me/${restaurantPhone.replace(/\D/g, "")}?text=${encodeURIComponent(bookingMessage)}`,
-              "_blank",
-            );
-          }
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            timestamp: new Date(),
-            content:
-              lang === "en"
-                ? "📱 Opening WhatsApp to book your table..."
-                : lang === "al"
-                  ? "📱 Duke hapur WhatsApp për të rezervuar tavolinë..."
-                  : "📱 Се отвора WhatsApp за резервација...",
-          });
-          break;
-        }
-        default:
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            timestamp: new Date(),
-            content:
-              lang === "en"
-                ? "How can I help you?"
-                : lang === "al"
-                  ? "Si mund t'ju ndihmoj?"
-                  : "Kako можам да помогнам?",
-          });
+          },
+        ]);
+      } finally {
+        setIsTyping(false);
       }
     },
     [
+      messages,
       menuItems,
       lang,
-      restaurantLocation,
-      restaurantPhone,
-      restaurantLatitude,
-      restaurantLongitude,
       restaurantName,
+      restaurantPhone,
+      restaurantLocation,
       openingTime,
       closingTime,
+      cart,
+      restaurantLatitude,
+      restaurantLongitude,
       onScrollToMap,
-      addMessage,
+      t,
     ],
   );
 
-  const detectIntent = (query: string): string => {
-    if (
-      /popular|best|recommend|speciali|pjat.{0,10}(mir|popul)|popullar|специјал|препорач|најдобр/i.test(
-        query,
-      )
-    )
-      return "popular";
-    if (
-      /vegetarian|vegan|diet|vegjetarian|vegan|vegane|без\s*мес|вегет/i.test(
-        query,
-      )
-    )
-      return "dietary";
-    if (
-      /drink|beverage|desert|embëlsir|ëmbëlsir|pij[eë]|dezert|пијал|десерт/i.test(
-        query,
-      )
-    )
-      return "drinks";
-    if (/cheap|price|afford|çmim|lir[eë]|çmim|цена|евтин|цени/i.test(query))
-      return "prices";
-    if (
-      /location|where|address|map|vendndodhj|adres[eë]|ku ndodh|hart[eë]|локац|адрес|каде/i.test(
-        query,
-      )
-    )
-      return "location";
-    if (
-      /hours|open|close|time|orar|hap|mbyll|kur|работн|отвор|затвор|час/i.test(
-        query,
-      )
-    )
-      return "hours";
-    if (/book|reserv|tavolinë|tavolina|rezerv|masa\b|маса|резерв/i.test(query))
-      return "book";
-    return "unknown";
-  };
-
   const [showButton, setShowButton] = useState(false);
-
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.scrollY;
@@ -1208,78 +1659,71 @@ function AIRestaurantAssistant({
         document.documentElement.clientHeight;
       setShowButton((scrollTop / docHeight) * 100 > 1);
     };
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
-    addMessage({
-      id: Date.now().toString(),
-      role: "user",
-      content: inputValue,
-      timestamp: new Date(),
-    });
-    const query = inputValue.toLowerCase();
+    if (!inputValue.trim() || isTyping) return;
+    const text = inputValue.trim();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: "user",
+        content: text,
+        timestamp: new Date(),
+      },
+    ]);
     setInputValue("");
-    setIsTyping(true);
-    setTimeout(() => {
-      const intent = detectIntent(query);
-      if (intent !== "unknown") {
-        executeAction(intent);
-      } else {
-        addMessage({
-          id: Date.now().toString(),
-          role: "assistant",
-          timestamp: new Date(),
-          content:
-            lang === "en"
-              ? "I can help you with:\n• 🍽️ Popular dishes\n• 🌱 Dietary options\n• 🥤 Drinks & desserts\n• 📍 Location\n• ⏰ Opening hours\n• 📅 Book a table\n\nWhat would you like?"
-              : lang === "al"
-                ? "Mund t'ju ndihmoj me:\n• 🍽️ Pjata popullore\n• 🌱 Opsione dietike\n• 🥤 Pije & ëmbëlsira\n• 📍 Vendndodhja\n• ⏰ Orari\n• 📅 Rezervo tavolinë\n\nÇfarë dëshironi?"
-                : "Можам да помогнам со:\n• 🍽️ Популарни јадења\n• 🌱 Диетски опции\n• 🥤 Пијалоци & десерти\n• 📍 Локација\n• ⏰ Работно време\n• 📅 Резервација\n\nШто сакате?",
-        });
-      }
-      setIsTyping(false);
-    }, 800);
+    sendToClaude(text);
+  };
+
+  const handleQuickAction = (prompt: string) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: "user",
+        content: prompt,
+        timestamp: new Date(),
+      },
+    ]);
+    sendToClaude(prompt);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button
-          className={`fixed bottom-[120px] right-4 sm:right-6 
-          h-12 w-12 sm:h-14 sm:w-14 
-          rounded-full shadow-2xl 
-          transition-all duration-300 
-          hover:scale-110
-          z-40 
-          bg-gradient-to-r from-primary to-primary/80
-          ${showButton ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"}
-          `}
+        <motion.button
+          animate={
+            showButton ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.75 }
+          }
+          transition={{ type: "spring", stiffness: 340, damping: 26 }}
+          style={{ pointerEvents: showButton ? "auto" : "none" }}
+          className="fixed bottom-[120px] right-4 sm:right-6 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-2xl z-40 bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center"
         >
-          <Bot className="h-5 w-5 sm:h-6 sm:w-6" />
-          <Sparkles className="h-2.5 w-2.5 absolute -top-1 -right-1 text-yellow-400 animate-pulse" />
-        </Button>
+          <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+          <motion.span
+            animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute -top-1 -right-1"
+          >
+            <Sparkles className="h-2.5 w-2.5 text-yellow-400" />
+          </motion.span>
+        </motion.button>
       </DialogTrigger>
-      <DialogContent
-        className="
-        w-[calc(100vw-16px)] max-w-md
-        h-[85dvh] sm:h-[80vh]
-        mx-auto
-        flex flex-col p-0 gap-0
-        bg-gradient-to-b from-white to-stone-50 dark:from-stone-900 dark:to-stone-950
-        rounded-2xl
-      "
-      >
+      <DialogContent className="w-[calc(100vw-16px)] max-w-md h-[85dvh] sm:h-[80vh] mx-auto flex flex-col p-0 gap-0 bg-gradient-to-b from-white to-stone-50 dark:from-stone-900 dark:to-stone-950 rounded-2xl">
         <DialogHeader className="p-4 pb-3 border-b dark:border-stone-700 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
-              <Bot className="h-4 w-4 text-white" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
+                <Bot className="h-4 w-4 text-white" />
+              </div>
+              <DialogTitle className="text-base sm:text-lg dark:text-stone-100">
+                {t.aiAssistant}
+              </DialogTitle>
             </div>
-            <DialogTitle className="text-base sm:text-lg dark:text-stone-100">
-              {t.aiAssistant}
-            </DialogTitle>
           </div>
           <div className="mt-3 space-y-2">
             <div className="grid grid-cols-3 gap-1.5">
@@ -1289,7 +1733,8 @@ function AIRestaurantAssistant({
                   variant="outline"
                   size="sm"
                   className="text-[10px] sm:text-xs h-7 px-1.5 justify-center"
-                  onClick={() => executeAction(btn.action)}
+                  onClick={() => handleQuickAction(btn.prompt)}
+                  disabled={isTyping}
                 >
                   {btn.label}
                 </Button>
@@ -1302,7 +1747,8 @@ function AIRestaurantAssistant({
                   variant="outline"
                   size="sm"
                   className="text-[10px] sm:text-xs h-7 px-1.5 justify-center"
-                  onClick={() => executeAction(btn.action)}
+                  onClick={() => handleQuickAction(btn.prompt)}
+                  disabled={isTyping}
                 >
                   {btn.label}
                 </Button>
@@ -1312,13 +1758,18 @@ function AIRestaurantAssistant({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {messages.map((message) => (
               <motion.div
                 key={message.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
+                // ✅ Improved: slide from side based on role
+                initial={{
+                  opacity: 0,
+                  x: message.role === "user" ? 20 : -20,
+                  scale: 0.95,
+                }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 340, damping: 26 }}
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
@@ -1336,15 +1787,22 @@ function AIRestaurantAssistant({
                       latitude={message.mapData.latitude}
                       longitude={message.mapData.longitude}
                       name={message.mapData.name}
-                      location={message.mapData.location}
                     />
                   )}
                   {message.recommendedItems &&
                     message.recommendedItems.length > 0 && (
                       <div className="mt-3 space-y-2">
-                        {message.recommendedItems.map((item) => (
-                          <div
+                        {message.recommendedItems.map((item, idx) => (
+                          <motion.div
                             key={item.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{
+                              delay: idx * 0.06,
+                              type: "spring",
+                              stiffness: 300,
+                              damping: 24,
+                            }}
                             className="bg-stone-50 dark:bg-stone-700/50 rounded-xl p-2.5 border dark:border-stone-600"
                           >
                             <div className="flex items-center gap-2.5">
@@ -1378,7 +1836,7 @@ function AIRestaurantAssistant({
                                 {t.addToCart}
                               </Button>
                             </div>
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                     )}
@@ -1387,35 +1845,39 @@ function AIRestaurantAssistant({
             ))}
           </AnimatePresence>
 
-          {isTyping && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex justify-start"
-            >
-              <div className="bg-white dark:bg-stone-800 border dark:border-stone-700 rounded-2xl px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    <span
-                      className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    />
-                    <span
-                      className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    />
-                    <span
-                      className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    />
+          <AnimatePresence>
+            {isTyping && (
+              <motion.div
+                initial={{ opacity: 0, x: -12, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 340, damping: 26 }}
+                className="flex justify-start"
+              >
+                <div className="bg-white dark:bg-stone-800 border dark:border-stone-700 rounded-2xl px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      {[0, 150, 300].map((delay) => (
+                        <motion.span
+                          key={delay}
+                          className="w-1.5 h-1.5 bg-primary rounded-full"
+                          animate={{ y: [0, -5, 0] }}
+                          transition={{
+                            duration: 0.6,
+                            repeat: Infinity,
+                            delay: delay / 1000,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-stone-500 dark:text-stone-400">
+                      {t.typing}
+                    </span>
                   </div>
-                  <span className="text-xs text-stone-500 dark:text-stone-400">
-                    {t.typing}
-                  </span>
                 </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div ref={messagesEndRef} />
         </div>
 
@@ -1512,7 +1974,7 @@ function DigitalReceipt({
       qty: "Кол.",
       price: "Цена",
       total: "Вкупно",
-      save: "Зачувај како слика",
+      save: "Зачувај kako слика",
       share: "Сподели",
       close: "Затвори",
       thankYou: "Благодарам!",
@@ -1528,8 +1990,6 @@ function DigitalReceipt({
   const [saving, setSaving] = useState(false);
 
   const menuUrl = `${window.location.origin}/restaurant/${data.restaurantSlug}`;
-
-  // Generate QR code as data URL using a simple QR API
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(menuUrl)}&bgcolor=ffffff&color=000000&margin=6`;
 
   const handleSave = async () => {
@@ -1549,7 +2009,6 @@ function DigitalReceipt({
       link.click();
       toast({ title: t.saved });
     } catch (e) {
-      // fallback: just show toast
       toast({ title: t.saved });
     }
     setSaving(false);
@@ -1580,14 +2039,11 @@ function DigitalReceipt({
       }}
     >
       <DialogContent className="w-[calc(100vw-24px)] max-w-sm bg-white dark:bg-stone-900 rounded-3xl overflow-hidden p-0 border-0 shadow-2xl flex flex-col max-h-[92dvh]">
-        {/* scrollable area */}
         <div className="flex-1 overflow-y-auto">
-          {/* receipt card — this is what gets saved as image */}
           <div
             ref={receiptRef}
             className="bg-white px-4 pt-6 pb-4 font-mono text-[13px]"
           >
-            {/* header */}
             <div className="text-center mb-5">
               <p className="text-xs font-bold text-stone-400 uppercase tracking-[0.2em] mb-1">
                 {t.receipt}
@@ -1602,37 +2058,22 @@ function DigitalReceipt({
                 <span>#{data.orderId}</span>
               </div>
             </div>
-
-            {/* divider dashed */}
             <div className="border-t-2 border-dashed border-stone-200 my-4" />
-
-            {/* order info */}
             <div className="space-y-1.5 mb-4">
-              <div className="flex justify-between gap-2 text-xs">
-                <span className="text-stone-400 flex-shrink-0">
-                  {t.customer}
-                </span>
-                <span className="font-bold text-stone-800 text-right break-words">
-                  {data.customerName}
-                </span>
-              </div>
-              <div className="flex justify-between gap-2 text-xs">
-                <span className="text-stone-400 flex-shrink-0">{t.type}</span>
-                <span className="font-bold text-stone-800 text-right">
-                  {data.orderType}
-                </span>
-              </div>
-              <div className="flex justify-between gap-2 text-xs">
-                <span className="text-stone-400 flex-shrink-0">{t.time}</span>
-                <span className="font-bold text-stone-800 text-right break-words">
-                  {data.deliveryTime}
-                </span>
-              </div>
+              {[
+                [t.customer, data.customerName],
+                [t.type, data.orderType],
+                [t.time, data.deliveryTime],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-2 text-xs">
+                  <span className="text-stone-400 flex-shrink-0">{label}</span>
+                  <span className="font-bold text-stone-800 text-right break-words">
+                    {value}
+                  </span>
+                </div>
+              ))}
             </div>
-
             <div className="border-t-2 border-dashed border-stone-200 my-4" />
-
-            {/* items */}
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-[10px] text-stone-400 uppercase tracking-widest mb-2">
                 <span className="flex-1">{t.item}</span>
@@ -1656,10 +2097,7 @@ function DigitalReceipt({
                 </div>
               ))}
             </div>
-
             <div className="border-t-2 border-dashed border-stone-200 my-4" />
-
-            {/* total */}
             <div className="flex justify-between items-center mb-5">
               <span className="font-bold text-sm text-stone-900 uppercase tracking-widest">
                 {t.total}
@@ -1668,8 +2106,6 @@ function DigitalReceipt({
                 {data.total} DEN
               </span>
             </div>
-
-            {/* QR + thank you — stacked for mobile */}
             <div className="flex flex-col items-center gap-3 mt-2">
               <div className="text-center">
                 <p className="font-bold text-base text-stone-900">
@@ -1687,10 +2123,7 @@ function DigitalReceipt({
                   className="rounded-xl"
                 />
               </div>
-              <p className="text-[9px] text-stone-300">{t.poweredBy}</p>
             </div>
-
-            {/* bottom serrated edge effect */}
             <div className="mt-5 -mx-6 h-4 relative overflow-hidden">
               <div className="absolute inset-x-0 bottom-0 flex">
                 {Array.from({ length: 18 }).map((_, i) => (
@@ -1703,8 +2136,6 @@ function DigitalReceipt({
             </div>
           </div>
         </div>
-
-        {/* action buttons — outside receipt ref so not saved in image */}
         <div className="px-4 py-3 bg-white dark:bg-stone-900 border-t border-stone-100 dark:border-stone-800 flex gap-2 flex-shrink-0">
           {"share" in navigator && (
             <Button
@@ -1729,8 +2160,6 @@ function DigitalReceipt({
             <span className="truncate">{t.save}</span>
           </Button>
         </div>
-
-        {/* close X handled by DialogContent built-in */}
       </DialogContent>
     </Dialog>
   );
@@ -1851,7 +2280,6 @@ function SurpriseMe({
   const parsePrice = (item: MenuItem) =>
     parseInt(item.price.replace(/[^0-9]/g, "")) || 0;
 
-  // Budget per person
   const budgetPerPerson = parseInt(budget)
     ? Math.floor(parseInt(budget) / persons)
     : 0;
@@ -1880,22 +2308,18 @@ function SurpriseMe({
       if (!main) break;
       let total = parsePrice(main);
       if (total > budgetPP) continue;
-
       const starter = pickRandom(
         starters.filter((i) => parsePrice(i) + total <= budgetPP),
       );
       if (starter) total += parsePrice(starter);
-
       const drink = pickRandom(
         drinks.filter((i) => parsePrice(i) + total <= budgetPP),
       );
       if (drink) total += parsePrice(drink);
-
       const dessert = pickRandom(
         desserts.filter((i) => parsePrice(i) + total <= budgetPP),
       );
       if (dessert) total += parsePrice(dessert);
-
       return {
         starter,
         main,
@@ -1926,12 +2350,9 @@ function SurpriseMe({
 
   const handleAddAll = () => {
     if (!result) return;
-    // Add items * persons count
     [result.starter, result.main, result.dessert, result.drink].forEach(
       (item) => {
-        if (item) {
-          for (let p = 0; p < persons; p++) onAddToCart(item.id, 1);
-        }
+        if (item) for (let p = 0; p < persons; p++) onAddToCart(item.id, 1);
       },
     );
     toast({ title: t.added });
@@ -1983,7 +2404,6 @@ function SurpriseMe({
         }
       }}
     >
-      {/* ── Trigger card ── */}
       <DialogTrigger asChild>
         <motion.button
           whileHover={{ scale: 1.015 }}
@@ -2009,19 +2429,8 @@ function SurpriseMe({
         </motion.button>
       </DialogTrigger>
 
-      {/* ── Dialog ── */}
-      <DialogContent
-        className="
-          w-[calc(100vw-32px)] max-w-md
-          max-h-[88dvh]
-          bg-white dark:bg-stone-900
-          rounded-3xl
-          overflow-hidden p-0 border-0 shadow-2xl
-          flex flex-col
-          [&>button]:z-[60] [&>button]:text-white/90 [&>button]:hover:text-white [&>button]:hover:bg-white/20 [&>button]:transition-all
-        "
-      >
-        {/* ── Header ── */}
+      <DialogContent className="w-[calc(100vw-32px)] max-w-md max-h-[88dvh] bg-white dark:bg-stone-900 rounded-3xl overflow-hidden p-0 border-0 shadow-2xl flex flex-col [&>button]:z-[60] [&>button]:text-white/90 [&>button]:hover:text-white [&>button]:hover:bg-white/20 [&>button]:transition-all">
+        {/* Header */}
         <div className="relative bg-primary px-5 pt-6 pb-10 sm:pt-8 sm:pb-12 flex-shrink-0">
           <div
             className="absolute inset-0 opacity-10 pointer-events-none"
@@ -2040,9 +2449,7 @@ function SurpriseMe({
             </DialogDescription>
           </DialogHeader>
 
-          {/* ── Budget + Persons card ── */}
           <div className="relative z-10 mt-4 sm:mt-5 bg-white dark:bg-stone-800 rounded-2xl shadow-2xl overflow-hidden">
-            {/* Budget row */}
             <div className="px-4 pt-4 pb-3 border-b border-stone-100 dark:border-stone-700">
               <label className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest block">
                 {t.budgetLabel}
@@ -2052,7 +2459,7 @@ function SurpriseMe({
                   ref={inputRef}
                   type="number"
                   inputMode="numeric"
-                  min="0"
+                  min="1"
                   value={budget}
                   onChange={(e) => {
                     setBudget(e.target.value);
@@ -2067,7 +2474,6 @@ function SurpriseMe({
                   {t.den}
                 </span>
               </div>
-              {/* per-person breakdown */}
               {budgetPerPerson > 0 && (
                 <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1">
                   ≈ {budgetPerPerson} {t.den} {t.perPerson}
@@ -2075,7 +2481,6 @@ function SurpriseMe({
               )}
             </div>
 
-            {/* Persons row */}
             <div className="px-4 py-3 flex items-center justify-between">
               <div>
                 <label className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-widest block">
@@ -2097,28 +2502,24 @@ function SurpriseMe({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setPersons((p) => Math.max(1, p - 1));
-                    setResult(null);
-                  }}
-                  className="h-9 w-9 rounded-xl border-2 border-stone-200 dark:border-stone-600 flex items-center justify-center text-stone-600 dark:text-stone-300 hover:border-primary hover:text-primary transition-colors font-bold text-lg active:scale-95"
-                >
-                  −
-                </button>
+                {[
+                  { label: "−", delta: -1 },
+                  { label: "+", delta: 1 },
+                ].map(({ label, delta }, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setPersons((p) => Math.max(1, Math.min(20, p + delta)));
+                      setResult(null);
+                    }}
+                    className="h-9 w-9 rounded-xl border-2 border-stone-200 dark:border-stone-600 flex items-center justify-center text-stone-600 dark:text-stone-300 hover:border-primary hover:text-primary transition-colors font-bold text-lg active:scale-95"
+                  >
+                    {label}
+                  </button>
+                ))}
                 <span className="w-8 text-center font-bold text-lg text-stone-900 dark:text-stone-100">
                   {persons}
                 </span>
-                <button
-                  onClick={() => {
-                    setPersons((p) => Math.min(20, p + 1));
-                    setResult(null);
-                  }}
-                  className="h-9 w-9 rounded-xl border-2 border-stone-200 dark:border-stone-600 flex items-center justify-center text-stone-600 dark:text-stone-300 hover:border-primary hover:text-primary transition-colors font-bold text-lg active:scale-95"
-                >
-                  +
-                </button>
-                {/* Go button */}
                 <Button
                   onClick={handleSurprise}
                   disabled={!budget || parseInt(budget) <= 0 || isSpinning}
@@ -2135,30 +2536,37 @@ function SurpriseMe({
           </div>
         </div>
 
-        {/* ── Results (scrollable) ── */}
+        {/* Results */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 -mt-3">
           <AnimatePresence mode="wait">
             {isSpinning && (
               <motion.div
                 key="spin"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 className="flex flex-col items-center justify-center py-12 gap-4"
               >
-                <div className="relative">
-                  <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-                  <motion.span
-                    className="absolute inset-0 flex items-center justify-center text-2xl"
-                    animate={{ rotate: [0, 15, -15, 0] }}
-                    transition={{ duration: 0.5, repeat: Infinity }}
-                  >
-                    🎲
-                  </motion.span>
-                </div>
-                <p className="text-sm text-stone-500 dark:text-stone-400 font-medium animate-pulse">
+                {/* ✅ Improved spinner — theatrical dice roll */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 0.6,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="text-5xl select-none"
+                >
+                  🎲
+                </motion.div>
+                <motion.p
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 1.4, repeat: Infinity }}
+                  className="text-sm text-stone-500 dark:text-stone-400 font-medium"
+                >
                   {t.spinning}
-                </p>
+                </motion.p>
               </motion.div>
             )}
 
@@ -2193,7 +2601,6 @@ function SurpriseMe({
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-3"
               >
-                {/* header */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
                     {t.result}
@@ -2208,15 +2615,20 @@ function SurpriseMe({
                   </div>
                 </div>
 
-                {/* item cards */}
                 <div className="space-y-2">
                   {slots.map(({ key, label, item, emoji }, i) =>
                     item ? (
+                      // ✅ Improved: cascade in with spring
                       <motion.div
                         key={key}
-                        initial={{ opacity: 0, x: -14 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.07 }}
+                        initial={{ opacity: 0, x: -20, scale: 0.96 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        transition={{
+                          delay: i * 0.08,
+                          type: "spring",
+                          stiffness: 320,
+                          damping: 26,
+                        }}
                         className="flex items-center gap-3 p-3 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-stone-100 dark:border-stone-700"
                       >
                         {item.imageUrl ? (
@@ -2253,7 +2665,6 @@ function SurpriseMe({
                   )}
                 </div>
 
-                {/* total breakdown */}
                 {persons > 1 && (
                   <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/10">
                     <span className="text-xs font-bold text-stone-600 dark:text-stone-300">
@@ -2265,7 +2676,6 @@ function SurpriseMe({
                   </div>
                 )}
 
-                {/* action buttons */}
                 <div className="flex gap-1 pt-1 pb-3">
                   <Button
                     variant="outline"
@@ -2318,8 +2728,9 @@ function SurpriseMe({
 
 export default function PublicMenu() {
   const { slug } = useParams<{ slug: string }>();
+  // ✅ lang read once via initializer function — no localStorage on every render
   const [lang] = useState<"en" | "al" | "mk">(
-    () => (localStorage.getItem("hajdeha-lang") as any) || "en",
+    () => (localStorage.getItem(LANG_KEY) as any) || "en",
   );
   const t = translations[lang];
   const { isDark, toggleDarkMode } = useDarkMode();
@@ -2348,8 +2759,11 @@ export default function PublicMenu() {
   const [deliveryTime, setDeliveryTime] = useState<"asap" | "custom">("asap");
   const [customDateTime, setCustomDateTime] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  // ✅ Debounced search — no fuzzy match on every keystroke
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
   const [voiceSearchMatches, setVoiceSearchMatches] = useState<MenuItem[]>([]);
   const [showVoiceResults, setShowVoiceResults] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [receiptData, setReceiptData] = useState<null | {
     orderId: string;
     customerName: string;
@@ -2362,28 +2776,32 @@ export default function PublicMenu() {
     timestamp: Date;
   }>(null);
 
-  const handleVoiceResult = (text: string, matches: MenuItem[]) => {
-    setSearchTerm(text);
-    setVoiceSearchMatches(matches);
-    setShowVoiceResults(true);
-    if (matches.length > 0) {
-      toast({
-        title: `${t.foundMatches.replace("{count}", matches.length.toString())} "${text}"`,
-      });
-      setTimeout(() => {
-        document
-          .getElementById(`item-${matches[0].id}`)
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 300);
-    } else {
-      toast({ title: t.noVoiceMatches, variant: "destructive" });
-    }
-  };
+  const handleVoiceResult = useCallback(
+    (text: string, matches: MenuItem[]) => {
+      setSearchTerm(text);
+      setVoiceSearchMatches(matches);
+      setShowVoiceResults(true);
+      if (matches.length > 0) {
+        toast({
+          title: `${t.foundMatches.replace("{count}", matches.length.toString())} "${text}"`,
+        });
+        setTimeout(() => {
+          document
+            .getElementById(`item-${matches[0].id}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 300);
+      } else {
+        toast({ title: t.noVoiceMatches, variant: "destructive" });
+      }
+    },
+    [t, toast],
+  );
 
   const { isListening, isSupported, startListening, stopListening } =
     useVoiceSearch(handleVoiceResult, restaurant?.menuItems || [], lang);
 
-  const updateCart = (itemId: number, delta: number) => {
+  // ✅ Stable updateCart with useCallback
+  const updateCart = useCallback((itemId: number, delta: number) => {
     setCart((prev) => {
       const next = Math.max(0, (prev[itemId] || 0) + delta);
       if (next === 0) {
@@ -2392,18 +2810,25 @@ export default function PublicMenu() {
       }
       return { ...prev, [itemId]: next };
     });
-  };
+  }, []);
 
-  const cartTotal = useMemo(() => {
-    if (!restaurant?.menuItems) return 0;
-    return Object.entries(cart).reduce((total, [id, qty]) => {
-      const item = restaurant.menuItems.find((i: any) => i.id === parseInt(id));
-      if (!item) return total;
-      return total + (parseInt(item.price.replace(/[^0-9]/g, "")) || 0) * qty;
-    }, 0);
-  }, [cart, restaurant]);
+  // ✅ O(1) price lookup instead of O(n) per entry
+  const priceMap = useMemo(() => {
+    const map: Record<number, number> = {};
+    restaurant?.menuItems.forEach((i: MenuItem) => {
+      map[i.id] = parseInt(i.price.replace(/[^0-9]/g, "")) || 0;
+    });
+    return map;
+  }, [restaurant?.menuItems]);
 
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const cartTotal = useMemo(
+    () =>
+      Object.entries(cart).reduce(
+        (sum, [id, qty]) => sum + (priceMap[+id] ?? 0) * qty,
+        0,
+      ),
+    [cart, priceMap],
+  );
 
   const filteredItems = useMemo(() => {
     if (!restaurant?.menuItems) return [];
@@ -2413,10 +2838,10 @@ export default function PublicMenu() {
       if (!item.active) return false;
       const categoryMatch =
         selectedCategory === "All" || item.category === selectedCategory;
-      if (searchTerm !== "") {
+      if (debouncedSearch !== "") {
         return (
           categoryMatch &&
-          findBestMatches(searchTerm, [item], lang, 0.3).length > 0
+          findBestMatches(debouncedSearch, [item], lang, 0.3).length > 0
         );
       }
       return categoryMatch;
@@ -2424,37 +2849,55 @@ export default function PublicMenu() {
   }, [
     restaurant?.menuItems,
     selectedCategory,
-    searchTerm,
+    debouncedSearch,
     showVoiceResults,
     voiceSearchMatches,
     lang,
   ]);
 
-  const categories = useMemo(() => {
-    if (!restaurant?.menuItems) return [];
-    return Array.from(
-      new Set(restaurant.menuItems.map((i: any) => i.category)),
-    );
-  }, [restaurant?.menuItems]);
+  // ✅ Memoized — not recomputed every render
+  const groupedMenu = useMemo(() => groupItems(filteredItems), [filteredItems]);
 
-  const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set(restaurant?.menuItems.map((i: MenuItem) => i.category) ?? []),
+      ),
+    [restaurant?.menuItems],
+  );
 
-  const scrollToMap = () => {
+  const cartCount = useMemo(
+    () => Object.values(cart).reduce((a, b) => a + b, 0),
+    [cart],
+  );
+
+  const scrollToMap = useCallback(() => {
     document
       .getElementById("map-section")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  }, []);
 
-  const callRestaurant = () => {
+  const callRestaurant = useCallback(() => {
     if (restaurant?.phoneNumber)
       window.location.href = `tel:${restaurant.phoneNumber}`;
-  };
+  }, [restaurant?.phoneNumber]);
 
   if (isLoading) {
     return (
       <div className="h-[100dvh] w-full bg-gradient-to-br from-stone-50 via-white to-stone-50 dark:from-stone-900 dark:via-stone-950 dark:to-stone-900 flex flex-col items-center justify-center gap-4 text-stone-400">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="font-display text-base animate-pulse">{t.loading}</p>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        >
+          <Loader2 className="h-10 w-10 text-primary" />
+        </motion.div>
+        <motion.p
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="font-display text-base"
+        >
+          {t.loading}
+        </motion.p>
       </div>
     );
   }
@@ -2475,29 +2918,28 @@ export default function PublicMenu() {
     );
   }
 
-  const groupedMenu = groupItems(filteredItems);
+  // ✅ Recomputed inside handlers (not stale closure)
   const isOpen = IsOpen(
     restaurant.openingTime || undefined,
     restaurant.closingTime || undefined,
   );
-
-  // ── Scheduling constraints ──────────────────────────────────────────────────
   const scheduling = getSchedulingConstraints(
     restaurant.openingTime || undefined,
     restaurant.closingTime || undefined,
   );
 
-  // ── Shared WhatsApp order builder ───────────────────────────────────────────
   const buildAndSendWhatsAppOrder = () => {
     if (!restaurant?.phoneNumber) return;
-
     if (!customerName.trim()) {
       toast({ title: t.pleaseEnterName, variant: "destructive" });
       return;
     }
-
-    // Block ASAP dine-in when restaurant is closed
-    if (!isOpen && deliveryTime === "asap") {
+    // ✅ Recompute isOpen at call time — not stale
+    const currentlyOpen = IsOpen(
+      restaurant.openingTime || undefined,
+      restaurant.closingTime || undefined,
+    );
+    if (!currentlyOpen && deliveryTime === "asap") {
       toast({
         title: t.restaurantClosed,
         description: t.closedAsapWarning,
@@ -2506,14 +2948,9 @@ export default function PublicMenu() {
       setDeliveryTime("custom");
       return;
     }
-
-    // Validate custom time is within opening hours
     if (deliveryTime === "custom") {
       if (!customDateTime) {
-        toast({
-          title: t.selectWithinHours,
-          variant: "destructive",
-        });
+        toast({ title: t.selectWithinHours, variant: "destructive" });
         return;
       }
       if (
@@ -2544,12 +2981,16 @@ export default function PublicMenu() {
           : t.customTime
     }\n\n🛒 *${t.orderSummary}*\n`;
 
+    const receiptItems: { name: string; qty: number; price: number }[] = [];
     Object.entries(cart).forEach(([id, qty]) => {
-      const item = restaurant.menuItems.find((i) => i.id === parseInt(id));
+      const item = restaurant.menuItems.find(
+        (i: MenuItem) => i.id === parseInt(id),
+      );
       if (!item) return;
-      const price = parseInt(item.price.replace(/[^0-9]/g, "")) || 0;
+      const price = priceMap[item.id] ?? 0;
       total += price * qty;
       message += `• ${qty} × ${item.name} — ${price * qty} den\n`;
+      receiptItems.push({ name: item.name, qty: qty as number, price });
     });
 
     message += `\n💰 *${t.total}*: ${total} den`;
@@ -2558,17 +2999,6 @@ export default function PublicMenu() {
       "_blank",
     );
 
-    // Generate receipt
-    const receiptItems: { name: string; qty: number; price: number }[] = [];
-    Object.entries(cart).forEach(([id, qty]) => {
-      const item = restaurant.menuItems.find((i) => i.id === parseInt(id));
-      if (!item) return;
-      receiptItems.push({
-        name: item.name,
-        qty: qty as number,
-        price: parseInt(item.price.replace(/[^0-9]/g, "")) || 0,
-      });
-    });
     setReceiptData({
       orderId: Math.random().toString(36).substring(2, 8).toUpperCase(),
       customerName,
@@ -2587,11 +3017,29 @@ export default function PublicMenu() {
     });
   };
 
-  // ── Order form (shared between mobile & desktop dialogs) ────────────────────
+  const sharedOrderFormProps: OrderFormContentProps = {
+    cart,
+    menuItems: restaurant.menuItems,
+    customerName,
+    setCustomerName,
+    orderType,
+    setOrderType,
+    deliveryTime,
+    setDeliveryTime,
+    customDateTime,
+    setCustomDateTime,
+    isOpen,
+    scheduling,
+    openingTime: restaurant.openingTime || undefined,
+    closingTime: restaurant.closingTime || undefined,
+    cartTotal,
+    t,
+    isDark,
+    updateCart,
+  };
 
   return (
     <>
-      {/* Digital Receipt overlay */}
       {receiptData && (
         <DigitalReceipt
           data={receiptData}
@@ -2599,7 +3047,9 @@ export default function PublicMenu() {
           onClose={() => setReceiptData(null)}
         />
       )}
-      <div className="min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 pb-36 transition-colors duration-300">
+      <div
+        className={`min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 transition-colors duration-300 ${cartCount > 0 ? "pb-48" : "pb-36"}`}
+      >
         <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
 
         <Link href="/">
@@ -2627,6 +3077,7 @@ export default function PublicMenu() {
           restaurantLongitude={
             restaurant.longitude ? String(restaurant.longitude) : null
           }
+          cart={cart}
         />
 
         {/* Hero Header */}
@@ -2646,80 +3097,82 @@ export default function PublicMenu() {
           )}
 
           <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center space-y-5 sm:space-y-8 text-white">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight">
+            {/* ✅ Improved: staggered hero with variants */}
+            <motion.div variants={heroVariants} initial="hidden" animate="show">
+              <motion.h1
+                variants={heroItem}
+                className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight"
+              >
                 {restaurant.name}
-              </h1>
-              <div
-                className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
-                  isOpen
-                    ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
-                    : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
-                }`}
-              >
-                {isOpen ? (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {t.openNow}
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-3.5 w-3.5" />
-                    {t.closed}
-                  </>
-                )}
-              </div>
-            </motion.div>
+              </motion.h1>
 
-            {restaurant.description && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed"
-              >
-                {restaurant.description}
-              </motion.p>
-            )}
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 }}
-              className="flex flex-wrap justify-center gap-3 pt-2"
-            >
-              {restaurant.website && (
-                <a
-                  href={restaurant.website}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
+              <motion.div variants={heroItem}>
+                <div
+                  className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
+                    isOpen
+                      ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
+                      : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
+                  }`}
                 >
-                  <Globe className="h-3.5 w-3.5" />
-                  {t.website}
-                </a>
-              )}
-              <a
-                href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
-              >
-                <Phone className="h-3.5 w-3.5" />
-                {t.reserve}
-              </a>
-            </motion.div>
+                  {isOpen ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {t.openNow}
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-3.5 w-3.5" />
+                      {t.closed}
+                    </>
+                  )}
+                </div>
+              </motion.div>
 
-            {restaurant.openingTime && restaurant.closingTime && (
-              <div className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2">
-                <Clock className="h-3.5 w-3.5" />
-                <span>
-                  {restaurant.openingTime} - {restaurant.closingTime}
-                </span>
-              </div>
-            )}
+              {restaurant.description && (
+                <motion.p
+                  variants={heroItem}
+                  className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed mt-4"
+                >
+                  {restaurant.description}
+                </motion.p>
+              )}
+
+              <motion.div
+                variants={heroItem}
+                className="flex flex-wrap justify-center gap-3 pt-2"
+              >
+                {restaurant.website && (
+                  <a
+                    href={restaurant.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    {t.website}
+                  </a>
+                )}
+                <a
+                  href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  {t.reserve}
+                </a>
+              </motion.div>
+
+              {restaurant.openingTime && restaurant.closingTime && (
+                <motion.div
+                  variants={heroItem}
+                  className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2"
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>
+                    {restaurant.openingTime} - {restaurant.closingTime}
+                  </span>
+                </motion.div>
+              )}
+            </motion.div>
           </div>
         </header>
 
@@ -2740,28 +3193,46 @@ export default function PublicMenu() {
                 />
               </div>
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                {searchTerm && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => {
-                      setSearchTerm("");
-                      setShowVoiceResults(false);
-                      setVoiceSearchMatches([]);
-                    }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+                <AnimatePresence>
+                  {searchTerm && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setShowVoiceResults(false);
+                          setVoiceSearchMatches([]);
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 {isSupported && (
                   <Button
                     variant={isListening ? "default" : "ghost"}
                     size="icon"
-                    className={`h-7 w-7 ${isListening ? "animate-pulse" : ""}`}
+                    className="h-7 w-7"
                     onClick={isListening ? stopListening : startListening}
                   >
-                    <Mic className="h-3.5 w-3.5" />
+                    <motion.div
+                      animate={
+                        isListening ? { scale: [1, 1.2, 1] } : { scale: 1 }
+                      }
+                      transition={{
+                        duration: 0.8,
+                        repeat: isListening ? Infinity : 0,
+                      }}
+                    >
+                      <Mic className="h-3.5 w-3.5" />
+                    </motion.div>
                   </Button>
                 )}
               </div>
@@ -2807,20 +3278,51 @@ export default function PublicMenu() {
 
         {/* Menu */}
         <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
-          {/* Surprise Me */}
           <SurpriseMe
             menuItems={restaurant.menuItems || []}
             onAddToCart={updateCart}
             lang={lang}
           />
 
+          {/* ✅ Empty state */}
+          <AnimatePresence>
+            {groupedMenu.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-20 gap-4 text-stone-400"
+              >
+                <UtensilsCrossed className="h-12 w-12 opacity-30" />
+                <p className="text-sm font-medium">
+                  No items match "{searchTerm}"
+                </p>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setShowVoiceResults(false);
+                  }}
+                >
+                  Clear search
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {groupedMenu.map(
             ([category, items]: [string, MenuItem[]], idx: number) => (
               <motion.section
                 key={category}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.08 }}
+                // ✅ Improved: spring + slide from left
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  delay: idx * 0.1,
+                  type: "spring",
+                  stiffness: 260,
+                  damping: 24,
+                }}
               >
                 <div className="flex items-center gap-3 mb-5">
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent to-stone-200 dark:to-stone-700" />
@@ -2834,9 +3336,14 @@ export default function PublicMenu() {
                     <motion.article
                       key={item.id}
                       id={`item-${item.id}`}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: itemIdx * 0.04 }}
+                      // ✅ Improved: blur + spring entrance
+                      initial={{ opacity: 0, y: 24, filter: "blur(4px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      transition={{
+                        delay: itemIdx * 0.055,
+                        duration: 0.45,
+                        ease: EASE_OUT_QUART,
+                      }}
                       className="group flex gap-3 sm:gap-5 items-start bg-white dark:bg-stone-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-stone-100 dark:border-stone-700 hover:shadow-md hover:border-primary/20 dark:hover:border-primary/30 transition-all duration-200"
                     >
                       {item.imageUrl && (
@@ -2860,7 +3367,11 @@ export default function PublicMenu() {
                             <span className="text-primary font-bold text-lg sm:text-xl whitespace-nowrap">
                               {item.price}
                             </span>
-                            <ShareDialog item={item} restaurantSlug={slug!} />
+                            <ShareDialog
+                              item={item}
+                              restaurantSlug={slug!}
+                              lang={lang}
+                            />
                           </div>
                         </div>
                         <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 line-clamp-2 mb-2.5 leading-relaxed">
@@ -2917,9 +3428,20 @@ export default function PublicMenu() {
                           >
                             <Minus className="h-3.5 w-3.5 text-stone-600 dark:text-stone-300" />
                           </Button>
-                          <span className="font-bold w-6 text-center text-stone-900 dark:text-stone-100 text-base">
+                          {/* ✅ Improved: quantity pops on change */}
+                          <motion.span
+                            key={cart[item.id] || 0}
+                            initial={{ scale: 1.6 }}
+                            animate={{ scale: 1 }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 500,
+                              damping: 22,
+                            }}
+                            className="font-bold w-6 text-center text-stone-900 dark:text-stone-100 text-base"
+                          >
                             {cart[item.id] || 0}
-                          </span>
+                          </motion.span>
                           <Button
                             size="icon"
                             variant="ghost"
@@ -2989,14 +3511,15 @@ export default function PublicMenu() {
         <AnimatePresence>
           {cartCount > 0 && (
             <motion.div
-              initial={{ y: 120 }}
-              animate={{ y: 0 }}
-              exit={{ y: 120 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              initial={{ y: 120, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 120, opacity: 0 }}
+              // ✅ Improved: tighter spring bounce
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
               className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t-2 border-stone-200 dark:border-stone-700 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-3 py-3 sm:px-5 sm:py-4 z-50"
             >
               <div className="max-w-4xl mx-auto">
-                {/* ── Mobile ── */}
+                {/* Mobile */}
                 <div className="flex flex-col gap-2 sm:hidden">
                   <div className="flex items-center gap-2">
                     <div className="bg-primary text-primary-foreground p-2 rounded-xl shadow-lg">
@@ -3006,9 +3529,19 @@ export default function PublicMenu() {
                       <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
                         {t.totalBill}
                       </p>
-                      <p className="text-lg font-bold text-primary">
+                      <motion.p
+                        key={cartTotal}
+                        initial={{ scale: 1.1 }}
+                        animate={{ scale: 1 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 20,
+                        }}
+                        className="text-lg font-bold text-primary"
+                      >
                         {cartTotal} DEN
-                      </p>
+                      </motion.p>
                     </div>
                     <Button
                       variant="ghost"
@@ -3036,216 +3569,7 @@ export default function PublicMenu() {
                           </DialogTitle>
                         </DialogHeader>
                         <ScrollArea className="flex-1">
-                          <>
-                            <div className="space-y-4">
-                              {/* Closed restaurant banner */}
-                              {!isOpen && (
-                                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-                                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                                  <div>
-                                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                                      {t.restaurantClosed}
-                                    </p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                                      {restaurant.openingTime} –{" "}
-                                      {restaurant.closingTime}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Name */}
-                              <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                                  {t.yourName} *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={customerName}
-                                  onChange={(e) =>
-                                    setCustomerName(e.target.value)
-                                  }
-                                  placeholder={t.enterYourName}
-                                  className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                                  required
-                                />
-                              </div>
-
-                              {/* Order type — disabled when restaurant is closed */}
-                              <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                                  {t.orderType} *
-                                </label>
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      orderType === "dineIn"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                    disabled={!isOpen}
-                                    onClick={() => setOrderType("dineIn")}
-                                  >
-                                    {t.dineIn}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      orderType === "takeaway"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                    disabled={!isOpen}
-                                    onClick={() => setOrderType("takeaway")}
-                                  >
-                                    {t.takeaway}
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {/* Delivery time */}
-                              <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                                  {t.deliveryTime}
-                                </label>
-                                <div className="flex gap-2">
-                                  {/* ASAP disabled when closed */}
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      deliveryTime === "asap"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                    disabled={!isOpen}
-                                    onClick={() => setDeliveryTime("asap")}
-                                  >
-                                    {t.asap}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      deliveryTime === "custom"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs"
-                                    onClick={() => setDeliveryTime("custom")}
-                                  >
-                                    {t.customTime}
-                                  </Button>
-                                </div>
-
-                                {(deliveryTime === "custom" || !isOpen) && (
-                                  <div className="mt-2 space-y-1">
-                                    <input
-                                      type="datetime-local"
-                                      value={customDateTime}
-                                      onChange={(e) => {
-                                        const chosen = e.target.value; // "YYYY-MM-DDTHH:MM"
-                                        if (!chosen) {
-                                          setCustomDateTime("");
-                                          return;
-                                        }
-
-                                        const open = scheduling.openingTime; // "HH:MM"
-                                        const close = scheduling.closingTime; // "HH:MM"
-                                        const dateOnly = chosen.split("T")[0]; // "YYYY-MM-DD"
-                                        const timeOnly = chosen.split("T")[1]; // "HH:MM"
-
-                                        // Clamp to opening time if before
-                                        if (timeOnly < open) {
-                                          setCustomDateTime(
-                                            `${dateOnly}T${open}`,
-                                          );
-                                          return;
-                                        }
-                                        // Clamp to closing time if after
-                                        if (timeOnly > close) {
-                                          setCustomDateTime(
-                                            `${dateOnly}T${close}`,
-                                          );
-                                          return;
-                                        }
-                                        setCustomDateTime(chosen);
-                                      }}
-                                      min={scheduling.minDateTime}
-                                      className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Cart items */}
-                              <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
-                                <ScrollArea className="h-[140px] pr-1">
-                                  <div className="space-y-1">
-                                    {Object.entries(cart).map(([id, qty]) => {
-                                      const item = restaurant.menuItems.find(
-                                        (i) => i.id === parseInt(id),
-                                      );
-                                      if (!item) return null;
-                                      return (
-                                        <div
-                                          key={id}
-                                          className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                                              {qty}x
-                                            </div>
-                                            <div>
-                                              <p className="font-bold dark:text-stone-100 text-sm">
-                                                {item.name}
-                                              </p>
-                                              <p className="text-xs text-stone-500 dark:text-stone-400">
-                                                {item.price}
-                                              </p>
-                                            </div>
-                                          </div>
-                                          <div className="flex gap-1">
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-8 w-8"
-                                              onClick={() =>
-                                                updateCart(item.id, -1)
-                                              }
-                                            >
-                                              <Minus className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-8 w-8"
-                                              onClick={() =>
-                                                updateCart(item.id, 1)
-                                              }
-                                            >
-                                              <Plus className="h-3 w-3 text-primary" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </ScrollArea>
-
-                                <div className="flex justify-between items-center p-2 pt-3 rounded-2xl">
-                                  <span className="text-base font-semibold dark:text-stone-100">
-                                    {t.totalBill}
-                                  </span>
-                                  <p className="text-xl font-bold text-primary">
-                                    {cartTotal} DEN
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </>
+                          <OrderFormContent {...sharedOrderFormProps} />
                         </ScrollArea>
                         <div className="pt-2 border-t border-stone-200 dark:border-stone-700">
                           <div className="flex gap-1">
@@ -3277,7 +3601,7 @@ export default function PublicMenu() {
                   </div>
                 </div>
 
-                {/* ── Desktop ── */}
+                {/* Desktop */}
                 <div className="hidden sm:flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="bg-primary text-primary-foreground p-3 rounded-xl">
@@ -3287,9 +3611,19 @@ export default function PublicMenu() {
                       <p className="text-xs uppercase text-muted-foreground">
                         {t.totalBill}
                       </p>
-                      <p className="text-2xl font-bold text-primary">
+                      <motion.p
+                        key={cartTotal}
+                        initial={{ scale: 1.1 }}
+                        animate={{ scale: 1 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 20,
+                        }}
+                        className="text-2xl font-bold text-primary"
+                      >
                         {cartTotal} DEN
-                      </p>
+                      </motion.p>
                     </div>
                   </div>
                   <div className="flex gap-3">
@@ -3321,226 +3655,8 @@ export default function PublicMenu() {
                           </DialogTitle>
                         </DialogHeader>
                         <ScrollArea className="flex-1 pr-4">
-                          <>
-                            <div className="space-y-4">
-                              {/* Closed restaurant banner */}
-                              {!isOpen && (
-                                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-                                  <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                                  <div>
-                                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                                      {t.restaurantClosed}
-                                    </p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                                      {restaurant.openingTime} –{" "}
-                                      {restaurant.closingTime}
-                                    </p>
-                                    <p className="text-xs text-amber-600 dark:text-amber-500">
-                                      {t.scheduleForLater}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Name */}
-                              <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                                  {t.yourName} *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={customerName}
-                                  onChange={(e) =>
-                                    setCustomerName(e.target.value)
-                                  }
-                                  placeholder={t.enterYourName}
-                                  className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                                  required
-                                />
-                              </div>
-
-                              {/* Order type — disabled when restaurant is closed */}
-                              <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                                  {t.orderType} *
-                                </label>
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      orderType === "dineIn"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                    disabled={!isOpen}
-                                    onClick={() => setOrderType("dineIn")}
-                                  >
-                                    {t.dineIn}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      orderType === "takeaway"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                    disabled={!isOpen}
-                                    onClick={() => setOrderType("takeaway")}
-                                  >
-                                    {t.takeaway}
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {/* Delivery time */}
-                              <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                                  {t.deliveryTime}
-                                </label>
-                                <div className="flex gap-2">
-                                  {/* ASAP disabled when closed */}
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      deliveryTime === "asap"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-                                    disabled={!isOpen}
-                                    onClick={() => setDeliveryTime("asap")}
-                                  >
-                                    {t.asap}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant={
-                                      deliveryTime === "custom"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    className="flex-1 h-10 rounded-xl text-xs"
-                                    onClick={() => setDeliveryTime("custom")}
-                                  >
-                                    {t.customTime}
-                                  </Button>
-                                </div>
-
-                                {(deliveryTime === "custom" || !isOpen) && (
-                                  <div className="mt-2 space-y-1">
-                                    <input
-                                      type="datetime-local"
-                                      value={customDateTime}
-                                      onChange={(e) => {
-                                        const chosen = e.target.value; // "YYYY-MM-DDTHH:MM"
-                                        if (!chosen) {
-                                          setCustomDateTime("");
-                                          return;
-                                        }
-
-                                        const open = scheduling.openingTime; // "HH:MM"
-                                        const close = scheduling.closingTime; // "HH:MM"
-                                        const dateOnly = chosen.split("T")[0]; // "YYYY-MM-DD"
-                                        const timeOnly = chosen.split("T")[1]; // "HH:MM"
-
-                                        // Clamp to opening time if before
-                                        if (timeOnly < open) {
-                                          setCustomDateTime(
-                                            `${dateOnly}T${open}`,
-                                          );
-                                          return;
-                                        }
-                                        // Clamp to closing time if after
-                                        if (timeOnly > close) {
-                                          setCustomDateTime(
-                                            `${dateOnly}T${close}`,
-                                          );
-                                          return;
-                                        }
-                                        setCustomDateTime(chosen);
-                                      }}
-                                      min={scheduling.minDateTime}
-                                      className="w-full px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                                    />
-                                    {restaurant.openingTime &&
-                                      restaurant.closingTime && (
-                                        <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
-                                          ⏰ {restaurant.openingTime} –{" "}
-                                          {restaurant.closingTime}
-                                        </p>
-                                      )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Cart items */}
-                              <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
-                                <ScrollArea className="h-[140px] pr-1">
-                                  <div className="space-y-1">
-                                    {Object.entries(cart).map(([id, qty]) => {
-                                      const item = restaurant.menuItems.find(
-                                        (i) => i.id === parseInt(id),
-                                      );
-                                      if (!item) return null;
-                                      return (
-                                        <div
-                                          key={id}
-                                          className="flex justify-between items-center p-3 rounded-2xl bg-stone-50 dark:bg-stone-700"
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary">
-                                              {qty}x
-                                            </div>
-                                            <div>
-                                              <p className="font-bold dark:text-stone-100 text-sm">
-                                                {item.name}
-                                              </p>
-                                              <p className="text-xs text-stone-500 dark:text-stone-400">
-                                                {item.price}
-                                              </p>
-                                            </div>
-                                          </div>
-                                          <div className="flex gap-1">
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-8 w-8"
-                                              onClick={() =>
-                                                updateCart(item.id, -1)
-                                              }
-                                            >
-                                              <Minus className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              className="h-8 w-8"
-                                              onClick={() =>
-                                                updateCart(item.id, 1)
-                                              }
-                                            >
-                                              <Plus className="h-3 w-3 text-primary" />
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </ScrollArea>
-
-                                <div className="flex justify-between items-center p-2 pt-3 rounded-2xl">
-                                  <span className="text-base font-semibold dark:text-stone-100">
-                                    {t.totalBill}
-                                  </span>
-                                  <p className="text-xl font-bold text-primary">
-                                    {cartTotal} DEN
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </>
+                          {/* ✅ Shared form — no duplication */}
+                          <OrderFormContent {...sharedOrderFormProps} />
                         </ScrollArea>
                         <div className="pt-4 space-y-2.5 border-t border-stone-200 dark:border-stone-700">
                           <Button
