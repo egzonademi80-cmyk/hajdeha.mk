@@ -71,10 +71,40 @@ export const api = {
       max_tokens: z.number().optional(),
     }),
     responses: {
-      200: z.object({
-        text: z.string(),
-      }),
+      200: z.object({ text: z.string() }),
       500: errorSchemas.internal,
+    },
+  },
+
+  // === ANALYTICS ===
+  analytics: {
+    track: {
+      method: "POST" as const,
+      path: "/api/analytics/track",
+      input: z.object({
+        restaurantId: z.number(),
+      }),
+      responses: {
+        200: z.object({ ok: z.boolean() }),
+      },
+    },
+    get: {
+      method: "GET" as const,
+      path: "/api/analytics/:restaurantId",
+      responses: {
+        200: z.object({
+          total: z.number(),
+          today: z.number(),
+          last7Days: z.array(
+            z.object({
+              date: z.string(),
+              count: z.number(),
+            }),
+          ),
+          last30Days: z.number(),
+        }),
+        404: errorSchemas.notFound,
+      },
     },
   },
 
@@ -148,6 +178,7 @@ export const api = {
       },
     },
   },
+
   menuItems: {
     create: {
       method: "POST" as const,
@@ -178,6 +209,22 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    reorder: {
+      method: "POST" as const,
+      path: "/api/admin/menu-items/reorder",
+      input: z.object({
+        items: z.array(
+          z.object({
+            id: z.number(),
+            sortOrder: z.number(),
+          }),
+        ),
+      }),
+      responses: {
+        200: z.object({ ok: z.boolean() }),
+        403: errorSchemas.unauthorized,
+      },
+    },
   },
 };
 
@@ -201,3 +248,4 @@ export type LoginInput = z.infer<typeof api.auth.login.input>;
 export type RestaurantWithMenu = z.infer<
   (typeof api.restaurants.getBySlug.responses)[200]
 >;
+export type AnalyticsData = z.infer<(typeof api.analytics.get.responses)[200]>;

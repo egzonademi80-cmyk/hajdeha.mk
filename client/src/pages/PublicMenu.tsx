@@ -972,6 +972,12 @@ function OrderFormContent({
               <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
                 {t.restaurantClosed}
               </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                {openingTime} – {closingTime}
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500">
+                {t.scheduleForLater}
+              </p>
             </div>
           </motion.div>
         )}
@@ -997,7 +1003,7 @@ function OrderFormContent({
         <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
           {t.orderType} *
         </label>
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           {(["dineIn", "takeaway"] as const).map((type) => (
             <Button
               key={type}
@@ -1018,7 +1024,7 @@ function OrderFormContent({
         <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
           {t.deliveryTime}
         </label>
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           <Button
             type="button"
             variant={deliveryTime === "asap" ? "default" : "outline"}
@@ -1046,7 +1052,7 @@ function OrderFormContent({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-1 space-y-1">
+              <div className="mt-2 space-y-1">
                 <input
                   type="datetime-local"
                   value={customDateTime}
@@ -1074,6 +1080,11 @@ function OrderFormContent({
                   min={scheduling.minDateTime}
                   className="w-full px-4 py-2 text-base rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
+                {openingTime && closingTime && (
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
+                    ⏰ {openingTime} – {closingTime}
+                  </p>
+                )}
               </div>
             </motion.div>
           )}
@@ -1081,8 +1092,8 @@ function OrderFormContent({
       </div>
 
       {/* Cart items */}
-      <div className="pt-1 border-t border-stone-200 dark:border-stone-700 space-y-1">
-        <ScrollArea className="h-[125px] pr-1">
+      <div className="pt-2 border-t border-stone-200 dark:border-stone-700 space-y-1">
+        <ScrollArea className="h-[140px] pr-1">
           <div className="space-y-1">
             <AnimatePresence initial={false}>
               {Object.entries(cart).map(([id, qty]) => {
@@ -1108,7 +1119,7 @@ function OrderFormContent({
                           stiffness: 500,
                           damping: 22,
                         }}
-                        className="h-7 w-8 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary"
+                        className="h-10 w-10 rounded-xl bg-white dark:bg-stone-600 flex items-center justify-center font-bold text-primary"
                       >
                         {qty}x
                       </motion.div>
@@ -1146,8 +1157,8 @@ function OrderFormContent({
           </div>
         </ScrollArea>
 
-        <div className="flex justify-between items-center p-2 pt-2 pb-1 rounded-2xl text-primary">
-          <span className="text-base font-semibold dark:text-stone-100 ">
+        <div className="flex justify-between items-center p-2 pt-3 rounded-2xl">
+          <span className="text-base font-semibold dark:text-stone-100">
             {t.totalBill}
           </span>
           <motion.p
@@ -1347,7 +1358,7 @@ function AIRestaurantAssistant({
       send: "Dërgo",
       addToCart: "Shto",
       added: "U shtua!",
-      greeting: `Përshëndetje! Jam kamarieri tuaj AI për **${restaurantName}** 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
+      greeting: `Përshëndetje! Jam kamarierin tuaj AI për **${restaurantName}** 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
       errorMsg: "Na vjen keq, pati një problem. Ju lutemi provoni sërish!",
       poweredBy: "Mundësuar nga Claude AI",
     },
@@ -1724,6 +1735,9 @@ _(debug: ${errText})_`,
                 {t.aiAssistant}
               </DialogTitle>
             </div>
+            <span className="text-[9px] text-stone-400 dark:text-stone-500 font-medium tracking-wide">
+              {t.poweredBy}
+            </span>
           </div>
           <div className="mt-3 space-y-2">
             <div className="grid grid-cols-3 gap-1.5">
@@ -2123,6 +2137,7 @@ function DigitalReceipt({
                   className="rounded-xl"
                 />
               </div>
+              <p className="text-[9px] text-stone-300">{t.poweredBy}</p>
             </div>
             <div className="mt-5 -mx-6 h-4 relative overflow-hidden">
               <div className="absolute inset-x-0 bottom-0 flex">
@@ -2751,6 +2766,21 @@ export default function PublicMenu() {
     enabled: !!slug,
     staleTime: 10 * 60 * 1000,
   });
+
+  // ── Analytics: track page view once per session per restaurant ──
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    const key = `pv-tracked-${restaurant.id}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    fetch(api.analytics.track.path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restaurantId: restaurant.id }),
+    }).catch(() => {
+      /* silent fail */
+    });
+  }, [restaurant?.id]);
 
   const [cart, setCart] = useState<Record<number, number>>({});
   const [openOrderDialog, setOpenOrderDialog] = useState(false);

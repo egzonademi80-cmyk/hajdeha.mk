@@ -29,6 +29,11 @@ import {
   Upload,
   X,
   Link as LinkIcon,
+  TrendingUp,
+  Eye,
+  BarChart2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -54,8 +59,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import QRCode from "qrcode";
 import { useState, useRef, useEffect } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
-// Image Upload Component for Create Restaurant Dialog
+// ── Image Upload ──────────────────────────────────────────────────────────────
 function ImageUploadField({
   value,
   onChange,
@@ -68,7 +82,6 @@ function ImageUploadField({
   const [uploadMode, setUploadMode] = useState<"url" | "file">("url");
   const [preview, setPreview] = useState<string>(value);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     setPreview(value);
   }, [value]);
@@ -76,22 +89,19 @@ function ImageUploadField({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
       alert("Please select an image file");
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
       alert("Image size should be less than 5MB");
       return;
     }
-
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setPreview(base64String);
-      onChange(base64String);
+      const b = reader.result as string;
+      setPreview(b);
+      onChange(b);
     };
     reader.readAsDataURL(file);
   };
@@ -99,15 +109,12 @@ function ImageUploadField({
   const clearImage = () => {
     setPreview("");
     onChange("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
     <div className="grid gap-2.5">
       <Label className="text-sm font-medium">{label}</Label>
-
       <div className="flex gap-2 mb-2">
         <Button
           type="button"
@@ -130,7 +137,6 @@ function ImageUploadField({
           Upload
         </Button>
       </div>
-
       {uploadMode === "url" ? (
         <Input
           value={value}
@@ -156,13 +162,12 @@ function ImageUploadField({
               <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
               <p className="text-sm font-medium">Click to upload image</p>
               <p className="text-xs text-muted-foreground mt-1">
-                PNG, JPG, GIF up to 5MB
+                PNG, JPG up to 5MB
               </p>
             </div>
           </label>
         </div>
       )}
-
       {preview && (
         <div className="relative mt-2">
           <img
@@ -170,9 +175,7 @@ function ImageUploadField({
             alt="Preview"
             className="w-full h-48 object-cover rounded-lg border"
             onError={() => {
-              if (uploadMode === "url") {
-                setPreview("");
-              }
+              if (uploadMode === "url") setPreview("");
             }}
           />
           <Button
@@ -190,6 +193,111 @@ function ImageUploadField({
   );
 }
 
+// ── Analytics Panel (per restaurant) ─────────────────────────────────────────
+function AnalyticsPanel({ restaurantId }: { restaurantId: number }) {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: [`analytics-${restaurantId}`],
+    queryFn: async () => {
+      const res = await fetch(
+        buildUrl(api.analytics.get.path, {
+          restaurantId: String(restaurantId),
+        }),
+      );
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  if (isLoading)
+    return (
+      <div className="py-4 flex justify-center">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  if (!data) return null;
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en", { month: "short", day: "numeric" });
+  };
+
+  const chartData = (data.last7Days || []).map((d: any) => ({
+    date: formatDate(d.date),
+    views: d.count,
+  }));
+
+  return (
+    <div className="mt-4 pt-4 border-t border-border space-y-3">
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-muted/50 rounded-lg p-2 text-center">
+          <p className="text-lg font-bold text-foreground">{data.today ?? 0}</p>
+          <p className="text-xs text-muted-foreground">Today</p>
+        </div>
+        <div className="bg-muted/50 rounded-lg p-2 text-center">
+          <p className="text-lg font-bold text-foreground">
+            {data.last30Days ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground">30 days</p>
+        </div>
+        <div className="bg-muted/50 rounded-lg p-2 text-center">
+          <p className="text-lg font-bold text-foreground">{data.total ?? 0}</p>
+          <p className="text-xs text-muted-foreground">All time</p>
+        </div>
+      </div>
+
+      {/* 7-day chart */}
+      {chartData.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Last 7 days</p>
+          <ResponsiveContainer width="100%" height={80}>
+            <BarChart
+              data={chartData}
+              margin={{ top: 0, right: 0, left: -30, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="hsl(var(--border))"
+              />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "hsl(var(--background))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: 8,
+                  fontSize: 11,
+                }}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+                itemStyle={{ color: "hsl(var(--primary))" }}
+                formatter={(v: any) => [v, "Views"]}
+              />
+              <Bar
+                dataKey="views"
+                fill="hsl(var(--primary))"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={24}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Translations ──────────────────────────────────────────────────────────────
 const translations: Record<string, any> = {
   en: {
     loading: "Loading dashboard...",
@@ -223,20 +331,21 @@ const translations: Record<string, any> = {
     delete: "Delete",
     confirmDelete: "Are you sure you want to delete this restaurant?",
     qrTitle: "Restaurant QR Code",
-    qrDesc: "Customers can scan this code to view your digital menu instantly.",
     downloadQR: "Download QR Image",
     successCreate: "Restaurant created successfully",
     successDelete: "Restaurant removed successfully",
     errorQR: "Failed to generate QR code",
+    analytics: "Analytics",
+    viewAnalytics: "View Stats",
+    hideAnalytics: "Hide Stats",
   },
   al: {
-    loading: "Duke ngarkuar panelin...",
+    loading: "Duke ngarkuar...",
     admin: "Admin",
     logout: "Çkyçu",
     dashboard: "Paneli",
     yourRestaurants: "Restorantet Tuaja",
-    dashboardDesc:
-      "Menaxhoni të gjitha vendet, menutë dhe kodet QR tuaja nga një panel i centralizuar.",
+    dashboardDesc: "Menaxhoni të gjitha vendet, menutë dhe kodet QR tuaja.",
     addRestaurant: "Shto Restorant",
     createNew: "Krijo Restorant të Ri",
     name: "Emri i Restorantit",
@@ -250,81 +359,91 @@ const translations: Record<string, any> = {
     description: "Përshkrimi",
     creating: "Duke u krijuar...",
     create: "Krijo Restorant",
-    statsTotal: "Totali i Restoranteve",
-    statsStatus: "Statusi i Sistemit",
-    statsQR: "Kodet QR Gati",
-    statsAccess: "Qasja në Menu",
+    statsTotal: "Totali",
+    statsStatus: "Statusi",
+    statsQR: "Kode QR",
+    statsAccess: "Qasja",
     noDesc: "Nuk ka përshkrim",
     manageMenu: "Menaxho Menunë",
-    viewPublic: "Shiko Menunë Publike",
-    getQR: "Merr Kodin QR",
+    getQR: "Merr QR",
     delete: "Fshij",
-    confirmDelete: "A jeni të sigurt që dëshironi ta fshini këtë restorant?",
-    qrTitle: "Kodi QR i Restorantit",
-    qrDesc:
-      "Klientët mund ta skanojnë këtë kod për të parë menunë tuaj dixhitale menjëherë.",
-    downloadQR: "Shkarko Kodin QR",
-    successCreate: "Restoranti u krijua me sukses",
-    successDelete: "Restoranti u hoq me sukses",
-    errorQR: "Dështoi gjenerimi i kodit QR",
+    confirmDelete: "A jeni të sigurt?",
+    qrTitle: "Kodi QR",
+    downloadQR: "Shkarko QR",
+    successCreate: "U krijua me sukses",
+    successDelete: "U hoq me sukses",
+    errorQR: "Dështoi QR",
+    analytics: "Analitikë",
+    viewAnalytics: "Shiko Statistikat",
+    hideAnalytics: "Fshih Statistikat",
   },
   mk: {
-    loading: "Се вчитува таблата...",
+    loading: "Се вчитува...",
     admin: "Админ",
     logout: "Одјава",
-    dashboard: "Контролна табла",
+    dashboard: "Табла",
     yourRestaurants: "Ваши ресторани",
-    dashboardDesc:
-      "Управувајте со сите ваши локации, менија и QR кодови од една централизирана табла.",
+    dashboardDesc: "Управувајте со сите локации, менија и QR кодови.",
     addRestaurant: "Додај ресторан",
-    createNew: "Креирај нов ресторан",
-    name: "Име на ресторан",
+    createNew: "Нов ресторан",
+    name: "Ime",
     slug: "URL слаг",
     address: "Адреса",
-    coverPhoto: "Насловна фотографија",
-    latitude: "Географска ширина",
-    longitude: "Географска должина",
-    opensAt: "Се отвора во",
-    closesAt: "Се затвора во",
+    coverPhoto: "Насловна фото",
+    latitude: "Ширина",
+    longitude: "Должина",
+    opensAt: "Отвора",
+    closesAt: "Затвора",
     description: "Опис",
     creating: "Се креира...",
-    create: "Креирај ресторан",
-    statsTotal: "Вкупно ресторани",
-    statsStatus: "Статус на систем",
-    statsQR: "QR кодови подготвени",
-    statsAccess: "Пристап до мени",
+    create: "Креирај",
+    statsTotal: "Вкупно",
+    statsStatus: "Статус",
+    statsQR: "QR кодови",
+    statsAccess: "Пристап",
     noDesc: "Нема опис",
-    manageMenu: "Управувај со мени",
-    viewPublic: "Види јавно мени",
-    getQR: "Земи QR код",
+    manageMenu: "Управувај",
+    getQR: "QR код",
     delete: "Избриши",
-    confirmDelete:
-      "Дали сте сигурни дека сакате да го избришете овој ресторан?",
-    qrTitle: "QR код на ресторанот",
-    qrDesc:
-      "Клиентите можат да го скенираат овој код за веднаш да го видат вашето дигитално мени.",
-    downloadQR: "Преземи QR слика",
-    successCreate: "Ресторанот е успешно креиран",
-    successDelete: "Ресторанот е успешно отстранет",
-    errorQR: "Неуспешно генерирање на QR код",
+    confirmDelete: "Сигурни?",
+    qrTitle: "QR код",
+    downloadQR: "Преземи QR",
+    successCreate: "Креиран",
+    successDelete: "Избришан",
+    errorQR: "Неуспешно",
+    analytics: "Аналитика",
+    viewAnalytics: "Статистики",
+    hideAnalytics: "Скриј",
   },
 };
 
+// ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const [lang] = useState<"en" | "al" | "mk">(() => {
-    const saved = localStorage.getItem("hajdeha-lang");
-    return (saved as any) || "en";
-  });
+  const [lang] = useState<"en" | "al" | "mk">(
+    () => (localStorage.getItem("hajdeha-lang") as any) || "en",
+  );
   const t = translations[lang];
-
   const { data: user } = useUser();
   const logoutMutation = useLogout();
   const { toast } = useToast();
-
-  const isAdmin = user?.role === "admin";
   const [qrData, setQrData] = useState<string | null>(null);
   const [activeRestaurant, setActiveRestaurant] = useState<any>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [expandedAnalytics, setExpandedAnalytics] = useState<Set<number>>(
+    new Set(),
+  );
+
+  const toggleAnalytics = (id: number) => {
+    setExpandedAnalytics((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const generateQR = async (restaurant: any) => {
     try {
@@ -332,18 +451,12 @@ export default function AdminDashboard() {
       const qrImage = await QRCode.toDataURL(url, {
         width: 1024,
         margin: 2,
-        color: {
-          dark: "#000000",
-          light: "#ffffff",
-        },
+        color: { dark: "#000000", light: "#ffffff" },
       });
       setQrData(qrImage);
       setActiveRestaurant(restaurant);
     } catch (err) {
-      toast({
-        title: t.errorQR,
-        variant: "destructive",
-      });
+      toast({ title: t.errorQR, variant: "destructive" });
     }
   };
 
@@ -368,9 +481,7 @@ export default function AdminDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.restaurants.list.path] });
-      toast({
-        title: t.successCreate,
-      });
+      toast({ title: t.successCreate });
       setIsCreateOpen(false);
       form.reset();
     },
@@ -389,9 +500,7 @@ export default function AdminDashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.restaurants.list.path] });
-      toast({
-        title: t.successDelete,
-      });
+      toast({ title: t.successDelete });
     },
     onError: (error: Error) => {
       toast({
@@ -425,7 +534,7 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
@@ -452,7 +561,7 @@ export default function AdminDashboard() {
                 <Store className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <span className="font-bold text-lg tracking-tight">
+                <span className="font-bold text-lg tracking-tight text-foreground">
                   Hajde Ha
                 </span>
                 <span className="hidden sm:inline text-xs text-muted-foreground ml-2 px-2 py-0.5 bg-muted rounded-full">
@@ -506,8 +615,10 @@ export default function AdminDashboard() {
                 {t.addRestaurant}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-              <DialogTitle className="text-xl">{t.createNew}</DialogTitle>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto bg-background border-border">
+              <DialogTitle className="text-xl text-foreground">
+                {t.createNew}
+              </DialogTitle>
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
@@ -518,9 +629,7 @@ export default function AdminDashboard() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          {t.name}
-                        </FormLabel>
+                        <FormLabel>{t.name}</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="e.g. Hajde Grill"
@@ -537,9 +646,7 @@ export default function AdminDashboard() {
                     name="slug"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          {t.slug}
-                        </FormLabel>
+                        <FormLabel>{t.slug}</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="e.g. hajde-grill"
@@ -556,9 +663,7 @@ export default function AdminDashboard() {
                     name="location"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          {t.address}
-                        </FormLabel>
+                        <FormLabel>{t.address}</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Enter full address..."
@@ -592,9 +697,7 @@ export default function AdminDashboard() {
                       name="latitude"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            {t.latitude}
-                          </FormLabel>
+                          <FormLabel>{t.latitude}</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="e.g. 42.01"
@@ -611,9 +714,7 @@ export default function AdminDashboard() {
                       name="longitude"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            {t.longitude}
-                          </FormLabel>
+                          <FormLabel>{t.longitude}</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="e.g. 20.97"
@@ -632,9 +733,7 @@ export default function AdminDashboard() {
                       name="openingTime"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            {t.opensAt}
-                          </FormLabel>
+                          <FormLabel>{t.opensAt}</FormLabel>
                           <FormControl>
                             <Input type="time" className="h-11" {...field} />
                           </FormControl>
@@ -647,9 +746,7 @@ export default function AdminDashboard() {
                       name="closingTime"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">
-                            {t.closesAt}
-                          </FormLabel>
+                          <FormLabel>{t.closesAt}</FormLabel>
                           <FormControl>
                             <Input type="time" className="h-11" {...field} />
                           </FormControl>
@@ -663,9 +760,7 @@ export default function AdminDashboard() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">
-                          {t.description}
-                        </FormLabel>
+                        <FormLabel>{t.description}</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Tell customers about your restaurant..."
@@ -677,10 +772,10 @@ export default function AdminDashboard() {
                       </FormItem>
                     )}
                   />
-                  <div className="pt-4 border-t">
+                  <div className="pt-4 border-t border-border">
                     <Button
                       type="submit"
-                      className="w-full h-11 text-base font-medium shadow-lg hover-elevate transition-all"
+                      className="w-full h-11 text-base font-medium"
                       disabled={createMutation.isPending}
                     >
                       {createMutation.isPending ? (
@@ -705,20 +800,26 @@ export default function AdminDashboard() {
         {/* Stats Bar */}
         {restaurants && restaurants.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-            <div className="bg-background border rounded-xl p-4">
-              <p className="text-2xl font-bold">{restaurants.length}</p>
+            <div className="bg-background border border-border rounded-xl p-4">
+              <p className="text-2xl font-bold text-foreground">
+                {restaurants.length}
+              </p>
               <p className="text-sm text-muted-foreground">{t.statsTotal}</p>
             </div>
-            <div className="bg-background border rounded-xl p-4">
-              <p className="text-2xl font-bold text-green-600">Active</p>
+            <div className="bg-background border border-border rounded-xl p-4">
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                Active
+              </p>
               <p className="text-sm text-muted-foreground">{t.statsStatus}</p>
             </div>
-            <div className="bg-background border rounded-xl p-4 hidden sm:block">
-              <p className="text-2xl font-bold">{restaurants.length}</p>
+            <div className="bg-background border border-border rounded-xl p-4 hidden sm:block">
+              <p className="text-2xl font-bold text-foreground">
+                {restaurants.length}
+              </p>
               <p className="text-sm text-muted-foreground">{t.statsQR}</p>
             </div>
-            <div className="bg-background border rounded-xl p-4 hidden sm:block">
-              <p className="text-2xl font-bold">24/7</p>
+            <div className="bg-background border border-border rounded-xl p-4 hidden sm:block">
+              <p className="text-2xl font-bold text-foreground">24/7</p>
               <p className="text-sm text-muted-foreground">{t.statsAccess}</p>
             </div>
           </div>
@@ -729,9 +830,8 @@ export default function AdminDashboard() {
           {restaurants?.map((restaurant) => (
             <Card
               key={restaurant.id}
-              className="group relative overflow-hidden border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 bg-transparent"
+              className="group relative overflow-hidden border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 bg-transparent"
             >
-              {/* Blurry Background Image */}
               {restaurant.photoUrl ? (
                 <>
                   <div
@@ -743,22 +843,19 @@ export default function AdminDashboard() {
                       filter: "blur(16px)",
                     }}
                   />
-                  {/* Dark overlay for readability */}
                   <div className="absolute inset-0 bg-background/70" />
                 </>
               ) : (
                 <div className="absolute inset-0 bg-card" />
               )}
 
-              {/* Content container */}
               <div className="relative z-10">
-                {/* Accent Line */}
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-primary to-primary/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-xl font-semibold truncate group-hover:text-primary transition-colors">
+                      <CardTitle className="text-xl font-semibold truncate group-hover:text-primary transition-colors text-foreground">
                         {restaurant.name}
                       </CardTitle>
                       <CardDescription className="mt-2 line-clamp-2 text-sm">
@@ -784,22 +881,24 @@ export default function AdminDashboard() {
                             <QrCode className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[400px]">
-                          <DialogHeader className="pb-4 border-b">
-                            <DialogTitle>{t.qrTitle}</DialogTitle>
+                        <DialogContent className="sm:max-w-[400px] bg-background border-border">
+                          <DialogHeader className="pb-4 border-b border-border">
+                            <DialogTitle className="text-foreground">
+                              {t.qrTitle}
+                            </DialogTitle>
                           </DialogHeader>
                           <div className="flex flex-col items-center justify-center space-y-6 py-6">
                             {qrData ? (
                               <>
                                 <div className="bg-white p-6 rounded-2xl shadow-inner border">
                                   <img
-                                    src={qrData || "/placeholder.svg"}
+                                    src={qrData}
                                     alt="QR Code"
                                     className="w-64 h-64"
                                   />
                                 </div>
                                 <div className="text-center space-y-1">
-                                  <p className="font-medium">
+                                  <p className="font-medium text-foreground">
                                     {restaurant.name}
                                   </p>
                                   <p className="text-sm text-muted-foreground font-mono">
@@ -839,9 +938,8 @@ export default function AdminDashboard() {
                         size="icon"
                         className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                         onClick={() => {
-                          if (confirm(t.confirmDelete)) {
+                          if (confirm(t.confirmDelete))
                             deleteMutation.mutate(restaurant.id);
-                          }
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -851,8 +949,7 @@ export default function AdminDashboard() {
                 </CardHeader>
 
                 <CardContent className="pt-0">
-                  {/* Info Pills */}
-                  <div className="flex flex-wrap gap-2 mb-5">
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {restaurant.location && (
                       <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-muted/50 rounded-full text-xs text-muted-foreground">
                         <MapPin className="h-3 w-3" />
@@ -871,19 +968,39 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  {/* Action Button */}
-                  <Link
-                    href={`/admin/restaurant/${restaurant.id}`}
-                    className="block"
-                  >
-                    <Button
-                      className="w-full h-11 font-medium transition-all duration-300 group-hover:bg-primary group-hover:text-primary-foreground bg-transparent"
-                      variant="outline"
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/admin/restaurant/${restaurant.id}`}
+                      className="flex-1"
                     >
-                      {t.manageMenu}
-                      <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      <Button
+                        className="w-full h-10 font-medium transition-all duration-300 group-hover:bg-primary group-hover:text-primary-foreground bg-transparent"
+                        variant="outline"
+                      >
+                        {t.manageMenu}
+                        <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 px-3 text-muted-foreground hover:text-primary"
+                      onClick={() => toggleAnalytics(restaurant.id)}
+                    >
+                      <BarChart2 className="h-4 w-4 mr-1" />
+                      {expandedAnalytics.has(restaurant.id) ? (
+                        <ChevronUp className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
                     </Button>
-                  </Link>
+                  </div>
+
+                  {/* Analytics panel — expandable */}
+                  {expandedAnalytics.has(restaurant.id) && (
+                    <AnalyticsPanel restaurantId={restaurant.id} />
+                  )}
                 </CardContent>
               </div>
             </Card>
@@ -893,7 +1010,7 @@ export default function AdminDashboard() {
         {/* Empty State */}
         {restaurants?.length === 0 && (
           <div className="col-span-full">
-            <div className="py-20 text-center border-2 border-dashed rounded-2xl bg-muted/20">
+            <div className="py-20 text-center border-2 border-dashed border-border rounded-2xl bg-muted/20">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/50 mb-6">
                 <Store className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -917,8 +1034,7 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t mt-16">
+      <footer className="border-t border-border mt-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
             <p>RestaurantOS Admin Dashboard</p>

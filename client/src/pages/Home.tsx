@@ -510,7 +510,7 @@ export default function Home() {
 
             {/* Search Bar */}
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground color-primary" />
               <Input
                 placeholder={t.searchPlaceholder}
                 className="pl-12 h-14 bg-white dark:bg-stone-800 text-foreground dark:text-stone-100 rounded-2xl border-0 shadow-2xl focus-visible:ring-2 focus-visible:ring-white/50 dark:focus-visible:ring-primary text-base"

@@ -89,12 +89,8 @@ export async function registerRoutes(
 
       if (!anthropicRes.ok) {
         const err = await anthropicRes.text();
-        console.error("Anthropic API error:", anthropicRes.status, err);
-        return res
-          .status(200)
-          .json({
-            text: `DEBUG: ${anthropicRes.status} - ${err.slice(0, 200)}`,
-          });
+        console.error("Anthropic API error:", err);
+        return res.status(500).json({ message: "AI service error" });
       }
 
       const data = await anthropicRes.json();
