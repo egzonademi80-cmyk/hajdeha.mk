@@ -34,8 +34,6 @@ import {
   BarChart2,
   ChevronDown,
   ChevronUp,
-  Bell,
-  BellOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -434,9 +432,6 @@ export default function AdminDashboard() {
   const [expandedAnalytics, setExpandedAnalytics] = useState<Set<number>>(
     new Set(),
   );
-  const [pushEnabled, setPushEnabled] = useState<Record<number, boolean>>({});
-  const [pushLoading, setPushLoading] = useState<Record<number, boolean>>({});
-
   const toggleAnalytics = (id: number) => {
     setExpandedAnalytics((prev) => {
       const next = new Set(prev);
@@ -448,68 +443,6 @@ export default function AdminDashboard() {
       return next;
     });
   };
-
-  const enablePushNotifications = async (restaurantId: number) => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      toast({
-        title: "Push notifications nuk mbështeten në këtë browser",
-        variant: "destructive",
-      });
-      return;
-    }
-    setPushLoading((p) => ({ ...p, [restaurantId]: true }));
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        toast({
-          title: "Lejo notifications nga browser-i",
-          variant: "destructive",
-        });
-        return;
-      }
-      // Get VAPID public key
-      const { key } = await fetch("/api/push/vapid-public-key").then((r) =>
-        r.json(),
-      );
-      if (!key) {
-        toast({
-          title: "VAPID key mungon — shto VAPID_PUBLIC_KEY në environment",
-          variant: "destructive",
-        });
-        return;
-      }
-      const sw = await navigator.serviceWorker.ready;
-      const sub = await sw.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
-      });
-      await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restaurantId, subscription: sub.toJSON() }),
-      });
-      setPushEnabled((p) => ({ ...p, [restaurantId]: true }));
-      toast({
-        title: "✅ Notifications u aktivizuan!",
-        description: "Do të njoftoheni kur vjen porosi e re.",
-      });
-    } catch (e) {
-      console.error(e);
-      toast({ title: "Gabim gjatë aktivizimit", variant: "destructive" });
-    } finally {
-      setPushLoading((p) => ({ ...p, [restaurantId]: false }));
-    }
-  };
-
-  // Convert VAPID key from base64 to Uint8Array
-  function urlBase64ToUint8Array(base64String: string) {
-    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding)
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
-    const rawData = window.atob(base64);
-    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
-  }
 
   const generateQR = async (restaurant: any) => {
     try {
@@ -1059,28 +992,6 @@ export default function AdminDashboard() {
                         <ChevronUp className="h-3 w-3" />
                       ) : (
                         <ChevronDown className="h-3 w-3" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={`h-10 px-3 ${pushEnabled[restaurant.id] ? "text-green-600 border-green-400" : "text-muted-foreground hover:text-primary"}`}
-                      onClick={() => enablePushNotifications(restaurant.id)}
-                      disabled={
-                        pushLoading[restaurant.id] || pushEnabled[restaurant.id]
-                      }
-                      title={
-                        pushEnabled[restaurant.id]
-                          ? "Notifications aktive"
-                          : "Aktivizo notifications"
-                      }
-                    >
-                      {pushLoading[restaurant.id] ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : pushEnabled[restaurant.id] ? (
-                        <Bell className="h-4 w-4" />
-                      ) : (
-                        <BellOff className="h-4 w-4" />
                       )}
                     </Button>
                   </div>

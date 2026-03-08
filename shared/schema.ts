@@ -80,44 +80,6 @@ export const menuItems = pgTable(
   },
 );
 
-// ── Push notification subscriptions ──
-export const pushSubscriptions = pgTable(
-  "push_subscriptions",
-  {
-    id: serial("id").primaryKey(),
-    restaurantId: integer("restaurant_id")
-      .notNull()
-      .references(() => restaurants.id, { onDelete: "cascade" }),
-    endpoint: text("endpoint").notNull().unique(),
-    p256dh: text("p256dh").notNull(),
-    auth: text("auth").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    restaurantIdIdx: index("ps_restaurant_id_idx").on(table.restaurantId),
-  }),
-);
-
-// ── NEW: page views analytics ──
-export const pageViews = pgTable(
-  "page_views",
-  {
-    id: serial("id").primaryKey(),
-    restaurantId: integer("restaurant_id")
-      .notNull()
-      .references(() => restaurants.id, { onDelete: "cascade" }),
-    viewedAt: timestamp("viewed_at").defaultNow().notNull(),
-    // optional: store date string "2026-03-07" for easy daily grouping
-    dateStr: text("date_str").notNull(),
-  },
-  (table) => {
-    return {
-      restaurantIdIdx: index("pv_restaurant_id_idx").on(table.restaurantId),
-      dateIdx: index("pv_date_idx").on(table.dateStr),
-    };
-  },
-);
-
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   restaurants: many(restaurants),
@@ -130,7 +92,6 @@ export const restaurantsRelations = relations(restaurants, ({ one, many }) => ({
   }),
   menuItems: many(menuItems),
   pageViews: many(pageViews),
-  pushSubscriptions: many(pushSubscriptions),
 }));
 
 export const menuItemsRelations = relations(menuItems, ({ one }) => ({
@@ -168,16 +129,6 @@ export const insertMenuItemSchema = createInsertSchema(menuItems, {
   sortOrder: z.number().optional(),
 }).omit({ id: true });
 
-export const pushSubscriptionsRelations = relations(
-  pushSubscriptions,
-  ({ one }) => ({
-    restaurant: one(restaurants, {
-      fields: [pushSubscriptions.restaurantId],
-      references: [restaurants.id],
-    }),
-  }),
-);
-
 export const insertPageViewSchema = createInsertSchema(pageViews).omit({
   id: true,
 });
@@ -191,4 +142,3 @@ export type MenuItem = typeof menuItems.$inferSelect;
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type PageView = typeof pageViews.$inferSelect;
 export type InsertPageView = z.infer<typeof insertPageViewSchema>;
-export type PushSubscription = typeof pushSubscriptions.$inferSelect;

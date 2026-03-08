@@ -3031,17 +3031,6 @@ export default function PublicMenu() {
       "_blank",
     );
 
-    // Push notification to restaurant admin (silent fail)
-    fetch("/api/push/notify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        restaurantId: restaurant.id,
-        title: `🛒 Porosi e re — ${restaurant.name}`,
-        body: `${customerName} • ${total} DEN • ${Object.values(cart).reduce((a: number, b) => a + (b as number), 0)} artikuj`,
-      }),
-    }).catch(() => {});
-
     setReceiptData({
       orderId: Math.random().toString(36).substring(2, 8).toUpperCase(),
       customerName,
