@@ -1012,7 +1012,7 @@ function OrderFormContent({
               type="button"
               variant={orderType === type ? "default" : "outline"}
               className="flex-1 h-10 rounded-xl text-xs disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={!isOpen}
+              disabled={!isOpen && !customDateTime}
               onClick={() => setOrderType(type)}
             >
               {t[type]}
@@ -1275,9 +1275,9 @@ function buildSystemPrompt({
     .join("\n\n");
 
   const langInstructions: Record<string, string> = {
-    en: "Always reply in English.",
-    al: "Gjithmonë përgjigju në shqip.",
-    mk: "Секогаш одговарај на македонски.",
+    en: "Detect the language the user writes in and ALWAYS reply in that same language. If they write in Albanian, reply in Albanian. If they write in Macedonian, reply in Macedonian. If they write in English, reply in English. Default to English if unsure.",
+    al: "Detekto gjuhën që përdoruesi shkruan dhe GJITHMONË përgjigju në të njëjtën gjuhë. Nëse shkruajnë shqip, përgjigju shqip. Nëse shkruajnë maqedonisht, përgjigju maqedonisht. Nëse shkruajnë anglisht, përgjigju anglisht. Parazgjedhja është shqipja.",
+    mk: "Детектирај го јазикот на кој пишува корисникот и СЕКОГАШ одговарај на истиот јазик. Ако пишуваат македонски, одговори македонски. Ако пишуваат албански, одговори албански. Ако пишуваат англиски, одговори англиски. Стандардно е македонски.",
   };
 
   return `You are a friendly, knowledgeable AI waiter assistant for "${restaurantName}".
@@ -1349,9 +1349,8 @@ function AIRestaurantAssistant({
       send: "Send",
       addToCart: "Add",
       added: "Added!",
-      greeting: `Hi! I'm your AI waiter for **${restaurantName}** 👋\n\nAsk me anything — I know the full menu, can suggest dishes for your mood, diet, or budget, and I'm watching your cart in real time!`,
+      greeting: `Hi! I'm your AI waiter for ${restaurantName} 👋\n\nAsk me anything — I know the full menu, can suggest dishes for your mood, diet, or budget, and I'm watching your cart in real time!`,
       errorMsg: "Sorry, I had a connection issue. Please try again!",
-      poweredBy: "Powered by Claude AI",
     },
     al: {
       aiAssistant: "Kamarieri AI",
@@ -1360,9 +1359,8 @@ function AIRestaurantAssistant({
       send: "Dërgo",
       addToCart: "Shto",
       added: "U shtua!",
-      greeting: `Përshëndetje! Jam kamarierin tuaj AI për **${restaurantName}** 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
+      greeting: `Përshëndetje! Jam kamarieri juaj AI për ${restaurantName} 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
       errorMsg: "Na vjen keq, pati një problem. Ju lutemi provoni sërish!",
-      poweredBy: "Mundësuar nga Claude AI",
     },
     mk: {
       aiAssistant: "AI Келнер",
@@ -1371,9 +1369,8 @@ function AIRestaurantAssistant({
       send: "Испрати",
       addToCart: "Додај",
       added: "Додадено!",
-      greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
+      greeting: `Здраво! Јас сум вашиот AI келнер за ${restaurantName} 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
       errorMsg: "Се извинуваме, имаше проблем. Обидете се повторно!",
-      poweredBy: "Овозможено од Claude AI",
     },
   };
 
@@ -1743,9 +1740,6 @@ _(debug: ${errText})_`,
                 {t.aiAssistant}
               </DialogTitle>
             </div>
-            <span className="text-[9px] text-stone-400 dark:text-stone-500 font-medium tracking-wide">
-              {t.poweredBy}
-            </span>
           </div>
           <div className="mt-2 space-y-1.5">
             <div className="grid grid-cols-3 gap-1">
