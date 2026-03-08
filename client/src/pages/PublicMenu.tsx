@@ -974,12 +974,7 @@ function OrderFormContent({
               <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
                 {t.restaurantClosed}
               </p>
-              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
-                {openingTime} – {closingTime}
-              </p>
-              <p className="text-xs text-amber-600 dark:text-amber-500">
-                {t.scheduleForLater}
-              </p>
+
             </div>
           </motion.div>
         )}
@@ -1082,11 +1077,7 @@ function OrderFormContent({
                   min={scheduling.minDateTime}
                   className="w-full px-4 py-2 text-base rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-                {openingTime && closingTime && (
-                  <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
-                    ⏰ {openingTime} – {closingTime}
-                  </p>
-                )}
+
               </div>
             </motion.div>
           )}
