@@ -80,6 +80,24 @@ export const menuItems = pgTable(
   },
 );
 
+// ── Push notification subscriptions ──
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    restaurantId: integer("restaurant_id")
+      .notNull()
+      .references(() => restaurants.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    restaurantIdIdx: index("ps_restaurant_id_idx").on(table.restaurantId),
+  }),
+);
+
 // ── NEW: page views analytics ──
 export const pageViews = pgTable(
   "page_views",
@@ -112,6 +130,7 @@ export const restaurantsRelations = relations(restaurants, ({ one, many }) => ({
   }),
   menuItems: many(menuItems),
   pageViews: many(pageViews),
+  pushSubscriptions: many(pushSubscriptions),
 }));
 
 export const menuItemsRelations = relations(menuItems, ({ one }) => ({
@@ -149,6 +168,16 @@ export const insertMenuItemSchema = createInsertSchema(menuItems, {
   sortOrder: z.number().optional(),
 }).omit({ id: true });
 
+export const pushSubscriptionsRelations = relations(
+  pushSubscriptions,
+  ({ one }) => ({
+    restaurant: one(restaurants, {
+      fields: [pushSubscriptions.restaurantId],
+      references: [restaurants.id],
+    }),
+  }),
+);
+
 export const insertPageViewSchema = createInsertSchema(pageViews).omit({
   id: true,
 });
@@ -162,3 +191,4 @@ export type MenuItem = typeof menuItems.$inferSelect;
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type PageView = typeof pageViews.$inferSelect;
 export type InsertPageView = z.infer<typeof insertPageViewSchema>;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;

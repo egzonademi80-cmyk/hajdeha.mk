@@ -5,12 +5,14 @@ import { setupAuth } from "./auth.js";
 import { api } from "../shared/routes.js";
 import { z } from "zod";
 import passport from "passport";
+import webpush from "web-push";
 
 import { db } from "./db.js";
 import {
   restaurants as restaurantsTable,
   menuItems as menuItemsTable,
   pageViews,
+  pushSubscriptions,
 } from "../shared/schema.js";
 import { eq, sql, gte, and } from "drizzle-orm";
 
@@ -86,9 +88,11 @@ export async function registerRoutes(
       if (!anthropicRes.ok) {
         const err = await anthropicRes.text();
         console.error("Anthropic API error:", anthropicRes.status, err);
-        return res.status(200).json({
-          text: `DEBUG: ${anthropicRes.status} - ${err.slice(0, 200)}`,
-        });
+        return res
+          .status(200)
+          .json({
+            text: `DEBUG: ${anthropicRes.status} - ${err.slice(0, 200)}`,
+          });
       }
       const data = await anthropicRes.json();
       const text: string =
@@ -299,6 +303,109 @@ export async function registerRoutes(
     if (!item) return res.status(404).json({ message: "Item not found" });
     await storage.deleteMenuItem(id);
     res.sendStatus(204);
+  });
+
+  // === PUSH NOTIFICATION ROUTES ===
+
+  // Setup VAPID keys (generate once: npx web-push generate-vapid-keys)
+  const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || "";
+  const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
+  if (VAPID_PUBLIC && VAPID_PRIVATE) {
+    webpush.setVapidDetails(
+      "mailto:admin@hajdeha.com",
+      VAPID_PUBLIC,
+      VAPID_PRIVATE,
+    );
+  }
+
+  // GET VAPID public key (needed by frontend to subscribe)
+  app.get("/api/push/vapid-public-key", (_req, res) => {
+    res.json({ key: VAPID_PUBLIC });
+  });
+
+  // POST /api/push/subscribe — admin saves their push subscription
+  app.post("/api/push/subscribe", async (req, res) => {
+    try {
+      const { restaurantId, subscription } = req.body;
+      if (!restaurantId || !subscription?.endpoint) {
+        return res.status(400).json({ message: "Missing data" });
+      }
+      // Upsert — replace if endpoint already exists
+      await db
+        .insert(pushSubscriptions)
+        .values({
+          restaurantId,
+          endpoint: subscription.endpoint,
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        })
+        .onConflictDoUpdate({
+          target: pushSubscriptions.endpoint,
+          set: {
+            p256dh: subscription.keys.p256dh,
+            auth: subscription.keys.auth,
+            restaurantId,
+          },
+        });
+      res.json({ ok: true });
+    } catch (e) {
+      console.error("Push subscribe error:", e);
+      res.status(500).json({ message: "Failed to save subscription" });
+    }
+  });
+
+  // POST /api/push/notify — called when a new order is placed
+  app.post("/api/push/notify", async (req, res) => {
+    try {
+      const { restaurantId, title, body } = req.body;
+      if (!restaurantId)
+        return res.status(400).json({ message: "Missing restaurantId" });
+
+      const subs = await db
+        .select()
+        .from(pushSubscriptions)
+        .where(eq(pushSubscriptions.restaurantId, restaurantId));
+
+      if (subs.length === 0) return res.json({ sent: 0 });
+
+      const payload = JSON.stringify({ title, body });
+      let sent = 0;
+      const failed: number[] = [];
+
+      await Promise.all(
+        subs.map(async (sub) => {
+          try {
+            await webpush.sendNotification(
+              {
+                endpoint: sub.endpoint,
+                keys: { p256dh: sub.p256dh, auth: sub.auth },
+              },
+              payload,
+            );
+            sent++;
+          } catch (e: any) {
+            // 410 Gone = subscription expired, remove it
+            if (e.statusCode === 410) {
+              failed.push(sub.id);
+            }
+          }
+        }),
+      );
+
+      // Clean up expired subscriptions
+      if (failed.length > 0) {
+        await Promise.all(
+          failed.map((id) =>
+            db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, id)),
+          ),
+        );
+      }
+
+      res.json({ sent });
+    } catch (e) {
+      console.error("Push notify error:", e);
+      res.status(500).json({ message: "Failed to send notification" });
+    }
   });
 
   // === SEED DATA ===

@@ -250,6 +250,8 @@ const translations: Record<string, any> = {
 };
 
 const leafletStyles = `
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .leaflet-container {
     width: 100%;
     height: 100%;
@@ -1712,7 +1714,7 @@ _(debug: ${errText})_`,
           }
           transition={{ type: "spring", stiffness: 340, damping: 26 }}
           style={{ pointerEvents: showButton ? "auto" : "none" }}
-          className="fixed bottom-[120px] right-4 sm:right-6 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-2xl z-40 bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center"
+          className="fixed bottom-[140px] right-4 sm:right-6 h-12 w-12 sm:h-14 sm:w-14 rounded-full shadow-2xl z-40 bg-gradient-to-r from-primary to-primary/80 flex items-center justify-center"
         >
           <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
           <motion.span
@@ -1724,14 +1726,20 @@ _(debug: ${errText})_`,
           </motion.span>
         </motion.button>
       </DialogTrigger>
-      <DialogContent className="w-[calc(100vw-16px)] max-w-md h-[85dvh] sm:h-[80vh] mx-auto flex flex-col p-0 gap-0 bg-gradient-to-b from-white to-stone-50 dark:from-stone-900 dark:to-stone-950 rounded-2xl">
-        <DialogHeader className="p-4 pb-3 border-b dark:border-stone-700 flex-shrink-0">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
+      <DialogContent
+        className="w-[calc(100vw-16px)] max-w-md h-[92dvh] sm:h-[80vh] mx-auto flex flex-col p-0 gap-0 bg-gradient-to-b from-white to-stone-50 dark:from-stone-900 dark:to-stone-950 rounded-2xl [&>button]:top-3 [&>button]:right-3"
+        style={{
+          maxHeight:
+            "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px)",
+        }}
+      >
+        <DialogHeader className="p-3 pb-2 border-b dark:border-stone-700 flex-shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
                 <Bot className="h-4 w-4 text-white" />
               </div>
-              <DialogTitle className="text-base sm:text-lg dark:text-stone-100">
+              <DialogTitle className="text-sm sm:text-base dark:text-stone-100">
                 {t.aiAssistant}
               </DialogTitle>
             </div>
@@ -1739,28 +1747,17 @@ _(debug: ${errText})_`,
               {t.poweredBy}
             </span>
           </div>
-          <div className="mt-3 space-y-2">
-            <div className="grid grid-cols-3 gap-1.5">
-              {actionButtons[lang].menu.map((btn, i) => (
+          <div className="mt-2">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+              {[
+                ...actionButtons[lang].menu,
+                ...actionButtons[lang].restaurant,
+              ].map((btn, i) => (
                 <Button
                   key={i}
                   variant="outline"
                   size="sm"
-                  className="text-[10px] sm:text-xs h-7 px-1.5 justify-center"
-                  onClick={() => handleQuickAction(btn.prompt)}
-                  disabled={isTyping}
-                >
-                  {btn.label}
-                </Button>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {actionButtons[lang].restaurant.map((btn, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="text-[10px] sm:text-xs h-7 px-1.5 justify-center"
+                  className="text-[10px] h-7 px-2 flex-shrink-0 whitespace-nowrap justify-center"
                   onClick={() => handleQuickAction(btn.prompt)}
                   disabled={isTyping}
                 >
@@ -1895,7 +1892,12 @@ _(debug: ${errText})_`,
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-3 border-t dark:border-stone-700 bg-white dark:bg-stone-900 flex-shrink-0 rounded-b-2xl">
+        <div
+          className="p-3 pb-safe border-t dark:border-stone-700 bg-white dark:bg-stone-900 flex-shrink-0 rounded-b-2xl"
+          style={{
+            paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))",
+          }}
+        >
           <div className="flex gap-2">
             <Input
               value={inputValue}
@@ -3029,6 +3031,17 @@ export default function PublicMenu() {
       "_blank",
     );
 
+    // Push notification to restaurant admin (silent fail)
+    fetch("/api/push/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        restaurantId: restaurant.id,
+        title: `🛒 Porosi e re — ${restaurant.name}`,
+        body: `${customerName} • ${total} DEN • ${Object.values(cart).reduce((a: number, b) => a + (b as number), 0)} artikuj`,
+      }),
+    }).catch(() => {});
+
     setReceiptData({
       orderId: Math.random().toString(36).substring(2, 8).toUpperCase(),
       customerName,
@@ -3070,6 +3083,7 @@ export default function PublicMenu() {
 
   return (
     <>
+      <style>{leafletStyles}</style>
       {receiptData && (
         <DigitalReceipt
           data={receiptData}
@@ -3546,7 +3560,10 @@ export default function PublicMenu() {
               exit={{ y: 120, opacity: 0 }}
               // ✅ Improved: tighter spring bounce
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t-2 border-stone-200 dark:border-stone-700 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-3 py-3 sm:px-5 sm:py-4 z-50"
+              className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t-2 border-stone-200 dark:border-stone-700 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-3 pt-3 sm:px-5 sm:pt-4 z-50"
+              style={{
+                paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))",
+              }}
             >
               <div className="max-w-4xl mx-auto">
                 {/* Mobile */}
