@@ -41,11 +41,7 @@ export const restaurants = pgTable(
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
   },
-  (table) => {
-    return {
-      slugIdx: index("slug_idx").on(table.slug),
-    };
-  },
+  (table) => ({ slugIdx: index("slug_idx").on(table.slug) }),
 );
 
 export const menuItems = pgTable(
@@ -70,14 +66,27 @@ export const menuItems = pgTable(
     isGlutenFree: boolean("is_gluten_free").default(false).notNull(),
     isSpicy: boolean("is_spicy").default(false).notNull(),
     containsNuts: boolean("is_contains_nuts").default(false).notNull(),
-    // ── NEW: drag & drop sort order ──
     sortOrder: integer("sort_order").default(0).notNull(),
   },
-  (table) => {
-    return {
-      restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),
-    };
+  (table) => ({
+    restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),
+  }),
+);
+
+export const pageViews = pgTable(
+  "page_views",
+  {
+    id: serial("id").primaryKey(),
+    restaurantId: integer("restaurant_id")
+      .notNull()
+      .references(() => restaurants.id, { onDelete: "cascade" }),
+    viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+    dateStr: text("date_str").notNull(),
   },
+  (table) => ({
+    restaurantIdIdx: index("pv_restaurant_id_idx").on(table.restaurantId),
+    dateIdx: index("pv_date_idx").on(table.dateStr),
+  }),
 );
 
 // === RELATIONS ===
@@ -86,10 +95,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 export const restaurantsRelations = relations(restaurants, ({ one, many }) => ({
-  user: one(users, {
-    fields: [restaurants.userId],
-    references: [users.id],
-  }),
+  user: one(users, { fields: [restaurants.userId], references: [users.id] }),
   menuItems: many(menuItems),
   pageViews: many(pageViews),
 }));

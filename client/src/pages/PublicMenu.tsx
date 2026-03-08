@@ -1747,17 +1747,28 @@ _(debug: ${errText})_`,
               {t.poweredBy}
             </span>
           </div>
-          <div className="mt-2">
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {[
-                ...actionButtons[lang].menu,
-                ...actionButtons[lang].restaurant,
-              ].map((btn, i) => (
+          <div className="mt-2 space-y-1.5">
+            <div className="grid grid-cols-3 gap-1">
+              {actionButtons[lang].menu.map((btn, i) => (
                 <Button
                   key={i}
                   variant="outline"
                   size="sm"
-                  className="text-[10px] h-7 px-2 flex-shrink-0 whitespace-nowrap justify-center"
+                  className="text-[10px] h-7 px-1 flex-shrink-0 whitespace-nowrap justify-center truncate"
+                  onClick={() => handleQuickAction(btn.prompt)}
+                  disabled={isTyping}
+                >
+                  {btn.label}
+                </Button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {actionButtons[lang].restaurant.map((btn, i) => (
+                <Button
+                  key={i}
+                  variant="outline"
+                  size="sm"
+                  className="text-[10px] h-7 px-1 flex-shrink-0 whitespace-nowrap justify-center truncate"
                   onClick={() => handleQuickAction(btn.prompt)}
                   disabled={isTyping}
                 >
