@@ -1,6 +1,4 @@
 import { createRoot } from "react-dom/client";
-import { useState, useEffect } from "react";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import App from "./App";
 import "./index.css";
 
@@ -210,99 +208,9 @@ self.addEventListener("notificationclick", (event) => {
   });
 }
 
-// ── Splash Screen ──
-function SplashScreen({ onDone }: { onDone: () => void }) {
-  const [fadeOut, setFadeOut] = useState(false);
-
-  useEffect(() => {
-    // Show splash for 2.4s, then fade out over 0.4s
-    const fadeTimer = setTimeout(() => setFadeOut(true), 2400);
-    const doneTimer = setTimeout(() => onDone(), 2800);
-    return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(doneTimer);
-    };
-  }, [onDone]);
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#000000",
-        transition: "opacity 0.4s ease",
-        opacity: fadeOut ? 0 : 1,
-        pointerEvents: fadeOut ? "none" : "all",
-      }}
-    >
-      {/* Lottie animation */}
-      <div style={{ width: 220, height: 220 }}>
-        <DotLottieReact
-          src="/animations/food-prepared.lottie"
-          autoplay
-          loop={false}
-          style={{ width: "100%", height: "100%" }}
-        />
-      </div>
-
-      {/* App name */}
-      <p
-        style={{
-          marginTop: 16,
-          fontFamily: "'Playfair Display', serif",
-          fontSize: 28,
-          fontWeight: 700,
-          color: "#ffffff",
-          letterSpacing: "0.04em",
-        }}
-      >
-        HAJDE HA
-      </p>
-
-      {/* Tagline */}
-      <p
-        style={{
-          marginTop: 6,
-          fontFamily: "'DM Sans', sans-serif",
-          fontSize: 13,
-          color: "rgba(255,255,255,0.5)",
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-        }}
-      >
-        Restaurant Menus
-      </p>
-    </div>
-  );
-}
-
 // ── Root ──
 function Root() {
-  // Don't show splash on navigation — only on first load
-  const [showSplash, setShowSplash] = useState(() => {
-    const shown = sessionStorage.getItem("splash-shown");
-    const isPWA =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
-    return isPWA && !shown;
-  });
-
-  const handleDone = () => {
-    sessionStorage.setItem("splash-shown", "1");
-    setShowSplash(false);
-  };
-
-  return (
-    <>
-      {showSplash && <SplashScreen onDone={handleDone} />}
-      <App />
-    </>
-  );
+  return <App />;
 }
 
 createRoot(document.getElementById("root")!).render(<Root />);

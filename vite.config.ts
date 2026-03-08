@@ -8,13 +8,10 @@ export default defineConfig({
   plugins: [
     react({
       jsxRuntime: "automatic",
-      babel: {
-        plugins: [],
-      },
+      babel: { plugins: [] },
     }),
     runtimeErrorOverlay(),
 
-    // ✅ PWA — install prompt + offline support
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "icon-192.png", "icon-512.png"],
@@ -22,7 +19,7 @@ export default defineConfig({
         name: "HAJDE HA",
         short_name: "HAJDE HA",
         description: "Platforma e Menusë Dixhitale e Tetovës",
-        theme_color: "#E8450A", // ← ndrysho me ngjyrën tënde primary
+        theme_color: "#E8450A",
         background_color: "#ffffff",
         display: "standalone",
         orientation: "portrait",
@@ -45,43 +42,30 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cache strategies
         runtimeCaching: [
           {
-            // Cache restaurant images from Unsplash / uploads
             urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|webp|svg)$/i,
             handler: "CacheFirst",
             options: {
               cacheName: "images-cache",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
           {
-            // Cache API calls — NetworkFirst so data is fresh but works offline
             urlPattern: /^https?:\/\/.*\/api\/.*/i,
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day
-              },
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
               networkTimeoutSeconds: 10,
             },
           },
           {
-            // Cache QR code API
             urlPattern: /^https:\/\/api\.qrserver\.com\/.*/i,
             handler: "CacheFirst",
             options: {
               cacheName: "qr-cache",
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-              },
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
         ],
@@ -100,28 +84,97 @@ export default defineConfig({
         ]
       : []),
   ],
+
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
     },
   },
+
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),
+
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     minify: "esbuild",
-    sourcemap: process.env.NODE_ENV === "development",
-    chunkSizeWarningLimit: 1000,
+    sourcemap: false,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-core": ["react", "react-dom"],
-          router: ["wouter"],
-          query: ["@tanstack/react-query"],
-          "ui-icons": ["lucide-react"],
-          "ui-motion": ["framer-motion"],
+        manualChunks(id) {
+          // React core
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/")
+          ) {
+            return "react-core";
+          }
+          // Router
+          if (id.includes("node_modules/wouter")) {
+            return "router";
+          }
+          // Data fetching
+          if (id.includes("node_modules/@tanstack")) {
+            return "query";
+          }
+          // Icons
+          if (id.includes("node_modules/lucide-react")) {
+            return "ui-icons";
+          }
+          // Animation — large, isolate it
+          if (id.includes("node_modules/framer-motion")) {
+            return "ui-motion";
+          }
+          // Radix UI components
+          if (id.includes("node_modules/@radix-ui")) {
+            return "ui-radix";
+          }
+          // Charts
+          if (
+            id.includes("node_modules/recharts") ||
+            id.includes("node_modules/d3-") ||
+            id.includes("node_modules/victory-")
+          ) {
+            return "charts";
+          }
+          // Map — lazy loaded anyway
+          if (id.includes("node_modules/leaflet")) {
+            return "map";
+          }
+          // Canvas / screenshot
+          if (id.includes("node_modules/html2canvas")) {
+            return "html2canvas";
+          }
+          // DnD
+          if (id.includes("node_modules/@dnd-kit")) {
+            return "dnd";
+          }
+          // Forms
+          if (
+            id.includes("node_modules/react-hook-form") ||
+            id.includes("node_modules/@hookform") ||
+            id.includes("node_modules/zod")
+          ) {
+            return "forms";
+          }
+          // Date
+          if (id.includes("node_modules/date-fns")) {
+            return "date";
+          }
+          // Lottie
+          if (id.includes("node_modules/@lottiefiles")) {
+            return "lottie";
+          }
+          // QR
+          if (id.includes("node_modules/qrcode")) {
+            return "qrcode";
+          }
+          // Vercel analytics
+          if (id.includes("node_modules/@vercel")) {
+            return "analytics";
+          }
         },
         entryFileNames: "assets/[name].[hash].js",
         chunkFileNames: "assets/[name].[hash].js",
@@ -132,15 +185,12 @@ export default defineConfig({
     cssCodeSplit: true,
     cssMinify: true,
   },
+
   server: {
-    fs: {
-      strict: true,
-      deny: ["**/.*"],
-    },
-    hmr: {
-      overlay: true,
-    },
+    fs: { strict: true, deny: ["**/.*"] },
+    hmr: { overlay: true },
   },
+
   optimizeDeps: {
     include: [
       "react",
@@ -152,6 +202,7 @@ export default defineConfig({
       "leaflet",
     ],
   },
+
   esbuild: {
     drop: process.env.NODE_ENV === "production" ? ["console", "debugger"] : [],
     target: "es2020",

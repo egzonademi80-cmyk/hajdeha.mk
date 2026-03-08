@@ -409,7 +409,10 @@ export async function registerRoutes(
   });
 
   // === SEED DATA ===
-  await seedDatabase(hashPassword);
+  // Seed is non-critical — don't crash server if DB connection is slow on cold start
+  seedDatabase(hashPassword).catch((err) => {
+    console.warn("[seed] Skipped:", err?.message ?? err);
+  });
 
   return httpServer;
 }
