@@ -104,10 +104,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // React core
+          // React core — must be first
           if (
             id.includes("node_modules/react/") ||
-            id.includes("node_modules/react-dom/")
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/scheduler/")
           ) {
             return "react-core";
           }
@@ -123,23 +124,15 @@ export default defineConfig({
           if (id.includes("node_modules/lucide-react")) {
             return "ui-icons";
           }
-          // Animation — large, isolate it
+          // Animation
           if (id.includes("node_modules/framer-motion")) {
             return "ui-motion";
           }
-          // Radix UI components
+          // Radix UI
           if (id.includes("node_modules/@radix-ui")) {
             return "ui-radix";
           }
-          // Charts
-          if (
-            id.includes("node_modules/recharts") ||
-            id.includes("node_modules/d3-") ||
-            id.includes("node_modules/victory-")
-          ) {
-            return "charts";
-          }
-          // Map — lazy loaded anyway
+          // Map — lazy loaded
           if (id.includes("node_modules/leaflet")) {
             return "map";
           }
@@ -151,30 +144,8 @@ export default defineConfig({
           if (id.includes("node_modules/@dnd-kit")) {
             return "dnd";
           }
-          // Forms
-          if (
-            id.includes("node_modules/react-hook-form") ||
-            id.includes("node_modules/@hookform") ||
-            id.includes("node_modules/zod")
-          ) {
-            return "forms";
-          }
-          // Date
-          if (id.includes("node_modules/date-fns")) {
-            return "date";
-          }
-          // Lottie
-          if (id.includes("node_modules/@lottiefiles")) {
-            return "lottie";
-          }
-          // QR
-          if (id.includes("node_modules/qrcode")) {
-            return "qrcode";
-          }
-          // Vercel analytics
-          if (id.includes("node_modules/@vercel")) {
-            return "analytics";
-          }
+          // NOTE: recharts, d3, victory intentionally NOT split — circular deps cause ReferenceError
+          // NOTE: zod, react-hook-form intentionally NOT split — shared across chunks
         },
         entryFileNames: "assets/[name].[hash].js",
         chunkFileNames: "assets/[name].[hash].js",
