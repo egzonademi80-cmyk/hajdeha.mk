@@ -38,8 +38,8 @@ function Router() {
           {() => <ProtectedRoute component={AdminRestaurant} />}
         </Route>
         {/* Fallback */}
+        <Route path="/pos/bujar" component={POS} />
         <Route component={NotFound} />
-        <Route path="/pos/restaurant-26-staff" component={POS} />
       </Switch>
     </div>
   );
