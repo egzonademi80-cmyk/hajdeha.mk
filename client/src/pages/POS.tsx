@@ -1,19 +1,17 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Minus,
-  X,
   Coffee,
   CheckCircle,
   Clock,
-  Trash2,
-  ChevronRight,
   Receipt,
+  ChevronLeft,
+  ShoppingBag,
 } from "lucide-react";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 interface MenuItem {
   id: number;
   name: string;
@@ -32,59 +30,42 @@ interface OrderItem {
 interface TableOrder {
   items: OrderItem[];
   startedAt: Date | null;
-  paid: boolean;
 }
 
-const RESTAURANT_SLUG = "embeltoresport"; // <-- update to your actual slug for ID 26
+const RESTAURANT_SLUG = "embeltoresport";
 const TABLE_COUNT = 16;
 
-const emptyTable = (): TableOrder => ({
-  items: [],
-  startedAt: null,
-  paid: false,
-});
+const emptyTable = (): TableOrder => ({ items: [], startedAt: null });
 
 function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
 }
 
-// ── Main POS ──────────────────────────────────────────────────────────────────
+type Screen = "tables" | "menu" | "order";
+
 export default function POS() {
   const [tables, setTables] = useState<TableOrder[]>(
     Array.from({ length: TABLE_COUNT }, emptyTable),
   );
   const [activeTable, setActiveTable] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
-  const [payConfirm, setPayConfirm] = useState<number | null>(null);
+  const [screen, setScreen] = useState<Screen>("tables");
+  const [payConfirm, setPayConfirm] = useState(false);
   const [justPaid, setJustPaid] = useState<number | null>(null);
 
-  // Fetch menu for restaurant (via slug)
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["pos-restaurant"],
     queryFn: async () => {
-      // Try to find slug by fetching all restaurants and filtering by ID
       const res = await fetch(`/api/restaurants/${RESTAURANT_SLUG}`);
-      if (!res.ok) throw new Error("Not found");
+      if (!res.ok) throw new Error("Restaurant not found");
       return res.json();
     },
     retry: false,
   });
 
-  // Also try by ID directly
-  const { data: restaurantById } = useQuery({
-    queryKey: ["pos-restaurant-by-id"],
-    queryFn: async () => {
-      const res = await fetch(`/api/admin/restaurants/26`);
-      if (!res.ok) throw new Error("Not found");
-      return res.json();
-    },
-    retry: false,
-  });
-
-  const restaurantData = restaurant || restaurantById;
   const menuItems: MenuItem[] = useMemo(
-    () => (restaurantData?.menuItems || []).filter((i: MenuItem) => i.active),
-    [restaurantData],
+    () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
+    [restaurant],
   );
 
   const categories = useMemo(() => {
@@ -100,65 +81,11 @@ export default function POS() {
     [menuItems, activeCategory],
   );
 
-  const activeTableOrder = activeTable !== null ? tables[activeTable] : null;
-
-  const addItem = (item: MenuItem) => {
-    if (activeTable === null) return;
-    setTables((prev) => {
-      const next = [...prev];
-      const table = { ...next[activeTable] };
-      const existing = table.items.findIndex((i) => i.id === item.id);
-      if (existing >= 0) {
-        table.items = table.items.map((i, idx) =>
-          idx === existing ? { ...i, qty: i.qty + 1 } : i,
-        );
-      } else {
-        table.items = [
-          ...table.items,
-          {
-            id: item.id,
-            name: item.name,
-            price: parsePrice(item.price),
-            qty: 1,
-          },
-        ];
-      }
-      if (!table.startedAt) table.startedAt = new Date();
-      next[activeTable] = table;
-      return next;
-    });
-  };
-
-  const updateQty = (tableIdx: number, itemId: number, delta: number) => {
-    setTables((prev) => {
-      const next = [...prev];
-      const table = { ...next[tableIdx] };
-      table.items = table.items
-        .map((i) => (i.id === itemId ? { ...i, qty: i.qty + delta } : i))
-        .filter((i) => i.qty > 0);
-      if (table.items.length === 0) table.startedAt = null;
-      next[tableIdx] = table;
-      return next;
-    });
-  };
-
-  const payTable = (tableIdx: number) => {
-    setTables((prev) => {
-      const next = [...prev];
-      next[tableIdx] = emptyTable();
-      return next;
-    });
-    setJustPaid(tableIdx);
-    setPayConfirm(null);
-    if (activeTable === tableIdx) setActiveTable(null);
-    setTimeout(() => setJustPaid(null), 2000);
-  };
+  const currentTable = activeTable !== null ? tables[activeTable] : null;
 
   const tableTotal = (t: TableOrder) =>
-    t.items.reduce((sum, i) => sum + i.price * i.qty, 0);
-
-  const tableItemCount = (t: TableOrder) =>
-    t.items.reduce((sum, i) => sum + i.qty, 0);
+    t.items.reduce((s, i) => s + i.price * i.qty, 0);
+  const tableCount = (t: TableOrder) => t.items.reduce((s, i) => s + i.qty, 0);
 
   const elapsed = (t: TableOrder) => {
     if (!t.startedAt) return null;
@@ -166,264 +93,358 @@ export default function POS() {
       (Date.now() - new Date(t.startedAt).getTime()) / 60000,
     );
     if (mins < 1) return "< 1 min";
-    if (mins < 60) return `${mins} min`;
-    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    if (mins < 60) return `${mins}min`;
+    return `${Math.floor(mins / 60)}h${mins % 60}m`;
+  };
+
+  const addItem = (item: MenuItem) => {
+    if (activeTable === null) return;
+    setTables((prev) => {
+      const next = [...prev];
+      const table = {
+        ...next[activeTable],
+        items: [...next[activeTable].items],
+      };
+      const idx = table.items.findIndex((i) => i.id === item.id);
+      if (idx >= 0) {
+        table.items[idx] = {
+          ...table.items[idx],
+          qty: table.items[idx].qty + 1,
+        };
+      } else {
+        table.items.push({
+          id: item.id,
+          name: item.name,
+          price: parsePrice(item.price),
+          qty: 1,
+        });
+      }
+      if (!table.startedAt) table.startedAt = new Date();
+      next[activeTable] = table;
+      return next;
+    });
+  };
+
+  const updateQty = (itemId: number, delta: number) => {
+    if (activeTable === null) return;
+    setTables((prev) => {
+      const next = [...prev];
+      const table = {
+        ...next[activeTable],
+        items: [...next[activeTable].items],
+      };
+      table.items = table.items
+        .map((i) => (i.id === itemId ? { ...i, qty: i.qty + delta } : i))
+        .filter((i) => i.qty > 0);
+      if (table.items.length === 0) table.startedAt = null;
+      next[activeTable] = table;
+      return next;
+    });
+  };
+
+  const payTable = () => {
+    if (activeTable === null) return;
+    const idx = activeTable;
+    setTables((prev) => {
+      const next = [...prev];
+      next[idx] = emptyTable();
+      return next;
+    });
+    setJustPaid(idx);
+    setPayConfirm(false);
+    setActiveTable(null);
+    setScreen("tables");
+    setTimeout(() => setJustPaid(null), 2500);
+  };
+
+  const [, forceUpdate] = useState(0);
+
+  // Tick every 30s so elapsed times update live
+  useEffect(() => {
+    const id = setInterval(() => forceUpdate((n) => n + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const tableStatus = (t: TableOrder): "empty" | "fresh" | "mid" | "late" => {
+    if (!t.startedAt || t.items.length === 0) return "empty";
+    const mins = Math.floor(
+      (Date.now() - new Date(t.startedAt).getTime()) / 60000,
+    );
+    if (mins < 15) return "fresh";
+    if (mins < 30) return "mid";
+    return "late";
+  };
+
+  const statusColors = {
+    empty: {
+      bg: "bg-white/4",
+      border: "border-white/8",
+      dot: "",
+      text: "text-white/25",
+      time: "text-white/20",
+    },
+    fresh: {
+      bg: "bg-emerald-500/12",
+      border: "border-emerald-500/35",
+      dot: "bg-emerald-400",
+      text: "text-white",
+      time: "text-emerald-400",
+    },
+    mid: {
+      bg: "bg-amber-500/15",
+      border: "border-amber-400/45",
+      dot: "bg-amber-400",
+      text: "text-white",
+      time: "text-amber-400",
+    },
+    late: {
+      bg: "bg-red-500/15",
+      border: "border-red-400/50",
+      dot: "bg-red-400",
+      text: "text-white",
+      time: "text-red-400",
+    },
+  };
+
+  const openTable = (idx: number) => {
+    setActiveTable(idx);
+    setScreen("menu");
+    setActiveCategory("All");
   };
 
   return (
-    <div className="h-screen w-screen bg-[#0F0F0F] text-white overflow-hidden flex flex-col font-['DM_Sans',sans-serif]">
-      {/* Google Font */}
+    <div
+      className="h-[100dvh] w-screen bg-[#0F0F0F] text-white flex flex-col overflow-hidden"
+      style={{ fontFamily: "'DM Sans', sans-serif" }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* Header */}
-      <div className="flex-shrink-0 px-6 py-3 border-b border-white/5 flex items-center justify-between bg-[#0F0F0F]">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-amber-500 flex items-center justify-center">
-            <Coffee className="h-4 w-4 text-black" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-white leading-none">
-              {restaurantData?.name || "POS System"}
-            </p>
-            <p className="text-[10px] text-white/30 mt-0.5 font-['DM_Mono']">
-              POINT OF SALE
-            </p>
-          </div>
+      {/* ── Header ── */}
+      <div
+        className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/8"
+        style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+      >
+        {screen !== "tables" && (
+          <button
+            onClick={() => setScreen(screen === "order" ? "menu" : "tables")}
+            className="h-8 w-8 rounded-full bg-white/8 flex items-center justify-center flex-shrink-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        )}
+        <div className="h-7 w-7 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
+          <Coffee className="h-3.5 w-3.5 text-black" />
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-[10px] text-white/30 font-['DM_Mono']">
-              ACTIVE TABLES
-            </p>
-            <p className="text-lg font-bold text-amber-400 font-['DM_Mono']">
-              {tables.filter((t) => t.items.length > 0).length}/{TABLE_COUNT}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] text-white/30 font-['DM_Mono']">
-              TOTAL OPEN
-            </p>
-            <p className="text-lg font-bold text-white font-['DM_Mono']">
-              {tables.reduce((s, t) => s + tableTotal(t), 0)}{" "}
-              <span className="text-xs text-white/40">DEN</span>
-            </p>
-          </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold leading-none truncate">
+            {restaurant?.name || "POS"}
+            {activeTable !== null && (
+              <span className="text-amber-400"> · T{activeTable + 1}</span>
+            )}
+          </p>
+          <p
+            className="text-[10px] text-white/30 mt-0.5"
+            style={{ fontFamily: "'DM Mono', monospace" }}
+          >
+            {screen === "tables"
+              ? `${tables.filter((t) => t.items.length > 0).length}/${TABLE_COUNT} ACTIVE`
+              : screen === "menu"
+                ? "ADD ITEMS"
+                : "ORDER"}
+          </p>
         </div>
+        {/* Cart badge — only in menu screen */}
+        {screen === "menu" &&
+          activeTable !== null &&
+          currentTable &&
+          currentTable.items.length > 0 && (
+            <button
+              onClick={() => setScreen("order")}
+              className="flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
+            >
+              <ShoppingBag className="h-3.5 w-3.5 text-black" />
+              <span
+                className="text-xs font-bold text-black"
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                {tableCount(currentTable)} · {tableTotal(currentTable)} DEN
+              </span>
+            </button>
+          )}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* LEFT — Table Grid */}
-        <div className="w-[280px] flex-shrink-0 border-r border-white/5 flex flex-col bg-[#0A0A0A]">
-          <div className="px-4 py-3 border-b border-white/5">
-            <p className="text-[10px] font-semibold text-white/30 tracking-widest font-['DM_Mono']">
-              TABLES
-            </p>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 grid grid-cols-4 gap-2 content-start">
-            {tables.map((table, idx) => {
-              const occupied = table.items.length > 0;
-              const isActive = activeTable === idx;
-              const wasJustPaid = justPaid === idx;
-              return (
-                <motion.button
-                  key={idx}
-                  onClick={() => setActiveTable(isActive ? null : idx)}
-                  whileTap={{ scale: 0.93 }}
-                  className={`relative aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all duration-150 border ${
-                    wasJustPaid
-                      ? "bg-emerald-500/20 border-emerald-500/50"
-                      : isActive
-                        ? "bg-amber-500 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]"
-                        : occupied
-                          ? "bg-white/8 border-white/15 hover:border-amber-500/50"
-                          : "bg-white/3 border-white/5 hover:bg-white/6"
-                  }`}
-                >
-                  {wasJustPaid && (
-                    <CheckCircle className="h-5 w-5 text-emerald-400" />
-                  )}
-                  {!wasJustPaid && (
-                    <>
-                      <span
-                        className={`text-xs font-bold font-['DM_Mono'] ${isActive ? "text-black" : occupied ? "text-white" : "text-white/30"}`}
-                      >
-                        T{idx + 1}
-                      </span>
-                      {occupied && !isActive && (
-                        <span className="text-[9px] text-amber-400 font-['DM_Mono'] font-medium">
-                          {tableTotal(table)}
-                        </span>
-                      )}
-                    </>
-                  )}
-                  {occupied && !isActive && !wasJustPaid && (
-                    <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-400" />
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
-
-          {/* Selected table summary */}
-          <AnimatePresence>
-            {activeTable !== null && activeTableOrder && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="border-t border-white/5 p-3 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-white/50">
-                    Table {activeTable + 1}
-                  </p>
-                  {activeTableOrder.startedAt && (
-                    <div className="flex items-center gap-1 text-[10px] text-white/30 font-['DM_Mono']">
-                      <Clock className="h-3 w-3" />
-                      {elapsed(activeTableOrder)}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1 max-h-[160px] overflow-y-auto">
-                  {activeTableOrder.items.length === 0 ? (
-                    <p className="text-[11px] text-white/20 text-center py-2">
-                      Empty — add items →
-                    </p>
-                  ) : (
-                    activeTableOrder.items.map((item) => (
-                      <div key={item.id} className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 bg-white/5 rounded-lg px-1.5 py-1">
-                          <button
-                            onClick={() => updateQty(activeTable, item.id, -1)}
-                            className="h-4 w-4 rounded flex items-center justify-center hover:bg-white/10 text-white/50"
-                          >
-                            <Minus className="h-2.5 w-2.5" />
-                          </button>
-                          <span className="text-xs font-bold font-['DM_Mono'] text-amber-400 w-4 text-center">
-                            {item.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(activeTable, item.id, 1)}
-                            className="h-4 w-4 rounded flex items-center justify-center hover:bg-white/10 text-white/50"
-                          >
-                            <Plus className="h-2.5 w-2.5" />
-                          </button>
-                        </div>
-                        <span className="flex-1 text-[11px] text-white/70 truncate">
-                          {item.name}
-                        </span>
-                        <span className="text-[11px] text-white/40 font-['DM_Mono']">
-                          {item.price * item.qty}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {activeTableOrder.items.length > 0 && (
-                  <>
-                    <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                      <span className="text-[11px] text-white/40">
-                        {tableItemCount(activeTableOrder)} items
-                      </span>
-                      <span className="text-sm font-bold text-white font-['DM_Mono']">
-                        {tableTotal(activeTableOrder)} DEN
-                      </span>
-                    </div>
-                    {payConfirm === activeTable ? (
-                      <div className="flex gap-1.5">
-                        <button
-                          onClick={() => setPayConfirm(null)}
-                          className="flex-1 h-8 rounded-lg bg-white/5 text-xs text-white/50 hover:bg-white/10"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => payTable(activeTable)}
-                          className="flex-1 h-8 rounded-lg bg-emerald-500 text-xs font-bold text-white hover:bg-emerald-400"
-                        >
-                          ✓ Confirm Cash
-                        </button>
-                      </div>
+      {/* ── SCREEN: TABLES ── */}
+      <AnimatePresence mode="wait">
+        {screen === "tables" && (
+          <motion.div
+            key="tables"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.18 }}
+            className="flex-1 overflow-y-auto p-4"
+          >
+            <div className="grid grid-cols-4 gap-3">
+              {tables.map((table, idx) => {
+                const occupied = table.items.length > 0;
+                const wasJustPaid = justPaid === idx;
+                return (
+                  <motion.button
+                    key={idx}
+                    onClick={() => openTable(idx)}
+                    whileTap={{ scale: 0.9 }}
+                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
+                      wasJustPaid
+                        ? "bg-emerald-500/20 border-emerald-500/40"
+                        : `${statusColors[tableStatus(table)].bg} ${statusColors[tableStatus(table)].border}`
+                    }`}
+                  >
+                    {wasJustPaid ? (
+                      <CheckCircle className="h-6 w-6 text-emerald-400" />
                     ) : (
-                      <button
-                        onClick={() => setPayConfirm(activeTable)}
-                        className="w-full h-8 rounded-lg bg-amber-500 text-xs font-bold text-black hover:bg-amber-400 flex items-center justify-center gap-1.5"
-                      >
-                        <Receipt className="h-3.5 w-3.5" />
-                        Pay — {tableTotal(activeTableOrder)} DEN
-                      </button>
+                      <>
+                        <span
+                          className={`text-sm font-bold font-['DM_Mono'] ${statusColors[tableStatus(table)].text}`}
+                        >
+                          T{idx + 1}
+                        </span>
+                        {occupied && (
+                          <>
+                            <span
+                              className={`text-[10px] font-bold font-['DM_Mono'] ${statusColors[tableStatus(table)].time}`}
+                            >
+                              {tableTotal(table)}
+                            </span>
+                            {table.startedAt && (
+                              <span
+                                className={`text-[9px] font-['DM_Mono'] ${statusColors[tableStatus(table)].time}`}
+                              >
+                                {elapsed(table)}
+                              </span>
+                            )}
+                            <motion.div
+                              animate={
+                                tableStatus(table) === "late"
+                                  ? { scale: [1, 1.4, 1] }
+                                  : {}
+                              }
+                              transition={{ duration: 1.2, repeat: Infinity }}
+                              className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${statusColors[tableStatus(table)].dot}`}
+                            />
+                          </>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* RIGHT — Menu */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Category tabs */}
-          <div className="flex-shrink-0 flex items-center gap-1.5 px-4 py-3 border-b border-white/5 overflow-x-auto">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  activeCategory === cat
-                    ? "bg-amber-500 text-black"
-                    : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/70"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Items */}
-          {isLoading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <Coffee className="h-8 w-8 text-amber-500 mx-auto" />
-                </motion.div>
-                <p className="text-white/30 text-sm">Loading menu...</p>
-              </div>
+                  </motion.button>
+                );
+              })}
             </div>
-          ) : menuItems.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-2">
-                <p className="text-white/20 text-sm">No menu items found</p>
-                <p className="text-white/10 text-xs font-['DM_Mono']">
-                  Check RESTAURANT_SLUG in POS.tsx
+
+            {/* Status legend */}
+            <div className="mt-4 flex items-center gap-4 px-1">
+              {[
+                { dot: "bg-emerald-400", label: "< 15min" },
+                { dot: "bg-amber-400", label: "15–30min" },
+                { dot: "bg-red-400", label: "30min+" },
+              ].map(({ dot, label }) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <div className={`h-2 w-2 rounded-full ${dot}`} />
+                  <span
+                    className="text-[10px] text-white/30"
+                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  >
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Summary bar */}
+            <div className="mt-3 p-4 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-between">
+              <div>
+                <p
+                  className="text-[10px] text-white/30"
+                  style={{ fontFamily: "'DM Mono', monospace" }}
+                >
+                  TOTAL OPEN
+                </p>
+                <p
+                  className="text-xl font-bold text-amber-400"
+                  style={{ fontFamily: "'DM Mono', monospace" }}
+                >
+                  {tables.reduce((s, t) => s + tableTotal(t), 0)}{" "}
+                  <span className="text-sm text-white/30">DEN</span>
+                </p>
+              </div>
+              <div className="text-right">
+                <p
+                  className="text-[10px] text-white/30"
+                  style={{ fontFamily: "'DM Mono', monospace" }}
+                >
+                  TABLES IN USE
+                </p>
+                <p
+                  className="text-xl font-bold text-white"
+                  style={{ fontFamily: "'DM Mono', monospace" }}
+                >
+                  {tables.filter((t) => t.items.length > 0).length}
+                  <span className="text-sm text-white/30">/{TABLE_COUNT}</span>
                 </p>
               </div>
             </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto p-4">
-              {activeTable === null ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center space-y-2">
-                    <div className="text-4xl mb-4">👆</div>
-                    <p className="text-white/30 text-sm">
-                      Select a table to start an order
-                    </p>
-                  </div>
+          </motion.div>
+        )}
+
+        {/* ── SCREEN: MENU ── */}
+        {screen === "menu" && (
+          <motion.div
+            key="menu"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.18 }}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            {/* Category tabs */}
+            <div className="flex-shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto border-b border-white/5">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    activeCategory === cat
+                      ? "bg-amber-500 text-black"
+                      : "bg-white/6 text-white/40"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Items grid */}
+            <div className="flex-1 overflow-y-auto p-3">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-40">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                  >
+                    <Coffee className="h-7 w-7 text-amber-500" />
+                  </motion.div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {filteredItems.map((item) => {
-                    const inCart = activeTableOrder?.items.find(
+                    const inCart = currentTable?.items.find(
                       (i) => i.id === item.id,
                     );
                     return (
@@ -431,28 +452,28 @@ export default function POS() {
                         key={item.id}
                         onClick={() => addItem(item)}
                         whileTap={{ scale: 0.95 }}
-                        className={`relative p-3 rounded-xl text-left border transition-all duration-150 ${
+                        className={`relative p-3 rounded-xl text-left border transition-all ${
                           inCart
-                            ? "bg-amber-500/15 border-amber-500/40"
-                            : "bg-white/3 border-white/8 hover:bg-white/8 hover:border-white/15"
+                            ? "bg-amber-500/15 border-amber-500/50"
+                            : "bg-white/4 border-white/8"
                         }`}
                       >
                         {inCart && (
                           <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-amber-500 flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-black font-['DM_Mono']">
+                            <span className="text-[10px] font-bold text-black">
                               {inCart.qty}
                             </span>
                           </div>
                         )}
-                        <p className="text-xs font-semibold text-white/80 leading-snug pr-5 line-clamp-2">
+                        <p className="text-xs font-semibold text-white/85 leading-snug pr-6 line-clamp-2">
                           {item.name}
                         </p>
-                        <p className="text-xs font-bold text-amber-400 mt-1.5 font-['DM_Mono']">
+                        <p
+                          className="text-xs font-bold text-amber-400 mt-1.5"
+                          style={{ fontFamily: "'DM Mono', monospace" }}
+                        >
                           {parsePrice(item.price)}{" "}
-                          <span className="text-[9px] text-white/30">DEN</span>
-                        </p>
-                        <p className="text-[9px] text-white/20 mt-0.5">
-                          {item.category}
+                          <span className="text-[9px] text-white/25">DEN</span>
                         </p>
                       </motion.button>
                     );
@@ -460,9 +481,125 @@ export default function POS() {
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
+          </motion.div>
+        )}
+
+        {/* ── SCREEN: ORDER ── */}
+        {screen === "order" && activeTable !== null && currentTable && (
+          <motion.div
+            key="order"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.18 }}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {currentTable.items.length === 0 ? (
+                <div className="flex items-center justify-center h-40">
+                  <p className="text-white/20 text-sm">Empty table</p>
+                </div>
+              ) : (
+                currentTable.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-white/4 border border-white/8"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white/85 truncate">
+                        {item.name}
+                      </p>
+                      <p
+                        className="text-xs text-amber-400 mt-0.5"
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        {item.price} × {item.qty} = {item.price * item.qty} DEN
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/6 rounded-xl px-2 py-1.5">
+                      <button
+                        onClick={() => updateQty(item.id, -1)}
+                        className="h-6 w-6 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <span
+                        className="text-sm font-bold text-amber-400 w-5 text-center"
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        {item.qty}
+                      </span>
+                      <button
+                        onClick={() => updateQty(item.id, 1)}
+                        className="h-6 w-6 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Total + Pay */}
+            {currentTable.items.length > 0 && (
+              <div
+                className="flex-shrink-0 p-4 border-t border-white/8 space-y-3"
+                style={{
+                  paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-white/40 text-xs">
+                    <Clock className="h-3.5 w-3.5" />
+                    {currentTable.startedAt ? elapsed(currentTable) : "—"}
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className="text-[10px] text-white/30"
+                      style={{ fontFamily: "'DM Mono', monospace" }}
+                    >
+                      TOTAL
+                    </p>
+                    <p
+                      className="text-2xl font-bold text-white"
+                      style={{ fontFamily: "'DM Mono', monospace" }}
+                    >
+                      {tableTotal(currentTable)}{" "}
+                      <span className="text-sm text-white/30">DEN</span>
+                    </p>
+                  </div>
+                </div>
+
+                {payConfirm ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPayConfirm(false)}
+                      className="flex-1 h-12 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={payTable}
+                      className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white"
+                    >
+                      ✓ Paid — Cash
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setPayConfirm(true)}
+                    className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400"
+                  >
+                    <Receipt className="h-4 w-4" />
+                    Pay {tableTotal(currentTable)} DEN — Cash
+                  </button>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
