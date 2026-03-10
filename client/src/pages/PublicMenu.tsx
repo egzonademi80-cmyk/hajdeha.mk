@@ -974,7 +974,12 @@ function OrderFormContent({
               <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
                 {t.restaurantClosed}
               </p>
-
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                {openingTime} – {closingTime}
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-500">
+                {t.scheduleForLater}
+              </p>
             </div>
           </motion.div>
         )}
@@ -1077,7 +1082,11 @@ function OrderFormContent({
                   min={scheduling.minDateTime}
                   className="w-full px-4 py-2 text-base rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-
+                {openingTime && closingTime && (
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
+                    ⏰ {openingTime} – {closingTime}
+                  </p>
+                )}
               </div>
             </motion.div>
           )}
@@ -1340,8 +1349,9 @@ function AIRestaurantAssistant({
       send: "Send",
       addToCart: "Add",
       added: "Added!",
-      greeting: `Hi! I'm your AI waiter for ${restaurantName} 👋\n\nAsk me anything — I know the full menu, can suggest dishes for your mood, diet, or budget, and I'm watching your cart in real time!`,
+      greeting: `Hi! I'm your AI waiter for **${restaurantName}** 👋\n\nAsk me anything — I know the full menu, can suggest dishes for your mood, diet, or budget, and I'm watching your cart in real time!`,
       errorMsg: "Sorry, I had a connection issue. Please try again!",
+      poweredBy: "Powered by Claude AI",
     },
     al: {
       aiAssistant: "Kamarieri AI",
@@ -1350,8 +1360,9 @@ function AIRestaurantAssistant({
       send: "Dërgo",
       addToCart: "Shto",
       added: "U shtua!",
-      greeting: `Përshëndetje! Jam kamarieri juaj AI për ${restaurantName} 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
+      greeting: `Përshëndetje! Jam kamarierin tuaj AI për **${restaurantName}** 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
       errorMsg: "Na vjen keq, pati një problem. Ju lutemi provoni sërish!",
+      poweredBy: "Mundësuar nga Claude AI",
     },
     mk: {
       aiAssistant: "AI Келнер",
@@ -1360,8 +1371,9 @@ function AIRestaurantAssistant({
       send: "Испрати",
       addToCart: "Додај",
       added: "Додадено!",
-      greeting: `Здраво! Јас сум вашиот AI келнер за ${restaurantName} 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
+      greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
       errorMsg: "Се извинуваме, имаше проблем. Обидете се повторно!",
+      poweredBy: "Овозможено од Claude AI",
     },
   };
 
@@ -1715,13 +1727,25 @@ _(debug: ${errText})_`,
         </motion.button>
       </DialogTrigger>
       <DialogContent
-        className="w-[calc(100vw-16px)] max-w-md h-[92dvh] sm:h-[80vh] mx-auto flex flex-col p-0 gap-0 bg-gradient-to-b from-white to-stone-50 dark:from-stone-900 dark:to-stone-950 rounded-2xl [&>button]:top-3 [&>button]:right-3"
+        className="w-screen max-w-none sm:w-[calc(100vw-16px)] sm:max-w-md mx-auto flex flex-col p-0 gap-0 bg-gradient-to-b from-white to-stone-50 dark:from-stone-900 dark:to-stone-950 rounded-none sm:rounded-2xl [&>button]:top-3 [&>button]:right-3"
         style={{
-          maxHeight:
-            "calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px)",
+          height: "100dvh",
+          maxHeight: "100dvh",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          transform: "none",
+          position: "fixed",
+          margin: 0,
+          touchAction: "manipulation",
+          WebkitUserSelect: "none",
         }}
       >
-        <DialogHeader className="p-3 pb-2 border-b dark:border-stone-700 flex-shrink-0">
+        <DialogHeader
+          className="p-3 pb-2 border-b dark:border-stone-700 flex-shrink-0"
+          style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
@@ -1731,6 +1755,9 @@ _(debug: ${errText})_`,
                 {t.aiAssistant}
               </DialogTitle>
             </div>
+            <span className="text-[9px] text-stone-400 dark:text-stone-500 font-medium tracking-wide">
+              {t.poweredBy}
+            </span>
           </div>
           <div className="mt-2 space-y-1.5">
             <div className="grid grid-cols-3 gap-1">
@@ -1889,9 +1916,9 @@ _(debug: ${errText})_`,
         </div>
 
         <div
-          className="p-3 pb-safe border-t dark:border-stone-700 bg-white dark:bg-stone-900 flex-shrink-0 rounded-b-2xl"
+          className="p-3 border-t dark:border-stone-700 bg-white dark:bg-stone-900 flex-shrink-0 rounded-b-none sm:rounded-b-2xl"
           style={{
-            paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))",
+            paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
           }}
         >
           <div className="flex gap-2">

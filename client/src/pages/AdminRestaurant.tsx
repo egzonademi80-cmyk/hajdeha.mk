@@ -847,6 +847,7 @@ function MenuItemDialog({
       isGlutenFree: false,
       isSpicy: false,
       containsNuts: false,
+      sortOrder: 0,
       restaurantId,
     },
     values: initialData ? { ...initialData, restaurantId } : undefined,
