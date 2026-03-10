@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import PublicMenu from "@/pages/PublicMenu";
 import AuthLogin from "@/pages/AuthLogin";
+import POS from "@/pages/POS";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminRestaurant from "@/pages/AdminRestaurant";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -38,6 +39,7 @@ function Router() {
         </Route>
         {/* Fallback */}
         <Route component={NotFound} />
+        <Route path="/pos/restaurant-26-staff" component={POS} />
       </Switch>
     </div>
   );
