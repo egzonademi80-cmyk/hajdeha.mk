@@ -44,9 +44,17 @@ function parsePrice(price: string): number {
 type Screen = "tables" | "menu" | "order";
 
 export default function POS() {
-  const [tables, setTables] = useState<TableOrder[]>(
-    Array.from({ length: TABLE_COUNT }, emptyTable),
-  );
+  const [tables, setTables] = useState<TableOrder[]>(() => {
+    try {
+      const saved = localStorage.getItem("pos-tables-v1");
+      if (saved) {
+        const parsed = JSON.parse(saved) as TableOrder[];
+        // Ensure correct length
+        if (parsed.length === TABLE_COUNT) return parsed;
+      }
+    } catch {}
+    return Array.from({ length: TABLE_COUNT }, emptyTable);
+  });
   const [activeTable, setActiveTable] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [screen, setScreen] = useState<Screen>("tables");
@@ -164,6 +172,13 @@ export default function POS() {
     const id = setInterval(() => forceUpdate((n) => n + 1), 30000);
     return () => clearInterval(id);
   }, []);
+
+  // Persist tables to localStorage on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem("pos-tables-v1", JSON.stringify(tables));
+    } catch {}
+  }, [tables]);
 
   const tableStatus = (t: TableOrder): "empty" | "fresh" | "mid" | "late" => {
     if (!t.startedAt || t.items.length === 0) return "empty";
