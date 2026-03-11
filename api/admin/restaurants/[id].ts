@@ -11,11 +11,9 @@ import {
 } from "../auth.js";
 
 async function parseBody(req: VercelRequest): Promise<any> {
-  // Already parsed by Vercel
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
     return req.body;
   }
-  // String body — parse it
   if (typeof req.body === "string") {
     try {
       return JSON.parse(req.body);
@@ -23,7 +21,6 @@ async function parseBody(req: VercelRequest): Promise<any> {
       return {};
     }
   }
-  // Raw stream — read and parse manually
   return new Promise((resolve) => {
     let data = "";
     req.on("data", (chunk) => (data += chunk));
@@ -63,7 +60,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "PUT" || req.method === "PATCH") {
+      // DEBUG LOGS
+      console.log("=== DEBUG ===");
+      console.log("Content-Type:", req.headers["content-type"]);
+      console.log("req.body type:", typeof req.body);
+      console.log("req.body value:", JSON.stringify(req.body));
+      console.log("=============");
+
       const rawBody = await parseBody(req);
+      console.log("Parsed body:", JSON.stringify(rawBody));
+
       const body = { ...rawBody };
       delete body.id;
       delete body.userId;
@@ -94,10 +100,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (body.tableCount !== undefined)
         updateData.tableCount = Number(body.tableCount);
 
+      console.log("updateData:", JSON.stringify(updateData));
+
       if (Object.keys(updateData).length === 0) {
-        return res
-          .status(400)
-          .json({ message: "No fields provided to update" });
+        console.log(
+          "updateData is empty! rawBody was:",
+          JSON.stringify(rawBody),
+        );
+        return res.status(400).json({
+          message: "No fields to update",
+          receivedBody: rawBody,
+        });
       }
 
       if (updateData.slug) {
