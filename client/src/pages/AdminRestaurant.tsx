@@ -640,6 +640,8 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
   const [formData, setFormData] = useState({
     name: restaurant.name,
     description: restaurant.description || "",
+    descriptionAl: restaurant.descriptionAl || "",
+    descriptionMk: restaurant.descriptionMk || "",
     slug: restaurant.slug,
     photoUrl: restaurant.photoUrl || "",
     website: restaurant.website || "",
@@ -650,12 +652,15 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
     active: restaurant.active ?? true,
     latitude: restaurant.latitude || "",
     longitude: restaurant.longitude || "",
+    tableCount: restaurant.tableCount || 0,
   });
 
   useEffect(() => {
     setFormData({
       name: restaurant.name,
       description: restaurant.description || "",
+      descriptionAl: restaurant.descriptionAl || "",
+      descriptionMk: restaurant.descriptionMk || "",
       slug: restaurant.slug,
       photoUrl: restaurant.photoUrl || "",
       website: restaurant.website || "",
@@ -666,12 +671,20 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
       active: restaurant.active ?? true,
       latitude: restaurant.latitude || "",
       longitude: restaurant.longitude || "",
+      tableCount: restaurant.tableCount || 0,
     });
   }, [restaurant]);
 
   const handleSave = () => {
+    // Dërgoni vetëm fushat që kanë vlera
+    const updatePayload = Object.fromEntries(
+      Object.entries(formData).filter(
+        ([_, v]) => v !== "" && v !== null && v !== undefined
+      )
+    );
+
     update(
-      { id: restaurant.id, ...formData },
+      { id: restaurant.id, ...updatePayload },
       {
         onSuccess: () => {
           setIsEditing(false);
