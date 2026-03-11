@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage.js";
 import { setupAuth } from "./auth.js";
 import { api } from "../shared/routes.js";
@@ -12,6 +13,31 @@ import {
   pageViews,
 } from "../shared/schema.js";
 import { eq, sql, gte, and } from "drizzle-orm";
+
+// ── Table Chat: in-memory rooms ──────────────────────────────────────────────
+interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  qty: number;
+}
+interface TableRoom {
+  pin: string;
+  restaurantId: number;
+  cart: CartItem[];
+  clients: Set<WebSocket>;
+}
+
+const tableRooms = new Map<string, TableRoom>();
+
+function broadcastRoom(room: TableRoom, exclude?: WebSocket) {
+  const msg = JSON.stringify({ type: "cart_update", cart: room.cart });
+  for (const client of room.clients) {
+    if (client !== exclude && client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -302,8 +328,93 @@ export async function registerRoutes(
     res.sendStatus(204);
   });
 
-  app.get("/pos-manifest.json", (_req, res) => {
-    res.json({ name: "POS Kafeja", short_name: "POS", start_url: "/pos/restaurant-26-staff", display: "standalone", background_color: "#0F0F0F", theme_color: "#F59E0B", orientation: "portrait-primary", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }, { src: "/icon-512.png", sizes: "512x512", type: "image/png" }] });
+  // === TABLE CHAT WEBSOCKET ===
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws/table" });
+
+  wss.on("connection", (ws) => {
+    let currentPin: string | null = null;
+
+    ws.on("message", (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+
+        if (msg.type === "join") {
+          const pin = String(msg.pin).trim();
+          const restaurantId = Number(msg.restaurantId);
+          if (!pin || !restaurantId) return;
+
+          currentPin = pin;
+
+          if (!tableRooms.has(pin)) {
+            tableRooms.set(pin, {
+              pin,
+              restaurantId,
+              cart: [],
+              clients: new Set(),
+            });
+          }
+          const room = tableRooms.get(pin)!;
+          room.clients.add(ws);
+
+          // Send current cart to new joiner
+          ws.send(JSON.stringify({ type: "cart_update", cart: room.cart }));
+        }
+
+        if (msg.type === "cart_update" && currentPin) {
+          const room = tableRooms.get(currentPin);
+          if (!room) return;
+          room.cart = msg.cart;
+          broadcastRoom(room, ws);
+        }
+
+        if (msg.type === "clear_cart" && currentPin) {
+          const room = tableRooms.get(currentPin);
+          if (!room) return;
+          room.cart = [];
+          broadcastRoom(room, ws);
+        }
+      } catch {
+        /* ignore malformed messages */
+      }
+    });
+
+    ws.on("close", () => {
+      if (currentPin) {
+        const room = tableRooms.get(currentPin);
+        if (room) {
+          room.clients.delete(ws);
+          if (room.clients.size === 0) {
+            // Keep cart alive for 30min even if everyone leaves
+            setTimeout(
+              () => {
+                const r = tableRooms.get(currentPin!);
+                if (r && r.clients.size === 0) tableRooms.delete(currentPin!);
+              },
+              30 * 60 * 1000,
+            );
+          }
+        }
+      }
+    });
+  });
+
+  // REST: Generate PIN for a table (admin or public)
+  app.post("/api/table/pin", (req, res) => {
+    const { tableNumber, restaurantId } = req.body;
+    if (!tableNumber || !restaurantId)
+      return res.status(400).json({ message: "Missing fields" });
+    const pin = String(tableNumber).padStart(4, "0");
+    if (!tableRooms.has(pin)) {
+      tableRooms.set(pin, { pin, restaurantId, cart: [], clients: new Set() });
+    }
+    res.json({ pin });
+  });
+
+  // REST: Get current cart for a PIN
+  app.get("/api/table/:pin/cart", (req, res) => {
+    const room = tableRooms.get(req.params.pin);
+    if (!room) return res.json({ cart: [] });
+    res.json({ cart: room.cart });
   });
 
   // === SEED DATA ===
@@ -443,20 +554,3 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
   }
   console.log("Database seeded successfully!");
 }
-
-// POS manifest — served only for /pos/* routes
-app.get("/pos-manifest.json", (_req, res) => {
-  res.json({
-    name: "POS Kafeja",
-    short_name: "POS",
-    start_url: "/pos/restaurant-26-staff",
-    display: "standalone",
-    background_color: "#0F0F0F",
-    theme_color: "#F59E0B",
-    orientation: "portrait-primary",
-    icons: [
-      { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png" }
-    ]
-  });
-});

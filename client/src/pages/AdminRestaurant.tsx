@@ -48,6 +48,9 @@ import {
   X,
   Link as LinkIcon,
   GripVertical,
+  QrCode,
+  Download,
+  Table2,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -610,6 +613,9 @@ export default function AdminRestaurant() {
             </DndContext>
           )}
         </section>
+
+        {/* ── QR Codes Section ── */}
+        <TableQRSection restaurant={restaurant} />
       </main>
 
       <MenuItemDialog
@@ -847,7 +853,6 @@ function MenuItemDialog({
       isGlutenFree: false,
       isSpicy: false,
       containsNuts: false,
-      sortOrder: 0,
       restaurantId,
     },
     values: initialData ? { ...initialData, restaurantId } : undefined,
@@ -975,5 +980,208 @@ function MenuItemDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Table QR Section ─────────────────────────────────────────────────────────
+function TableQRSection({ restaurant }: { restaurant: any }) {
+  const { mutate: update } = useUpdateRestaurant();
+  const { toast } = useToast();
+  const [tableCount, setTableCount] = useState<number>(
+    restaurant.tableCount || 0,
+  );
+  const [inputVal, setInputVal] = useState(String(restaurant.tableCount || 0));
+  const [saving, setSaving] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<number | null>(null);
+  const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+  // Load qrcode library dynamically
+  useEffect(() => {
+    if (!(window as any).QRCode) {
+      const script = document.createElement("script");
+      script.src =
+        "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  // Draw QR for each table using canvas
+  useEffect(() => {
+    if (tableCount === 0) return;
+    const timer = setTimeout(() => {
+      for (let i = 0; i < tableCount; i++) {
+        const canvas = canvasRefs.current[i];
+        if (!canvas) continue;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
+        const url = `${baseUrl}/table/${restaurant.slug}/${i + 1}`;
+        // Draw QR using qrcode-svg approach via data URL
+        drawQR(canvas, url, i + 1);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [tableCount, restaurant.slug, baseUrl]);
+
+  const drawQR = (canvas: HTMLCanvasElement, url: string, tableNum: number) => {
+    // Use a simple QR via Google Charts API rendered to canvas
+    const size = 200;
+    canvas.width = size;
+    canvas.height = size + 40;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, size, size + 40);
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}&bgcolor=FFFFFF&color=000000&margin=10`;
+    img.onload = () => {
+      ctx.drawImage(img, 10, 10, 180, 180);
+      // Table label
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold 14px DM Sans, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`Table ${tableNum}`, size / 2, size + 20);
+      ctx.font = "10px DM Sans, sans-serif";
+      ctx.fillStyle = "#888888";
+      ctx.fillText(restaurant.name, size / 2, size + 35);
+    };
+  };
+
+  const saveTableCount = () => {
+    const count = parseInt(inputVal);
+    if (isNaN(count) || count < 0 || count > 100) {
+      toast({
+        title: "Numër i gabuar",
+        description: "Ndërmjet 0 dhe 100",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSaving(true);
+    update(
+      { id: restaurant.id, data: { tableCount: count } as any },
+      {
+        onSuccess: () => {
+          setTableCount(count);
+          setSaving(false);
+          toast({ title: "✓ Ruajtur", description: `${count} tavolina` });
+        },
+        onError: () => setSaving(false),
+      },
+    );
+  };
+
+  const downloadQR = (tableNum: number) => {
+    const canvas = canvasRefs.current[tableNum - 1];
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `${restaurant.slug}-table-${tableNum}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
+  const downloadAll = () => {
+    for (let i = 1; i <= tableCount; i++) {
+      setTimeout(() => downloadQR(i), i * 300);
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <QrCode className="h-5 w-5 text-primary" />
+          <h2 className="text-lg sm:text-xl font-bold text-foreground">
+            QR Codes · Tavolinat
+          </h2>
+        </div>
+        {tableCount > 0 && (
+          <button
+            onClick={downloadAll}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Shkarko të gjitha
+          </button>
+        )}
+      </div>
+
+      {/* Table count input */}
+      <div className="bg-background rounded-xl border border-border p-4 flex items-center gap-3">
+        <Table2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-foreground">
+            Numri i tavolinave
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Gjeneron QR kod unik për çdo tavolinë
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            className="w-16 h-9 rounded-lg border border-border bg-muted text-center text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <button
+            onClick={saveTableCount}
+            disabled={saving}
+            className="h-9 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ruaj"}
+          </button>
+        </div>
+      </div>
+
+      {/* QR Grid */}
+      {tableCount > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {Array.from({ length: tableCount }, (_, i) => i + 1).map(
+            (tableNum) => (
+              <div
+                key={tableNum}
+                className="bg-background rounded-xl border border-border p-3 flex flex-col items-center gap-2 hover:border-primary/50 transition-colors"
+              >
+                <canvas
+                  ref={(el) => {
+                    canvasRefs.current[tableNum - 1] = el;
+                  }}
+                  className="w-full max-w-[160px] rounded-lg"
+                  style={{ imageRendering: "pixelated" }}
+                />
+                <div className="w-full flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground">
+                    T{tableNum}
+                  </span>
+                  <button
+                    onClick={() => downloadQR(tableNum)}
+                    className="flex items-center gap-1 text-xs text-primary font-semibold hover:underline"
+                  >
+                    <Download className="h-3 w-3" />
+                    PNG
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center truncate w-full">
+                  /table/{restaurant.slug}/{tableNum}
+                </p>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+
+      {tableCount === 0 && (
+        <div className="bg-muted/40 rounded-xl border border-dashed border-border p-8 flex flex-col items-center gap-2">
+          <QrCode className="h-8 w-8 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">
+            Shkruani numrin e tavolinave dhe klikoni Ruaj
+          </p>
+        </div>
+      )}
+    </section>
   );
 }

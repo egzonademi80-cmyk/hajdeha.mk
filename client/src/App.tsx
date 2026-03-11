@@ -10,6 +10,7 @@ import Home from "@/pages/Home";
 import PublicMenu from "@/pages/PublicMenu";
 import AuthLogin from "@/pages/AuthLogin";
 import POS from "@/pages/POS";
+import TablePage from "@/pages/TablePage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminRestaurant from "@/pages/AdminRestaurant";
 import ProtectedRoute from "@/components/ProtectedRoute";

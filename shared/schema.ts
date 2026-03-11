@@ -40,6 +40,7 @@ export const restaurants = pgTable(
     active: boolean("active").default(true).notNull(),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
+    tableCount: integer("table_count").default(0).notNull(),
   },
   (table) => ({ slugIdx: index("slug_idx").on(table.slug) }),
 );
