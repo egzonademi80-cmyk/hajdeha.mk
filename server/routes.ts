@@ -244,23 +244,40 @@ export async function registerRoutes(
     res.json({ ...restaurant, menuItems });
   });
 
+  // === ADMIN RESTAURANTS (authenticated) ===
   app.get(api.restaurants.list.path, async (req, res) => {
-    const restaurants = await storage.getAllRestaurants();
+    if (!req.isAuthenticated())
+      return res.status(401).json({ message: "Not authenticated" });
+    const user = req.user as any;
+    const restaurants = await db
+      .select()
+      .from(restaurantsTable)
+      .where(eq(restaurantsTable.userId, user.id));
     res.json(restaurants);
   });
 
   app.get(api.restaurants.get.path, async (req, res) => {
+    if (!req.isAuthenticated())
+      return res.status(401).json({ message: "Not authenticated" });
+    const user = req.user as any;
     const id = parseInt(req.params.id);
     const restaurant = await storage.getRestaurant(id);
     if (!restaurant) return res.status(404).json({ message: "Not found" });
+    if (restaurant.userId !== user.id)
+      return res.status(403).json({ message: "Forbidden" });
     const menuItems = await storage.getMenuItems(id);
     res.json({ ...restaurant, menuItems });
   });
 
   app.put(api.restaurants.update.path, async (req, res) => {
+    if (!req.isAuthenticated())
+      return res.status(401).json({ message: "Not authenticated" });
+    const user = req.user as any;
     const id = parseInt(req.params.id);
     const restaurant = await storage.getRestaurant(id);
     if (!restaurant) return res.status(404).json({ message: "Not found" });
+    if (restaurant.userId !== user.id)
+      return res.status(403).json({ message: "Forbidden" });
     const input = api.restaurants.update.input.parse(req.body);
     const updated = await storage.updateRestaurant(id, input);
     res.json(updated);
@@ -268,12 +285,13 @@ export async function registerRoutes(
 
   app.post(api.restaurants.create.path, async (req, res) => {
     try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Not authenticated" });
       const input = api.restaurants.create.input.parse(req.body);
       const user = req.user as any;
-      const userId = user?.id || 1;
       const restaurant = await storage.createRestaurant({
         ...input,
-        userId,
+        userId: user.id,
         latitude: input.latitude ?? null,
         longitude: input.longitude ?? null,
       });
@@ -287,9 +305,14 @@ export async function registerRoutes(
   });
 
   app.delete(api.restaurants.delete.path, async (req, res) => {
+    if (!req.isAuthenticated())
+      return res.status(401).json({ message: "Not authenticated" });
+    const user = req.user as any;
     const id = parseInt(req.params.id);
     const restaurant = await storage.getRestaurant(id);
     if (!restaurant) return res.status(404).json({ message: "Not found" });
+    if (restaurant.userId !== user.id)
+      return res.status(403).json({ message: "Forbidden" });
     await storage.deleteRestaurant(id);
     res.sendStatus(204);
   });
