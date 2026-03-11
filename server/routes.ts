@@ -32,10 +32,23 @@ const tableRooms = new Map<string, TableRoom>();
 
 function broadcastRoom(room: TableRoom, exclude?: WebSocket) {
   const msg = JSON.stringify({ type: "cart_update", cart: room.cart });
+  const peerMsg = JSON.stringify({ type: "peer_count", count: room.clients.size - 1 });
 
   for (const client of Array.from(room.clients)) {
-    if (client !== exclude && client.readyState === WebSocket.OPEN) {
-      client.send(msg);
+    if (client.readyState === WebSocket.OPEN) {
+      if (client !== exclude) {
+        client.send(msg);
+      }
+      client.send(peerMsg);
+    }
+  }
+}
+
+function broadcastPeerCount(room: TableRoom) {
+  const peerMsg = JSON.stringify({ type: "peer_count", count: room.clients.size - 1 });
+  for (const client of Array.from(room.clients)) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(peerMsg);
     }
   }
 }
@@ -357,6 +370,9 @@ export async function registerRoutes(
 
           // Send current cart to new joiner
           ws.send(JSON.stringify({ type: "cart_update", cart: room.cart }));
+
+          // Broadcast peer count
+          broadcastPeerCount(room);
         }
 
         if (msg.type === "cart_update" && currentPin) {
@@ -382,6 +398,8 @@ export async function registerRoutes(
         const room = tableRooms.get(currentPin);
         if (room) {
           room.clients.delete(ws);
+          // Broadcast updated peer count
+          broadcastPeerCount(room);
           if (room.clients.size === 0) {
             // Keep cart alive for 30min even if everyone leaves
             setTimeout(
