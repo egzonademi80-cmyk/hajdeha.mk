@@ -10,10 +10,11 @@ import {
   forbidden,
 } from "../auth.js";
 
+// Optional: Vercel automatically parses JSON, but keep fallback for raw bodies
 async function parseBody(req: VercelRequest): Promise<any> {
-  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
+  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body))
     return req.body;
-  }
+
   if (typeof req.body === "string") {
     try {
       return JSON.parse(req.body);
@@ -21,6 +22,7 @@ async function parseBody(req: VercelRequest): Promise<any> {
       return {};
     }
   }
+
   return new Promise((resolve) => {
     let data = "";
     req.on("data", (chunk) => (data += chunk));
@@ -44,13 +46,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
   try {
+    // Fetch restaurant
     const [restaurant] = await db
       .select()
       .from(restaurants)
       .where(eq(restaurants.id, id));
+
     if (!restaurant) return notFound(res);
     if (restaurant.userId !== user.userId) return forbidden(res);
 
+    // GET: return restaurant + menu items
     if (req.method === "GET") {
       const items = await db
         .select()
@@ -59,60 +64,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ...restaurant, menuItems: items });
     }
 
+    // PUT/PATCH: update restaurant
     if (req.method === "PUT" || req.method === "PATCH") {
-      // DEBUG LOGS
-      console.log("=== DEBUG ===");
-      console.log("Content-Type:", req.headers["content-type"]);
-      console.log("req.body type:", typeof req.body);
-      console.log("req.body value:", JSON.stringify(req.body));
-      console.log("=============");
-
       const rawBody = await parseBody(req);
-      console.log("Parsed body:", JSON.stringify(rawBody));
 
-      const body = { ...rawBody };
-      delete body.id;
-      delete body.userId;
+      // Remove protected fields
+      const { id: _id, userId: _uid, ...body } = rawBody;
+
+      // Allowed fields
+      const allowedFields = [
+        "name",
+        "description",
+        "descriptionAl",
+        "descriptionMk",
+        "slug",
+        "photoUrl",
+        "website",
+        "phoneNumber",
+        "location",
+        "openingTime",
+        "closingTime",
+        "active",
+        "latitude",
+        "longitude",
+        "tableCount",
+      ];
 
       const updateData: any = {};
-      if (body.name !== undefined) updateData.name = body.name;
-      if (body.description !== undefined)
-        updateData.description = body.description;
-      if (body.descriptionAl !== undefined)
-        updateData.descriptionAl = body.descriptionAl;
-      if (body.descriptionMk !== undefined)
-        updateData.descriptionMk = body.descriptionMk;
-      if (body.slug !== undefined) updateData.slug = body.slug;
-      if (body.photoUrl !== undefined) updateData.photoUrl = body.photoUrl;
-      if (body.website !== undefined) updateData.website = body.website;
-      if (body.phoneNumber !== undefined)
-        updateData.phoneNumber = body.phoneNumber;
-      if (body.location !== undefined) updateData.location = body.location;
-      if (body.openingTime !== undefined)
-        updateData.openingTime = body.openingTime;
-      if (body.closingTime !== undefined)
-        updateData.closingTime = body.closingTime;
-      if (body.active !== undefined) updateData.active = body.active;
-      if (body.latitude !== undefined)
-        updateData.latitude = body.latitude ? Number(body.latitude) : null;
-      if (body.longitude !== undefined)
-        updateData.longitude = body.longitude ? Number(body.longitude) : null;
-      if (body.tableCount !== undefined)
-        updateData.tableCount = Number(body.tableCount);
 
-      console.log("updateData:", JSON.stringify(updateData));
+      for (const key of allowedFields) {
+        if (body[key] !== undefined) updateData[key] = body[key];
+      }
 
-      if (Object.keys(updateData).length === 0) {
-        console.log(
-          "updateData is empty! rawBody was:",
-          JSON.stringify(rawBody),
-        );
+      // Convert numeric fields
+      if (updateData.latitude !== undefined)
+        updateData.latitude = updateData.latitude
+          ? Number(updateData.latitude)
+          : null;
+      if (updateData.longitude !== undefined)
+        updateData.longitude = updateData.longitude
+          ? Number(updateData.longitude)
+          : null;
+      if (updateData.tableCount !== undefined)
+        updateData.tableCount = Number(updateData.tableCount);
+
+      if (Object.keys(updateData).length === 0)
         return res.status(400).json({
           message: "No fields to update",
           receivedBody: rawBody,
         });
-      }
 
+      // Check slug uniqueness
       if (updateData.slug) {
         const [existing] = await db
           .select()
@@ -127,14 +129,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // Update
       const [updated] = await db
         .update(restaurants)
         .set(updateData)
         .where(eq(restaurants.id, id))
         .returning();
+
       return res.status(200).json(updated);
     }
 
+    // DELETE: restaurant + menu items
     if (req.method === "DELETE") {
       await db.delete(menuItems).where(eq(menuItems.restaurantId, id));
       await db.delete(restaurants).where(eq(restaurants.id, id));
