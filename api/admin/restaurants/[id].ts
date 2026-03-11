@@ -9,7 +9,14 @@ import {
   notFound,
   forbidden,
 } from "../auth.js";
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('🔑 Headers:', req.headers); // ✅ Shiko të gjitha headers
+  console.log('🔑 Authorization:', req.headers.authorization); // ✅ Shiko token-in
 
+  const user = verifyToken(req);
+  console.log('👤 User:', user); // ✅ Shiko nëse user është null
+
+  if (!user) return unauthorized(res);
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = verifyToken(req);
   if (!user) return unauthorized(res);
