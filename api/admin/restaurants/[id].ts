@@ -16,7 +16,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { id: idParam } = req.query;
   const id = parseInt(Array.isArray(idParam) ? idParam[0] : idParam || "");
-
   if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
   try {
@@ -63,15 +62,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ];
 
       const updateData: any = {};
+
       for (const key of allowedFields) {
-        if (body[key] !== undefined) {
-          updateData[key] =
-            key === "latitude" || key === "longitude" || key === "tableCount"
-              ? body[key] !== null
-                ? Number(body[key])
-                : null
-              : body[key];
+        if (body.hasOwnProperty(key)) {
+          if (
+            key === "latitude" ||
+            key === "longitude" ||
+            key === "tableCount"
+          ) {
+            updateData[key] =
+              body[key] !== null && body[key] !== "" ? Number(body[key]) : null;
+          } else {
+            updateData[key] = body[key];
+          }
         }
+      }
+
+      // If no fields to update, return current data
+      if (Object.keys(updateData).length === 0) {
+        const items = await db
+          .select()
+          .from(menuItems)
+          .where(eq(menuItems.restaurantId, id));
+        return res.status(200).json({ ...restaurant, menuItems: items });
       }
 
       // Slug uniqueness check
@@ -83,22 +96,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             and(eq(restaurants.slug, updateData.slug), ne(restaurants.id, id)),
           );
         if (existing) {
-          return res
-            .status(400)
-            .json({
-              message:
-                "Slug already exists. Please choose a different URL slug.",
-            });
+          return res.status(400).json({
+            message: "Slug already exists. Please choose a different URL slug.",
+          });
         }
-      }
-
-      // If no fields to update, just return the current restaurant with menu items
-      if (Object.keys(updateData).length === 0) {
-        const items = await db
-          .select()
-          .from(menuItems)
-          .where(eq(menuItems.restaurantId, id));
-        return res.status(200).json({ ...restaurant, menuItems: items });
       }
 
       // Perform update
@@ -119,11 +120,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === "DELETE") {
       await db.delete(menuItems).where(eq(menuItems.restaurantId, id));
       await db.delete(restaurants).where(eq(restaurants.id, id));
-      return res
-        .status(200)
-        .json({
-          message: "Restaurant and all menu items deleted successfully",
-        });
+      return res.status(200).json({
+        message: "Restaurant and all menu items deleted successfully",
+      });
     }
 
     return methodNotAllowed(res);
