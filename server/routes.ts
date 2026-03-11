@@ -302,6 +302,10 @@ export async function registerRoutes(
     res.sendStatus(204);
   });
 
+  app.get("/pos-manifest.json", (_req, res) => {
+    res.json({ name: "POS Kafeja", short_name: "POS", start_url: "/pos/restaurant-26-staff", display: "standalone", background_color: "#0F0F0F", theme_color: "#F59E0B", orientation: "portrait-primary", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }, { src: "/icon-512.png", sizes: "512x512", type: "image/png" }] });
+  });
+
   // === SEED DATA ===
   // Seed is non-critical — don't crash server if DB connection is slow on cold start
   seedDatabase(hashPassword).catch((err) => {
@@ -439,3 +443,20 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
   }
   console.log("Database seeded successfully!");
 }
+
+// POS manifest — served only for /pos/* routes
+app.get("/pos-manifest.json", (_req, res) => {
+  res.json({
+    name: "POS Kafeja",
+    short_name: "POS",
+    start_url: "/pos/restaurant-26-staff",
+    display: "standalone",
+    background_color: "#0F0F0F",
+    theme_color: "#F59E0B",
+    orientation: "portrait-primary",
+    icons: [
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png" }
+    ]
+  });
+});

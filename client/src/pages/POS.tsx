@@ -167,6 +167,22 @@ export default function POS() {
 
   const [, forceUpdate] = useState(0);
 
+  // Override PWA manifest so Chrome installs POS not HAJDE HA
+  useEffect(() => {
+    const link = document.querySelector("link[rel=\"manifest\"]") as HTMLLinkElement;
+    if (link) link.href = "/pos-manifest.json";
+    return () => { if (link) link.href = "/manifest.json"; };
+  }, []);
+  useEffect(() => {
+    // Override manifest for POS page
+    const link = document.querySelector(
+      'link[rel="manifest"]',
+    ) as HTMLLinkElement;
+    if (link) link.href = "/pos-manifest.json";
+    return () => {
+      if (link) link.href = "/manifest.json";
+    };
+  }, []);
   // Tick every 30s so elapsed times update live
   useEffect(() => {
     const id = setInterval(() => forceUpdate((n) => n + 1), 30000);
