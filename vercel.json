@@ -48,35 +48,35 @@
       "dest": "/apple-touch-icon.png"
     },
     {
-      "src": "/api/restaurants",
+      "src": "^/api/restaurants$",
       "dest": "api/restaurants/index.ts"
     },
     {
-      "src": "/api/login",
+      "src": "^/api/login$",
       "dest": "api/login.ts"
     },
     {
-      "src": "/api/admin/restaurants",
+      "src": "^/api/admin/restaurants$",
       "dest": "api/admin/restaurants/index.ts"
     },
     {
-      "src": "/api/admin/restaurants/(?<id>[^/]*)",
-      "dest": "api/admin/restaurants/[id].ts?id=$id"
+      "src": "^/api/admin/restaurants/([^/]+)$",
+      "dest": "api/admin/restaurants/[id].ts"
     },
     {
-      "src": "/api/admin/menu-items",
+      "src": "^/api/admin/menu-items$",
       "dest": "api/admin/menu-items/index.ts"
     },
     {
-      "src": "/api/admin/menu-items/(?<id>[^/]*)",
-      "dest": "api/admin/menu-items/[id].ts?id=$id"
+      "src": "^/api/admin/menu-items/([^/]+)$",
+      "dest": "api/admin/menu-items/[id].ts"
     },
     {
-      "src": "/api/(.*)",
+      "src": "^/api/(.*)",
       "dest": "api/index.ts"
     },
     {
-      "src": "/assets/(.*)",
+      "src": "^/assets/(.*)",
       "dest": "/assets/$1"
     },
     {

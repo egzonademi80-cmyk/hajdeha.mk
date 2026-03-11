@@ -10,6 +10,34 @@ import {
   forbidden,
 } from "../auth.js";
 
+async function parseBody(req: VercelRequest): Promise<any> {
+  // Already parsed by Vercel
+  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+  // String body — parse it
+  if (typeof req.body === "string") {
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return {};
+    }
+  }
+  // Raw stream — read and parse manually
+  return new Promise((resolve) => {
+    let data = "";
+    req.on("data", (chunk) => (data += chunk));
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(data));
+      } catch {
+        resolve({});
+      }
+    });
+    req.on("error", () => resolve({}));
+  });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = verifyToken(req);
   if (!user) return unauthorized(res);
@@ -19,7 +47,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
   try {
-    // Ownership check
     const [restaurant] = await db
       .select()
       .from(restaurants)
@@ -36,11 +63,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === "PUT" || req.method === "PATCH") {
-      const body = { ...req.body };
+      const rawBody = await parseBody(req);
+      const body = { ...rawBody };
       delete body.id;
       delete body.userId;
 
-      // Explicitly map only known fields to avoid SQL errors
       const updateData: any = {};
       if (body.name !== undefined) updateData.name = body.name;
       if (body.description !== undefined)
@@ -67,6 +94,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (body.tableCount !== undefined)
         updateData.tableCount = Number(body.tableCount);
 
+      if (Object.keys(updateData).length === 0) {
+        return res
+          .status(400)
+          .json({ message: "No fields provided to update" });
+      }
+
       if (updateData.slug) {
         const [existing] = await db
           .select()
@@ -75,12 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             and(eq(restaurants.slug, updateData.slug), ne(restaurants.id, id)),
           );
         if (existing) {
-          return res
-            .status(400)
-            .json({
-              message:
-                "Slug already exists. Please choose a different URL slug.",
-            });
+          return res.status(400).json({
+            message: "Slug already exists. Please choose a different URL slug.",
+          });
         }
       }
 
@@ -95,11 +125,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === "DELETE") {
       await db.delete(menuItems).where(eq(menuItems.restaurantId, id));
       await db.delete(restaurants).where(eq(restaurants.id, id));
-      return res
-        .status(200)
-        .json({
-          message: "Restaurant and all menu items deleted successfully",
-        });
+      return res.status(200).json({
+        message: "Restaurant and all menu items deleted successfully",
+      });
     }
 
     return methodNotAllowed(res);
