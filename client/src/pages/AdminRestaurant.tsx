@@ -1060,7 +1060,7 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
     }
     setSaving(true);
     update(
-      { id: restaurant.id, data: { tableCount: count } as any },
+      { id: restaurant.id, tableCount: count },
       {
         onSuccess: () => {
           setTableCount(count);

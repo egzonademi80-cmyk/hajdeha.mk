@@ -32,7 +32,8 @@ const tableRooms = new Map<string, TableRoom>();
 
 function broadcastRoom(room: TableRoom, exclude?: WebSocket) {
   const msg = JSON.stringify({ type: "cart_update", cart: room.cart });
-  for (const client of room.clients) {
+
+  for (const client of Array.from(room.clients)) {
     if (client !== exclude && client.readyState === WebSocket.OPEN) {
       client.send(msg);
     }
@@ -111,11 +112,9 @@ export async function registerRoutes(
       if (!anthropicRes.ok) {
         const err = await anthropicRes.text();
         console.error("Anthropic API error:", anthropicRes.status, err);
-        return res
-          .status(200)
-          .json({
-            text: `DEBUG: ${anthropicRes.status} - ${err.slice(0, 200)}`,
-          });
+        return res.status(200).json({
+          text: `DEBUG: ${anthropicRes.status} - ${err.slice(0, 200)}`,
+        });
       }
       const data = await anthropicRes.json();
       const text: string =

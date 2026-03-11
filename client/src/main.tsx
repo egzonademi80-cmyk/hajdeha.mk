@@ -2,6 +2,52 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+// ── Push helper functions (MOVED OUTSIDE BLOCK) ──
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+}
+
+async function subscribeToPush(reg: ServiceWorkerRegistration) {
+  try {
+    const res = await fetch("/api/push/vapid-public-key");
+    if (!res.ok) return;
+
+    const { key } = await res.json();
+    if (!key) return;
+
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) return;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(key),
+    });
+
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(subscription),
+    });
+
+    console.log("✅ Push subscription saved");
+  } catch (err) {
+    console.warn("Push subscription failed:", err);
+  }
+}
+
 // ── Inline Service Worker (works on Vercel static hosting) ──
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   const SW_CODE = `
@@ -90,6 +136,7 @@ self.addEventListener("fetch", (event) => {
       )
   );
 });
+
 self.addEventListener("push", (event) => {
   if (!event.data) return;
   try {
@@ -122,53 +169,6 @@ self.addEventListener("notificationclick", (event) => {
 });
 `;
 
-  // Subscribe user to push notifications
-  async function subscribeToPush(reg: ServiceWorkerRegistration) {
-    try {
-      // Get VAPID public key from server
-      const res = await fetch("/api/push/vapid-public-key");
-      if (!res.ok) return;
-      const { key } = await res.json();
-      if (!key) return;
-
-      // Check existing subscription
-      const existing = await reg.pushManager.getSubscription();
-      if (existing) return; // Already subscribed
-
-      // Request permission
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") return;
-
-      // Subscribe
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
-      });
-
-      // Send to server
-      await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(subscription),
-      });
-      console.log("✅ Push subscription saved");
-    } catch (err) {
-      console.warn("Push subscription failed:", err);
-    }
-  }
-
-  function urlBase64ToUint8Array(base64String: string) {
-    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding)
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i)
-      outputArray[i] = rawData.charCodeAt(i);
-    return outputArray;
-  }
-
   window.addEventListener("load", () => {
     try {
       const blob = new Blob([SW_CODE], { type: "application/javascript" });
@@ -178,10 +178,13 @@ self.addEventListener("notificationclick", (event) => {
         .register(swUrl, { scope: "/" })
         .then((reg) => {
           console.log("✅ PWA ServiceWorker registered");
-          setInterval(() => reg.update(), 60_000);
+
+          setInterval(() => reg.update(), 60000);
+
           reg.addEventListener("updatefound", () => {
             const newWorker = reg.installing;
             if (!newWorker) return;
+
             newWorker.addEventListener("statechange", () => {
               if (
                 newWorker.state === "installed" &&
@@ -192,11 +195,11 @@ self.addEventListener("notificationclick", (event) => {
             });
           });
 
-          // Subscribe to push notifications
           subscribeToPush(reg);
         })
         .catch((err) => {
           console.warn("Blob SW failed, trying file SW:", err);
+
           navigator.serviceWorker
             .register("/service-worker.js")
             .then(() => console.log("✅ File SW registered"))

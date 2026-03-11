@@ -25,9 +25,7 @@ function Router() {
       <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
       <Switch>
         {/* Public Routes */}
-        <Route path="/">
-          {() => <Home isDark={isDark} toggleDarkMode={toggleDarkMode} />}
-        </Route>
+        <Route path="/">{() => <Home />}</Route>
         <Route path="/restaurant/:slug" component={PublicMenu} />
         <Route path="/auth/login" component={AuthLogin} />
 
