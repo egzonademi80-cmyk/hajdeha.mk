@@ -36,6 +36,9 @@ function Router() {
         <Route path="/admin/restaurant/:id">
           {() => <ProtectedRoute component={AdminRestaurant} />}
         </Route>
+        {/* Table ordering (QR scan) */}
+        <Route path="/table/:restaurantSlug/:tableNumber" component={TablePage} />
+
         {/* Fallback */}
         <Route path="/pos/bujar" component={POS} />
         <Route component={NotFound} />
