@@ -11,19 +11,31 @@ import {
 } from "../auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log("🔍 req.url:", req.url);
-  console.log("🔍 req.query:", req.query);
-
   const user = verifyToken(req);
   if (!user) return unauthorized(res);
 
+  // Provoni të merrni ID-në nga URL, jo nga query
+  const urlParts = req.url?.split("/") || [];
+  const idFromUrl = urlParts[urlParts.length - 1];
+
+  console.log("🔍 req.url:", req.url);
+  console.log("🔍 req.query:", req.query);
+  console.log("🔍 idFromUrl:", idFromUrl);
+
   const { id: idParam } = req.query;
-  console.log("🔍 idParam:", idParam, "type:", typeof idParam);
+  const id = parseInt(
+    idFromUrl || (Array.isArray(idParam) ? idParam[0] : idParam || ""),
+  );
 
-  const id = parseInt(Array.isArray(idParam) ? idParam[0] : idParam || "");
-  console.log("🔍 parsed id:", id, "isNaN:", isNaN(id));
+  console.log("🔍 parsed id:", id);
 
-  if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+  if (isNaN(id))
+    return res
+      .status(400)
+      .json({
+        message: "Invalid ID",
+        debug: { url: req.url, query: req.query },
+      });
 
   try {
     // Fetch restaurant & ownership check
