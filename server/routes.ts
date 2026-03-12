@@ -72,7 +72,8 @@ export async function registerRoutes(
           .json({ message: info?.message || "Authentication failed" });
       req.logIn(user, (err) => {
         if (err) return next(err);
-        return res.json(user);
+        const { password: _pw, ...safeUser } = user;
+        return res.json({ user: safeUser });
       });
     })(req, res, next);
   });
@@ -91,7 +92,8 @@ export async function registerRoutes(
   app.get(api.auth.user.path, (req, res) => {
     if (!req.isAuthenticated())
       return res.status(401).json({ message: "Not authenticated" });
-    res.json(req.user);
+    const { password: _pw, ...safeUser } = req.user as any;
+    res.json({ user: safeUser });
   });
 
   // === AI CHAT PROXY ===
@@ -270,17 +272,24 @@ export async function registerRoutes(
   });
 
   app.put(api.restaurants.update.path, async (req, res) => {
-    if (!req.isAuthenticated())
-      return res.status(401).json({ message: "Not authenticated" });
-    const user = req.user as any;
-    const id = parseInt(req.params.id);
-    const restaurant = await storage.getRestaurant(id);
-    if (!restaurant) return res.status(404).json({ message: "Not found" });
-    if (restaurant.userId !== user.id)
-      return res.status(403).json({ message: "Forbidden" });
-    const input = api.restaurants.update.input.parse(req.body);
-    const updated = await storage.updateRestaurant(id, input);
-    res.json(updated);
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Not authenticated" });
+      const user = req.user as any;
+      const id = parseInt(req.params.id);
+      const restaurant = await storage.getRestaurant(id);
+      if (!restaurant) return res.status(404).json({ message: "Not found" });
+      if (restaurant.userId !== user.id)
+        return res.status(403).json({ message: "Forbidden" });
+      const result = api.restaurants.update.input.safeParse(req.body);
+      if (!result.success)
+        return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+      const updated = await storage.updateRestaurant(id, result.data);
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Update restaurant error:", err);
+      res.status(500).json({ message: err.message || "Failed to update" });
+    }
   });
 
   app.post(api.restaurants.create.path, async (req, res) => {

@@ -12,15 +12,14 @@ export function useUser() {
     queryKey: ["/api/user"],
     queryFn: async () => {
       const token = getToken();
-
-      if (!token) {
-        return null;
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
       }
 
       const res = await fetch("/api/user", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: "include",
       });
 
       if (res.status === 401 || !res.ok) {
@@ -29,7 +28,7 @@ export function useUser() {
       }
 
       const data = await res.json();
-      return data.user;
+      return data.user ?? data;
     },
     retry: false,
   });
@@ -45,22 +44,22 @@ export function useLogin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
+        credentials: "include",
       });
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "Login failed");
+        throw new Error(error.message || error.error || "Login failed");
       }
 
       return res.json();
     },
     onSuccess: (data) => {
+      const user = data.user ?? data;
       if (data.token) {
         setToken(data.token);
-        // Store in localStorage for persistence across page reloads
-        localStorage.setItem("hajdeha-token", data.token);
       }
-      queryClient.setQueryData(["/api/user"], data.user);
+      queryClient.setQueryData(["/api/user"], user);
       setLocation("/admin/dashboard");
     },
   });
@@ -72,7 +71,10 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      await fetch("/api/logout", { method: "POST" });
+      await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     },
     onSuccess: () => {
       removeToken();
