@@ -5,12 +5,16 @@ import {
   Plus,
   Minus,
   ShoppingBag,
-  Coffee,
   Wifi,
   WifiOff,
   Users,
   CheckCircle,
+  UtensilsCrossed,
+  ChevronLeft,
+  Loader2,
+  ArrowLeft,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface MenuItem {
   id: number;
@@ -18,6 +22,7 @@ interface MenuItem {
   price: string;
   category: string;
   active: boolean;
+  imageUrl?: string | null;
 }
 
 interface CartItem {
@@ -49,8 +54,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [ordered, setOrdered] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const isLocal = useRef(false);
+  const categoryBarRef = useRef<HTMLDivElement>(null);
 
-  // Fetch menu
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["table-restaurant", restaurantSlug],
     queryFn: async () => {
@@ -78,7 +83,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     [menuItems, activeCategory],
   );
 
-  // WebSocket connection — wait for restaurant to load so we have restaurantId
   useEffect(() => {
     if (!restaurant?.id) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -95,9 +99,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === "cart_update" && !isLocal.current) {
-          setCart(msg.cart);
-        }
+        if (msg.type === "cart_update" && !isLocal.current) setCart(msg.cart);
         if (msg.type === "peer_count") setPeerCount(msg.count);
       } catch {}
     };
@@ -108,7 +110,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     return () => ws.close();
   }, [pin, restaurant?.id]);
 
-  // Sync cart to WebSocket
   const syncCart = useCallback((newCart: CartItem[]) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       isLocal.current = true;
@@ -140,7 +141,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       return next;
     });
     setJustAdded(item.id);
-    setTimeout(() => setJustAdded(null), 800);
+    setTimeout(() => setJustAdded(null), 700);
   };
 
   const updateQty = (id: number, delta: number) => {
@@ -161,99 +162,132 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     setTimeout(() => setOrdered(false), 3000);
   };
 
+  // ─── Loading state ─────────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="h-[100dvh] w-full bg-background flex flex-col items-center justify-center gap-4 text-muted-foreground">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        >
+          <Loader2 className="h-9 w-9 text-primary" />
+        </motion.div>
+        <p className="text-sm font-medium">Duke ngarkuar menunë…</p>
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="h-[100dvh] w-full bg-background flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <UtensilsCrossed className="h-12 w-12 text-muted-foreground/40" />
+        <p className="text-stone-500 dark:text-stone-400 text-sm max-w-xs">
+          Restoranti nuk u gjet. Kontrolloni URL-në dhe provoni përsëri.
+        </p>
+      </div>
+    );
+  }
+
+  // ─── Main UI ───────────────────────────────────────────────────────────────
   return (
     <div
-      className="h-[100dvh] w-screen flex flex-col overflow-hidden bg-[#FAFAF8]"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}
+      className="h-[100dvh] w-screen flex flex-col overflow-hidden bg-background"
+      data-testid="table-cart-page"
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* Header */}
-      <div
-        className="flex-shrink-0 bg-white border-b border-black/6 px-4 py-3 flex items-center justify-between"
-        style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+      {/* ── Header ── */}
+      <header
+        className="flex-shrink-0 bg-white dark:bg-stone-900 border-b border-border px-4 flex items-center justify-between gap-3 shadow-sm"
+        style={{
+          paddingTop: "max(12px, env(safe-area-inset-top, 12px))",
+          paddingBottom: 12,
+        }}
       >
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-xl bg-amber-500 flex items-center justify-center">
-            <Coffee className="h-4 w-4 text-white" />
+        {/* Left: logo + restaurant + table */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+            <UtensilsCrossed className="h-4 w-4 text-primary-foreground" />
           </div>
-          <div>
-            <p className="text-sm font-bold text-black leading-none">
-              {restaurant?.name || "Menu"}
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-foreground leading-tight truncate">
+              {restaurant.name}
             </p>
-            <p
-              className="text-[11px] text-black/40 mt-0.5"
-              style={{ fontFamily: "'DM Mono', monospace" }}
-            >
-              TABLE {tableNumber}
+            <p className="text-[11px] text-muted-foreground font-mono mt-0.5 uppercase tracking-widest">
+              Tavolina {tableNumber}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Peer count */}
+
+        {/* Right: peers + connection + cart */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           {peerCount > 0 && (
-            <div className="flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-full">
-              <Users className="h-3 w-3 text-emerald-600" />
-              <span className="text-[11px] font-semibold text-emerald-600">
+            <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-full">
+              <Users className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                 {peerCount + 1}
               </span>
             </div>
           )}
-          {/* Connection status */}
+
           <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${connected ? "bg-emerald-50" : "bg-red-50"}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold font-mono uppercase ${
+              connected
+                ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                : "bg-red-50 dark:bg-red-900/30 text-red-500"
+            }`}
           >
             {connected ? (
-              <Wifi className="h-3 w-3 text-emerald-600" />
+              <Wifi className="h-3 w-3" />
             ) : (
-              <WifiOff className="h-3 w-3 text-red-500" />
+              <WifiOff className="h-3 w-3" />
             )}
-            <span
-              className={`text-[10px] font-semibold ${connected ? "text-emerald-600" : "text-red-500"}`}
-              style={{ fontFamily: "'DM Mono', monospace" }}
-            >
-              {connected ? "LIVE" : "OFF"}
-            </span>
+            {connected ? "LIVE" : "OFF"}
           </div>
-          {/* Cart button */}
+
           {itemCount > 0 && (
             <button
+              data-testid="button-view-cart"
               onClick={() => setView(view === "cart" ? "menu" : "cart")}
-              className="relative h-9 w-9 rounded-xl bg-amber-500 flex items-center justify-center"
+              className="relative h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-sm active:scale-95 transition-transform"
             >
-              <ShoppingBag className="h-4 w-4 text-white" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-black text-white text-[10px] font-bold flex items-center justify-center">
+              <ShoppingBag className="h-4 w-4 text-primary-foreground" />
+              <span className="absolute -top-1.5 -right-1.5 h-4.5 w-4.5 min-w-[18px] px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center leading-none">
                 {itemCount}
               </span>
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       <AnimatePresence mode="wait">
-        {/* ── MENU VIEW ── */}
+        {/* ══════════════ MENU VIEW ══════════════ */}
         {view === "menu" && (
           <motion.div
             key="menu"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
             className="flex-1 flex flex-col overflow-hidden"
           >
-            {/* Category tabs */}
-            <div className="flex-shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto bg-white border-b border-black/5">
+            {/* Category pill bar */}
+            <div
+              ref={categoryBarRef}
+              className="flex-shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto bg-white dark:bg-stone-900 border-b border-border"
+            >
               {categories.map((cat) => (
                 <button
                   key={cat}
+                  data-testid={`filter-category-${cat}`}
                   onClick={() => setActiveCategory(cat)}
-                  className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
                     activeCategory === cat
-                      ? "bg-amber-500 text-white"
-                      : "bg-black/5 text-black/50 hover:bg-black/8"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
                 >
                   {cat}
@@ -261,209 +295,307 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               ))}
             </div>
 
-            {/* Items */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 1,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                  >
-                    <Coffee className="h-7 w-7 text-amber-500" />
-                  </motion.div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {filtered.map((item) => {
-                    const inCart = cart.find((i) => i.id === item.id);
-                    const isJust = justAdded === item.id;
-                    return (
-                      <motion.button
-                        key={item.id}
-                        onClick={() => addItem(item)}
-                        whileTap={{ scale: 0.95 }}
-                        className={`relative p-3.5 rounded-2xl text-left border transition-all ${
-                          inCart
-                            ? "bg-amber-50 border-amber-200"
-                            : "bg-white border-black/8 active:bg-black/3"
-                        }`}
-                      >
-                        {inCart && (
-                          <div className="absolute top-2.5 right-2.5 h-5 w-5 rounded-full bg-amber-500 flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-white">
-                              {inCart.qty}
-                            </span>
-                          </div>
-                        )}
-                        <AnimatePresence>
-                          {isJust && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                              className="absolute inset-0 rounded-2xl bg-amber-500/10 flex items-center justify-center"
-                            >
-                              <CheckCircle className="h-6 w-6 text-amber-500" />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        <p className="text-xs font-semibold text-black/80 leading-snug pr-6 line-clamp-2">
+            {/* Menu items list */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-3 max-w-2xl mx-auto w-full">
+                {filtered.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                    <UtensilsCrossed className="h-10 w-10 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">
+                      Nuk ka artikuj në këtë kategori
+                    </p>
+                  </div>
+                )}
+
+                {filtered.map((item) => {
+                  const inCart = cart.find((c) => c.id === item.id);
+                  const isJust = justAdded === item.id;
+                  const qty = inCart?.qty ?? 0;
+
+                  return (
+                    <motion.div
+                      key={item.id}
+                      id={`item-${item.id}`}
+                      layout
+                      className={`relative flex items-center gap-3 p-3.5 rounded-2xl border transition-colors duration-150 ${
+                        inCart
+                          ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30"
+                          : "bg-white dark:bg-stone-800/60 border-border"
+                      }`}
+                    >
+                      {/* Image or placeholder */}
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-xl bg-primary/8 dark:bg-primary/15 flex items-center justify-center flex-shrink-0 text-2xl">
+                          🍽️
+                        </div>
+                      )}
+
+                      {/* Name + category + price */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
                           {item.name}
                         </p>
-                        <p
-                          className="text-sm font-bold text-amber-600 mt-1.5"
-                          style={{ fontFamily: "'DM Mono', monospace" }}
-                        >
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {item.category}
+                        </p>
+                        <p className="text-sm font-bold text-primary mt-1">
                           {parsePrice(item.price)}{" "}
-                          <span className="text-[10px] text-black/25 font-normal">
+                          <span className="text-[10px] text-muted-foreground font-normal">
                             DEN
                           </span>
                         </p>
-                        <p className="text-[10px] text-black/30 mt-0.5">
-                          {item.category}
-                        </p>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              )}
+                      </div>
+
+                      {/* Add / qty controls */}
+                      <div className="flex-shrink-0">
+                        <AnimatePresence mode="wait">
+                          {qty > 0 ? (
+                            <motion.div
+                              key="stepper"
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              className="flex items-center gap-1.5 bg-muted rounded-xl px-2 py-1.5"
+                            >
+                              <button
+                                data-testid={`button-decrease-${item.id}`}
+                                onClick={() => updateQty(item.id, -1)}
+                                className="h-6 w-6 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                              >
+                                <Minus className="h-3 w-3 text-muted-foreground" />
+                              </button>
+                              <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
+                                {qty}
+                              </span>
+                              <button
+                                data-testid={`button-increase-${item.id}`}
+                                onClick={() => addItem(item)}
+                                className="h-6 w-6 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                              >
+                                <Plus className="h-3 w-3 text-muted-foreground" />
+                              </button>
+                            </motion.div>
+                          ) : (
+                            <motion.button
+                              key="add"
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              data-testid={`button-add-${item.id}`}
+                              onClick={() => addItem(item)}
+                              className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-sm active:scale-95 transition-transform"
+                            >
+                              <Plus className="h-4 w-4 text-primary-foreground" />
+                            </motion.button>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      {/* Added flash overlay */}
+                      <AnimatePresence>
+                        {isJust && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 rounded-2xl bg-primary/10 flex items-center justify-center pointer-events-none"
+                          >
+                            <CheckCircle className="h-6 w-6 text-primary" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Bottom padding for sticky bar */}
+              {itemCount > 0 && <div className="h-24" />}
             </div>
 
-            {/* Sticky cart bar */}
-            {itemCount > 0 && (
-              <motion.div
-                initial={{ y: 80 }}
-                animate={{ y: 0 }}
-                className="flex-shrink-0 p-4 bg-white border-t border-black/6"
-                style={{
-                  paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
-                }}
-              >
-                <button
-                  onClick={() => setView("cart")}
-                  className="w-full h-13 rounded-2xl bg-amber-500 flex items-center justify-between px-5 active:bg-amber-600"
-                  style={{ height: 52 }}
+            {/* Sticky view-cart bar */}
+            <AnimatePresence>
+              {itemCount > 0 && (
+                <motion.div
+                  initial={{ y: 100, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 100, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  className="absolute bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-stone-900/80 backdrop-blur-md border-t border-border"
+                  style={{
+                    paddingBottom:
+                      "max(16px, env(safe-area-inset-bottom, 16px))",
+                  }}
                 >
-                  <span className="h-6 w-6 rounded-full bg-white/25 text-white text-xs font-bold flex items-center justify-center">
-                    {itemCount}
-                  </span>
-                  <span className="text-sm font-bold text-white">
-                    View Cart
-                  </span>
-                  <span
-                    className="text-sm font-bold text-white/80"
-                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  <button
+                    data-testid="button-open-cart"
+                    onClick={() => setView("cart")}
+                    className="w-full h-13 rounded-2xl bg-primary flex items-center justify-between px-5 active:bg-primary/90 transition-colors shadow-lg"
+                    style={{ height: 52 }}
                   >
-                    {total} DEN
-                  </span>
-                </button>
-              </motion.div>
-            )}
+                    <span className="h-6 w-6 rounded-full bg-primary-foreground/20 text-primary-foreground text-xs font-bold flex items-center justify-center">
+                      {itemCount}
+                    </span>
+                    <span className="text-sm font-bold text-primary-foreground">
+                      Shiko shportën
+                    </span>
+                    <span className="text-sm font-bold text-primary-foreground/80 font-mono">
+                      {total} DEN
+                    </span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 
-        {/* ── CART VIEW ── */}
+        {/* ══════════════ CART VIEW ══════════════ */}
         {view === "cart" && (
           <motion.div
             key="cart"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="flex-1 flex flex-col overflow-hidden bg-[#FAFAF8]"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1 flex flex-col overflow-hidden bg-background"
           >
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {cart.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 gap-3">
-                  <ShoppingBag className="h-10 w-10 text-black/15" />
-                  <p className="text-sm text-black/30">Shporta është bosh</p>
-                  <button
-                    onClick={() => setView("menu")}
-                    className="px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold"
-                  >
-                    Shto artikuj
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p
-                    className="text-[11px] font-semibold text-black/30 uppercase tracking-wider px-1 pb-1"
-                    style={{ fontFamily: "'DM Mono', monospace" }}
-                  >
-                    Porosia juaj · Tavolina {tableNumber}
-                  </p>
-                  {cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-black/6"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-black/85 truncate">
-                          {item.name}
-                        </p>
-                        <p
-                          className="text-xs text-amber-600 mt-0.5"
-                          style={{ fontFamily: "'DM Mono', monospace" }}
-                        >
-                          {item.price} × {item.qty} = {item.price * item.qty}{" "}
-                          DEN
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 bg-black/4 rounded-xl px-2 py-1.5">
-                        <button
-                          onClick={() => updateQty(item.id, -1)}
-                          className="h-6 w-6 rounded-lg flex items-center justify-center active:bg-black/10"
-                        >
-                          <Minus className="h-3 w-3 text-black/50" />
-                        </button>
-                        <span
-                          className="text-sm font-bold text-black w-5 text-center"
-                          style={{ fontFamily: "'DM Mono', monospace" }}
-                        >
-                          {item.qty}
-                        </span>
-                        <button
-                          onClick={() => updateQty(item.id, 1)}
-                          className="h-6 w-6 rounded-lg flex items-center justify-center active:bg-black/10"
-                        >
-                          <Plus className="h-3 w-3 text-black/50" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
+            {/* Cart header sub-bar */}
+            <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white dark:bg-stone-900 border-b border-border">
+              <button
+                data-testid="button-back-to-menu"
+                onClick={() => setView("menu")}
+                className="h-8 w-8 rounded-xl bg-muted flex items-center justify-center active:bg-muted/70 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <div>
+                <p className="text-sm font-bold text-foreground leading-tight">
+                  Shporta
+                </p>
+                <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider">
+                  Tavolina {tableNumber} · {itemCount} artikuj
+                </p>
+              </div>
             </div>
 
-            {/* Total + Order */}
+            {/* Cart items */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-2.5 max-w-2xl mx-auto w-full">
+                {cart.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                    <ShoppingBag className="h-12 w-12 text-muted-foreground/25" />
+                    <p className="text-sm text-muted-foreground">
+                      Shporta është bosh
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="rounded-xl border-primary/30 text-primary hover:bg-primary/5"
+                      onClick={() => setView("menu")}
+                    >
+                      Shto artikuj
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 pb-1 font-mono">
+                      Porosia juaj · Tavolina {tableNumber}
+                    </p>
+
+                    {cart.map((item) => (
+                      <motion.div
+                        key={item.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-border"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">
+                            {item.name}
+                          </p>
+                          <p className="text-xs text-primary font-mono mt-0.5">
+                            {item.price} × {item.qty} ={" "}
+                            <span className="font-bold">
+                              {item.price * item.qty}
+                            </span>{" "}
+                            DEN
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-muted rounded-xl px-2 py-1.5 flex-shrink-0">
+                          <button
+                            data-testid={`button-cart-decrease-${item.id}`}
+                            onClick={() => updateQty(item.id, -1)}
+                            className="h-6 w-6 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                          >
+                            <Minus className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                          <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
+                            {item.qty}
+                          </span>
+                          <button
+                            data-testid={`button-cart-increase-${item.id}`}
+                            onClick={() =>
+                              addItem({
+                                id: item.id,
+                                name: item.name,
+                                price: String(item.price),
+                                category: "",
+                                active: true,
+                              })
+                            }
+                            className="h-6 w-6 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                          >
+                            <Plus className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </>
+                )}
+              </div>
+
+              {cart.length > 0 && <div className="h-40" />}
+            </div>
+
+            {/* Total + Place Order */}
             {cart.length > 0 && (
               <div
-                className="flex-shrink-0 p-4 bg-white border-t border-black/6 space-y-3"
+                className="absolute bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-stone-900/80 backdrop-blur-md border-t border-border space-y-3"
                 style={{
-                  paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
+                  paddingBottom:
+                    "max(16px, env(safe-area-inset-bottom, 16px))",
                 }}
               >
+                {/* Total row */}
                 <div className="flex items-center justify-between px-1">
-                  <span className="text-sm text-black/40">
+                  <span className="text-sm text-muted-foreground">
                     {itemCount} artikuj
                   </span>
-                  <span
-                    className="text-xl font-bold text-black"
-                    style={{ fontFamily: "'DM Mono', monospace" }}
-                  >
-                    {total} <span className="text-sm text-black/30">DEN</span>
+                  <span className="text-xl font-bold text-foreground font-mono">
+                    {total}{" "}
+                    <span className="text-sm text-muted-foreground font-sans font-normal">
+                      DEN
+                    </span>
                   </span>
                 </div>
+
+                {/* Order / success button */}
                 <AnimatePresence mode="wait">
                   {ordered ? (
                     <motion.div
                       key="success"
-                      initial={{ scale: 0.9, opacity: 0 }}
+                      initial={{ scale: 0.92, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="w-full h-14 rounded-2xl bg-emerald-500 flex items-center justify-center gap-2"
+                      className="w-full h-14 rounded-2xl bg-emerald-500 flex items-center justify-center gap-2 shadow-md"
                     >
                       <CheckCircle className="h-5 w-5 text-white" />
                       <span className="text-sm font-bold text-white">
@@ -472,23 +604,18 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     </motion.div>
                   ) : (
                     <motion.button
-                      key="order"
+                      key="place-order"
+                      data-testid="button-place-order"
                       onClick={placeOrder}
-                      className="w-full h-14 rounded-2xl bg-black flex items-center justify-center active:bg-black/80"
-                      style={{ height: 52 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="w-full h-14 rounded-2xl bg-foreground dark:bg-stone-100 flex items-center justify-center active:opacity-80 transition-opacity shadow-md"
                     >
-                      <span className="text-sm font-bold text-white">
+                      <span className="text-sm font-bold text-background dark:text-stone-900">
                         Porosit · {total} DEN
                       </span>
                     </motion.button>
                   )}
                 </AnimatePresence>
-                <button
-                  onClick={() => setView("menu")}
-                  className="w-full h-10 rounded-xl text-sm text-black/40 font-medium"
-                >
-                  ← Kthehu tek menuja
-                </button>
               </div>
             )}
           </motion.div>
