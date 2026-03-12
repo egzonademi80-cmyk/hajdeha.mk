@@ -14,28 +14,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const user = verifyToken(req);
   if (!user) return unauthorized(res);
 
-  // Provoni të merrni ID-në nga URL, jo nga query
-  const urlParts = req.url?.split("/") || [];
-  const idFromUrl = urlParts[urlParts.length - 1];
+  // 🔹 Merr ID-në nga query ose URL
+  let idParam = req.query.id;
 
-  console.log("🔍 req.url:", req.url);
-  console.log("🔍 req.query:", req.query);
-  console.log("🔍 idFromUrl:", idFromUrl);
+  // Nëse nuk ekziston në query, provoni ta nxirrni nga URL
+  if (!idParam && req.url) {
+    const match = req.url.match(/\/restaurants\/(\d+)/);
+    if (match) {
+      idParam = match[1];
+    }
+  }
 
-  const { id: idParam } = req.query;
-  const id = parseInt(
-    idFromUrl || (Array.isArray(idParam) ? idParam[0] : idParam || ""),
-  );
+  console.log("🔍 DEBUG - req.url:", req.url);
+  console.log("🔍 DEBUG - req.query:", JSON.stringify(req.query));
+  console.log("🔍 DEBUG - idParam:", idParam);
 
-  console.log("🔍 parsed id:", id);
+  const id = parseInt(Array.isArray(idParam) ? idParam[0] : idParam || "");
+  console.log("🔍 DEBUG - parsed id:", id, "isNaN:", isNaN(id));
 
-  if (isNaN(id))
-    return res
-      .status(400)
-      .json({
-        message: "Invalid ID",
-        debug: { url: req.url, query: req.query },
-      });
+  if (isNaN(id)) {
+    return res.status(400).json({
+      message: "Invalid ID",
+      debug: {
+        url: req.url,
+        query: req.query,
+        idParam,
+        parsedId: id,
+      },
+    });
+  }
 
   try {
     // Fetch restaurant & ownership check
