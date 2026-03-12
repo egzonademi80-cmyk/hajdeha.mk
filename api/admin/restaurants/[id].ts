@@ -11,11 +11,18 @@ import {
 } from "../auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log("🔍 req.url:", req.url);
+  console.log("🔍 req.query:", req.query);
+
   const user = verifyToken(req);
   if (!user) return unauthorized(res);
 
   const { id: idParam } = req.query;
+  console.log("🔍 idParam:", idParam, "type:", typeof idParam);
+
   const id = parseInt(Array.isArray(idParam) ? idParam[0] : idParam || "");
+  console.log("🔍 parsed id:", id, "isNaN:", isNaN(id));
+
   if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
   try {
@@ -24,6 +31,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select()
       .from(restaurants)
       .where(eq(restaurants.id, id));
+
+    console.log("🔍 restaurant found:", !!restaurant);
 
     if (!restaurant) return notFound(res);
     if (restaurant.userId !== user.userId) return forbidden(res);
@@ -43,7 +52,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       delete body.id;
       delete body.userId;
 
-      // Prepare updateData only for allowed fields
       const allowedFields = [
         "name",
         "description",
@@ -79,7 +87,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // If no fields to update, return current data
       if (Object.keys(updateData).length === 0) {
         const items = await db
           .select()
@@ -88,7 +95,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ...restaurant, menuItems: items });
       }
 
-      // Slug uniqueness check
       if (updateData.slug) {
         const [existing] = await db
           .select()
@@ -103,7 +109,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // Perform update
       const [updated] = await db
         .update(restaurants)
         .set(updateData)
@@ -117,7 +122,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ...updated, menuItems: items });
     }
 
-    // DELETE: Remove restaurant & menu items
     if (req.method === "DELETE") {
       await db.delete(menuItems).where(eq(menuItems.restaurantId, id));
       await db.delete(restaurants).where(eq(restaurants.id, id));
