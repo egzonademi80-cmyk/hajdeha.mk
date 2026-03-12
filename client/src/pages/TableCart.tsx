@@ -84,16 +84,12 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   useEffect(() => {
     if (!restaurant?.id) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(
-      `${protocol}//${window.location.host}/api/ws/table`,
-    );
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/table`);
     wsRef.current = ws;
 
     ws.onopen = () => {
       setConnected(true);
-      ws.send(
-        JSON.stringify({ type: "join", pin, restaurantId: restaurant.id }),
-      );
+      ws.send(JSON.stringify({ type: "join", pin, restaurantId: restaurant.id }));
     };
     ws.onmessage = (e) => {
       try {
@@ -110,12 +106,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const syncCart = useCallback((newCart: CartItem[]) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       isLocal.current = true;
-      wsRef.current.send(
-        JSON.stringify({ type: "cart_update", cart: newCart }),
-      );
-      setTimeout(() => {
-        isLocal.current = false;
-      }, 100);
+      wsRef.current.send(JSON.stringify({ type: "cart_update", cart: newCart }));
+      setTimeout(() => { isLocal.current = false; }, 100);
     }
   }, []);
 
@@ -125,15 +117,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       const next =
         idx >= 0
           ? prev.map((i, n) => (n === idx ? { ...i, qty: i.qty + 1 } : i))
-          : [
-              ...prev,
-              {
-                id: item.id,
-                name: item.name,
-                price: parsePrice(item.price),
-                qty: 1,
-              },
-            ];
+          : [...prev, { id: item.id, name: item.name, price: parsePrice(item.price), qty: 1 }];
       syncCart(next);
       return next;
     });
@@ -156,9 +140,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
   const placeOrder = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({ type: "place_order", cart, tableNumber }),
-      );
+      wsRef.current.send(JSON.stringify({ type: "place_order", cart, tableNumber }));
     }
     setOrdered(true);
     setTimeout(() => {
@@ -171,10 +153,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   if (isLoading) {
     return (
       <div className="h-[100dvh] w-full bg-background flex flex-col items-center justify-center gap-3 text-muted-foreground">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        >
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
           <Loader2 className="h-9 w-9 text-primary" />
         </motion.div>
         <p className="text-sm font-medium">Duke ngarkuar menunë…</p>
@@ -206,10 +185,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       {/* ── Shared top header ── */}
       <header
         className="flex-shrink-0 bg-white dark:bg-stone-900 border-b border-border px-4 flex items-center justify-between gap-3 shadow-sm"
-        style={{
-          paddingTop: "max(12px, env(safe-area-inset-top, 12px))",
-          paddingBottom: 12,
-        }}
+        style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))", paddingBottom: 12 }}
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -242,11 +218,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 : "bg-red-50 dark:bg-red-900/30 text-red-500"
             }`}
           >
-            {connected ? (
-              <Wifi className="h-3 w-3" />
-            ) : (
-              <WifiOff className="h-3 w-3" />
-            )}
+            {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {connected ? "LIVE" : "OFF"}
           </div>
 
@@ -266,6 +238,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       </header>
 
       <AnimatePresence mode="wait">
+
         {/* ══════════════════ MENU VIEW ══════════════════ */}
         {view === "menu" && (
           <motion.div
@@ -300,9 +273,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 {filtered.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
                     <UtensilsCrossed className="h-10 w-10 text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">
-                      Nuk ka artikuj në këtë kategori
-                    </p>
+                    <p className="text-sm text-muted-foreground">Nuk ka artikuj në këtë kategori</p>
                   </div>
                 )}
 
@@ -339,14 +310,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
                           {item.name}
                         </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {item.category}
-                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{item.category}</p>
                         <p className="text-sm font-bold text-primary mt-1">
                           {parsePrice(item.price)}{" "}
-                          <span className="text-[10px] text-muted-foreground font-normal">
-                            DEN
-                          </span>
+                          <span className="text-[10px] text-muted-foreground font-normal">DEN</span>
                         </p>
                       </div>
 
@@ -425,10 +392,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                   exit={{ y: 80, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 400, damping: 34 }}
                   className="flex-shrink-0 px-4 pt-3 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md border-t border-border"
-                  style={{
-                    paddingBottom:
-                      "max(16px, env(safe-area-inset-bottom, 16px))",
-                  }}
+                  style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))" }}
                 >
                   <button
                     data-testid="button-open-cart"
@@ -472,9 +436,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 <ArrowLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               <div>
-                <p className="text-sm font-bold text-foreground leading-tight">
-                  Shporta
-                </p>
+                <p className="text-sm font-bold text-foreground leading-tight">Shporta</p>
                 <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider">
                   Tavolina {tableNumber} · {itemCount} artikuj
                 </p>
@@ -487,9 +449,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 {cart.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
                     <ShoppingBag className="h-12 w-12 text-muted-foreground/25" />
-                    <p className="text-sm text-muted-foreground">
-                      Shporta është bosh
-                    </p>
+                    <p className="text-sm text-muted-foreground">Shporta është bosh</p>
                     <Button
                       variant="outline"
                       className="rounded-xl border-primary/30 text-primary hover:bg-primary/5"
@@ -519,10 +479,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                           </p>
                           <p className="text-xs text-primary font-mono mt-0.5">
                             {item.price} × {item.qty} ={" "}
-                            <span className="font-bold">
-                              {item.price * item.qty}
-                            </span>{" "}
-                            DEN
+                            <span className="font-bold">{item.price * item.qty}</span> DEN
                           </p>
                         </div>
 
@@ -557,19 +514,13 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             {cart.length > 0 && (
               <div
                 className="flex-shrink-0 px-4 pt-3 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md border-t border-border space-y-3"
-                style={{
-                  paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
-                }}
+                style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))" }}
               >
                 <div className="flex items-center justify-between px-1">
-                  <span className="text-sm text-muted-foreground">
-                    {itemCount} artikuj
-                  </span>
+                  <span className="text-sm text-muted-foreground">{itemCount} artikuj</span>
                   <span className="text-xl font-bold text-foreground font-mono">
                     {total}{" "}
-                    <span className="text-sm text-muted-foreground font-sans font-normal">
-                      DEN
-                    </span>
+                    <span className="text-sm text-muted-foreground font-sans font-normal">DEN</span>
                   </span>
                 </div>
 
@@ -583,9 +534,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       style={{ height: 52 }}
                     >
                       <CheckCircle className="h-5 w-5 text-white" />
-                      <span className="text-sm font-bold text-white">
-                        Porosia u dërgua!
-                      </span>
+                      <span className="text-sm font-bold text-white">Porosia u dërgua!</span>
                     </motion.div>
                   ) : (
                     <motion.button
@@ -606,6 +555,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             )}
           </motion.div>
         )}
+
       </AnimatePresence>
     </div>
   );
