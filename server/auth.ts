@@ -4,6 +4,7 @@ import { Express } from "express";
 import cookieSession from "cookie-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage.js";
 import { User as SelectUser } from "../shared/schema.js";
 
@@ -16,7 +17,13 @@ async function hashPassword(password: string) {
 }
 
 async function comparePasswords(supplied: string, stored: string) {
+  // Bcrypt hashes always start with $2a$ or $2b$
+  if (stored.startsWith("$2")) {
+    return bcrypt.compare(supplied, stored);
+  }
+  // Scrypt format: salt:hexKey
   const [salt, key] = stored.split(":");
+  if (!salt || !key) return false;
   const derivedKey = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(Buffer.from(key, "hex"), derivedKey);
 }
