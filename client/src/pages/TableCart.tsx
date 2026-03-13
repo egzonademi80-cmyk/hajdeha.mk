@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import Pusher from "pusher-js";
 import {
   Plus,
   Minus,
@@ -79,12 +80,15 @@ function AIWaiterPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialized = useRef(false);
+  const messagesRef = useRef<AIMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Greet on first open
   useEffect(() => {
     if (open && !initialized.current) {
       initialized.current = true;
@@ -106,14 +110,11 @@ function AIWaiterPanel({
           `• ${i.name} — ${i.price}${i.description ? ` (${i.description})` : ""} [${i.category}]`,
       )
       .join("\n");
-
     const cartText =
       cart.length > 0
         ? cart.map((i) => `  - ${i.qty}x ${i.name} (${i.price} DEN)`).join("\n")
         : "Shporta është bosh";
-
     const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-
     return `Ti je një kamarier AI miqësor për restorantin "${restaurantName}".
 Klienti ndodhet në Tavolinën ${tableNumber}.
 
@@ -140,12 +141,6 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
     { label: "🍹 Pije", prompt: "Çfarë pijesh keni?" },
   ];
 
-  // Ref so sendMessage never captures stale messages
-  const messagesRef = useRef<AIMessage[]>([]);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isTyping) return;
@@ -157,12 +152,10 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
       setMessages((prev) => [...prev, userMsg]);
       setInput("");
       setIsTyping(true);
-
       try {
         const history = messagesRef.current
           .filter((m) => m.content.trim())
           .map((m) => ({ role: m.role, content: m.content }));
-
         const response = await fetch("/api/ai-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -172,21 +165,14 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
             messages: [...history, { role: "user", content: text.trim() }],
           }),
         });
-
         if (!response.ok) {
           const errBody = await response.text();
           throw new Error(`HTTP ${response.status}: ${errBody}`);
         }
-
         const data = await response.json();
-
-        // Handle both { text } and { content: [{ text }] } response shapes
-        const rawText: string =
-          data.text || data.content?.[0]?.text || data.message || "";
-
+        const rawText: string = data.text || data.content?.[0]?.text || "";
         if (!rawText)
-          throw new Error(`Empty response body: ${JSON.stringify(data)}`);
-
+          throw new Error(`Empty response: ${JSON.stringify(data)}`);
         const mentioned = menuItems
           .filter(
             (item) =>
@@ -194,7 +180,6 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
               rawText.toLowerCase().includes(item.name.toLowerCase()),
           )
           .slice(0, 3);
-
         setMessages((prev) => [
           ...prev,
           {
@@ -211,8 +196,7 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
           {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: `Na vjen keq, pati një problem. 🙏
-_(${err?.message || "unknown"})_`,
+            content: `Na vjen keq, pati një problem. 🙏\n_(${err?.message || "unknown"})_`,
           },
         ]);
       } finally {
@@ -226,7 +210,6 @@ _(${err?.message || "unknown"})_`,
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -235,8 +218,6 @@ _(${err?.message || "unknown"})_`,
             className="fixed inset-0 bg-black/40 z-40"
             onClick={onClose}
           />
-
-          {/* Bottom sheet */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -248,12 +229,9 @@ _(${err?.message || "unknown"})_`,
               paddingBottom: "env(safe-area-inset-bottom, 0px)",
             }}
           >
-            {/* Drag handle */}
             <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
               <div className="w-10 h-1 rounded-full bg-stone-200 dark:bg-stone-700" />
             </div>
-
-            {/* Header */}
             <div className="flex items-center justify-between px-4 py-2.5 flex-shrink-0 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-sm">
@@ -275,8 +253,6 @@ _(${err?.message || "unknown"})_`,
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
-
-            {/* Quick actions */}
             <div className="flex gap-1.5 px-4 py-2 overflow-x-auto flex-shrink-0 border-b border-border">
               {quickActions.map((a) => (
                 <button
@@ -289,8 +265,6 @@ _(${err?.message || "unknown"})_`,
                 </button>
               ))}
             </div>
-
-            {/* Messages */}
             <div
               className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0"
               style={{ WebkitOverflowScrolling: "touch" }}
@@ -305,17 +279,11 @@ _(${err?.message || "unknown"})_`,
                     className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${
-                        msg.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
-                      }`}
+                      className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}
                     >
                       <p className="text-sm leading-relaxed whitespace-pre-line">
                         {msg.content.replace(/\*\*/g, "")}
                       </p>
-
-                      {/* Recommended items */}
                       {msg.recommendedItems &&
                         msg.recommendedItems.length > 0 && (
                           <div className="mt-2.5 space-y-2">
@@ -360,8 +328,6 @@ _(${err?.message || "unknown"})_`,
                   </motion.div>
                 ))}
               </AnimatePresence>
-
-              {/* Typing indicator */}
               <AnimatePresence>
                 {isTyping && (
                   <motion.div
@@ -389,8 +355,6 @@ _(${err?.message || "unknown"})_`,
               </AnimatePresence>
               <div ref={messagesEndRef} />
             </div>
-
-            {/* Input */}
             <div className="flex-shrink-0 px-4 py-3 border-t border-border bg-white dark:bg-stone-900">
               <div className="flex gap-2 items-center">
                 <input
@@ -420,7 +384,7 @@ _(${err?.message || "unknown"})_`,
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TableCart({ restaurantSlug, tableNumber }: Props) {
-  const pin = String(tableNumber).padStart(4, "0");
+  const channelName = `table-${restaurantSlug}-${tableNumber}`;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<View>("menu");
   const [activeCategory, setActiveCategory] = useState("All");
@@ -429,8 +393,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [justAdded, setJustAdded] = useState<number | null>(null);
   const [ordered, setOrdered] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
   const isLocal = useRef(false);
+  const pusherRef = useRef<Pusher | null>(null);
 
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["table-restaurant", restaurantSlug],
@@ -459,41 +423,73 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     [menuItems, activeCategory],
   );
 
+  // ── Pusher setup ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!restaurant?.id) return;
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/table`);
-    wsRef.current = ws;
+    const pusherKey = import.meta.env.VITE_PUSHER_KEY;
+    const pusherCluster = import.meta.env.VITE_PUSHER_CLUSTER;
+    if (!pusherKey || !pusherCluster) {
+      console.warn("Pusher env vars missing");
+      return;
+    }
 
-    ws.onopen = () => {
+    const pusher = new Pusher(pusherKey, {
+      cluster: pusherCluster,
+    });
+    pusherRef.current = pusher;
+
+    const channel = pusher.subscribe(channelName);
+
+    pusher.connection.bind("connected", () => setConnected(true));
+    pusher.connection.bind("disconnected", () => setConnected(false));
+    pusher.connection.bind("error", () => setConnected(false));
+
+    // Receive cart updates from other clients
+    channel.bind(
+      "cart-update",
+      (data: { cart: CartItem[]; peerId: string }) => {
+        if (isLocal.current) return;
+        setCart(data.cart);
+      },
+    );
+
+    // Peer count via presence info
+    channel.bind("pusher:subscription_succeeded", () => {
       setConnected(true);
-      ws.send(
-        JSON.stringify({ type: "join", pin, restaurantId: restaurant.id }),
-      );
-    };
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "cart_update" && !isLocal.current) setCart(msg.cart);
-        if (msg.type === "peer_count") setPeerCount(msg.count);
-      } catch {}
-    };
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
-    return () => ws.close();
-  }, [pin, restaurant?.id]);
+    });
 
-  const syncCart = useCallback((newCart: CartItem[]) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    // Fetch initial cart from server
+    fetch(`/api/table/${channelName}/cart`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.cart) setCart(d.cart);
+      })
+      .catch(() => {});
+
+    return () => {
+      channel.unbind_all();
+      pusher.unsubscribe(channelName);
+      pusher.disconnect();
+    };
+  }, [channelName]);
+
+  const syncCart = useCallback(
+    async (newCart: CartItem[]) => {
       isLocal.current = true;
-      wsRef.current.send(
-        JSON.stringify({ type: "cart_update", cart: newCart }),
-      );
       setTimeout(() => {
         isLocal.current = false;
-      }, 100);
-    }
-  }, []);
+      }, 200);
+      try {
+        await fetch("/api/table/cart-update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ channel: channelName, cart: newCart }),
+        });
+      } catch (e) {
+        console.error("syncCart failed", e);
+      }
+    },
+    [channelName],
+  );
 
   const addItem = (item: MenuItem) => {
     setCart((prev) => {
@@ -530,16 +526,19 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const itemCount = cart.reduce((s, i) => s + i.qty, 0);
 
-  const placeOrder = () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({ type: "place_order", cart, tableNumber }),
-      );
-    }
+  const placeOrder = async () => {
+    try {
+      await fetch("/api/table/place-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: channelName, cart, tableNumber }),
+      });
+    } catch {}
     setOrdered(true);
     setTimeout(() => {
       setOrdered(false);
       setCart([]);
+      syncCart([]);
     }, 3000);
   };
 
@@ -578,7 +577,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* ── AI Waiter Panel ── */}
       <AIWaiterPanel
         open={aiOpen}
         onClose={() => setAiOpen(false)}
@@ -589,7 +587,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         onAddItem={addItem}
       />
 
-      {/* ── Floating AI button — always visible, bottom-right ── */}
+      {/* Floating AI button */}
       <motion.button
         onClick={() => setAiOpen(true)}
         whileTap={{ scale: 0.9 }}
@@ -601,7 +599,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
           width: 50,
           transition: "bottom 0.3s cubic-bezier(0.34,1.56,0.64,1)",
         }}
-        aria-label="Hap AI Kamarierinin"
       >
         <Bot className="h-5 w-5 text-white" />
         <motion.span
@@ -613,7 +610,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         </motion.span>
       </motion.button>
 
-      {/* ── Shared top header ── */}
+      {/* Header */}
       <header
         className="flex-shrink-0 bg-white dark:bg-stone-900 border-b border-border px-4 flex items-center justify-between gap-3 shadow-sm"
         style={{
@@ -634,22 +631,17 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             </p>
           </div>
         </div>
-
         <div className="flex items-center gap-2 flex-shrink-0">
           {peerCount > 0 && (
             <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-full">
               <Users className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
               <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                {peerCount + 1}
+                {peerCount}
               </span>
             </div>
           )}
           <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-              connected
-                ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-                : "bg-red-50 dark:bg-red-900/30 text-red-500"
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${connected ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" : "bg-red-50 dark:bg-red-900/30 text-red-500"}`}
           >
             {connected ? (
               <Wifi className="h-3 w-3" />
@@ -675,7 +667,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
       <div className="flex-1 relative overflow-hidden min-h-0">
         <AnimatePresence mode="sync">
-          {/* ══════════════════ MENU VIEW ══════════════════ */}
+          {/* ══ MENU VIEW ══ */}
           {view === "menu" && (
             <motion.div
               key="menu"
@@ -685,25 +677,18 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               transition={{ duration: 0.18 }}
               className="absolute inset-0 flex flex-col overflow-hidden"
             >
-              {/* Category pill bar */}
               <div className="flex-shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto bg-white dark:bg-stone-900 border-b border-border">
                 {categories.map((cat) => (
                   <button
                     key={cat}
-                    data-testid={`filter-category-${cat}`}
                     onClick={() => setActiveCategory(cat)}
-                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
-                      activeCategory === cat
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                    className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${activeCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                   >
                     {cat}
                   </button>
                 ))}
               </div>
 
-              {/* Scrollable items */}
               <div className="flex-1 overflow-y-auto min-h-0">
                 <div
                   className="p-4 space-y-3 max-w-2xl mx-auto w-full"
@@ -717,21 +702,15 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       </p>
                     </div>
                   )}
-
                   {filtered.map((item) => {
                     const inCart = cart.find((c) => c.id === item.id);
                     const qty = inCart?.qty ?? 0;
                     const isJust = justAdded === item.id;
-
                     return (
                       <motion.div
                         key={item.id}
                         layout
-                        className={`relative flex items-center gap-3 p-3.5 rounded-2xl border transition-colors duration-150 ${
-                          inCart
-                            ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30"
-                            : "bg-white dark:bg-stone-800/60 border-border"
-                        }`}
+                        className={`relative flex items-center gap-3 p-3.5 rounded-2xl border transition-colors duration-150 ${inCart ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30" : "bg-white dark:bg-stone-800/60 border-border"}`}
                       >
                         {item.imageUrl ? (
                           <img
@@ -744,7 +723,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             🍽️
                           </div>
                         )}
-
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
                             {item.name}
@@ -759,7 +737,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             </span>
                           </p>
                         </div>
-
                         <div className="flex-shrink-0">
                           <AnimatePresence mode="wait">
                             {qty > 0 ? (
@@ -805,7 +782,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             )}
                           </AnimatePresence>
                         </div>
-
                         <AnimatePresence>
                           {isJust && (
                             <motion.div
@@ -824,7 +800,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 </div>
               </div>
 
-              {/* Sticky "View Cart" bar */}
               <AnimatePresence>
                 {itemCount > 0 && (
                   <motion.div
@@ -860,7 +835,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             </motion.div>
           )}
 
-          {/* ══════════════════ CART VIEW ══════════════════ */}
+          {/* ══ CART VIEW ══ */}
           {view === "cart" && (
             <motion.div
               key="cart"

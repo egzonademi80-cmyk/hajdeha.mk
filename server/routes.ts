@@ -1,10 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import Pusher from "pusher";
 import { storage } from "./storage.js";
 import { setupAuth } from "./auth.js";
 import { api } from "../shared/routes.js";
-import { z } from "zod";
 import passport from "passport";
 import { db } from "./db.js";
 import {
@@ -14,7 +13,7 @@ import {
 } from "../shared/schema.js";
 import { eq, sql, gte, and } from "drizzle-orm";
 
-// ── Table Chat: in-memory rooms ──────────────────────────────────────────────
+// ── In-memory cart store (keyed by Pusher channel name) ──────────────────────
 interface CartItem {
   id: number;
   name: string;
@@ -22,36 +21,19 @@ interface CartItem {
   qty: number;
 }
 interface TableRoom {
-  pin: string;
-  restaurantId: number;
   cart: CartItem[];
-  clients: Set<WebSocket>;
 }
 
 const tableRooms = new Map<string, TableRoom>();
 
-function broadcastRoom(room: TableRoom, exclude?: WebSocket) {
-  const msg = JSON.stringify({ type: "cart_update", cart: room.cart });
-  const peerMsg = JSON.stringify({ type: "peer_count", count: room.clients.size - 1 });
-
-  for (const client of Array.from(room.clients)) {
-    if (client.readyState === WebSocket.OPEN) {
-      if (client !== exclude) {
-        client.send(msg);
-      }
-      client.send(peerMsg);
-    }
-  }
-}
-
-function broadcastPeerCount(room: TableRoom) {
-  const peerMsg = JSON.stringify({ type: "peer_count", count: room.clients.size - 1 });
-  for (const client of Array.from(room.clients)) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(peerMsg);
-    }
-  }
-}
+// ── Pusher server client ──────────────────────────────────────────────────────
+const pusherServer = new Pusher({
+  appId: process.env.PUSHER_APP_ID!,
+  key: process.env.PUSHER_KEY!,
+  secret: process.env.PUSHER_SECRET!,
+  cluster: process.env.PUSHER_CLUSTER!,
+  useTLS: true,
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -141,6 +123,47 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("AI chat error:", err);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // === TABLE / PUSHER ROUTES ===
+
+  // Sync cart update to all clients via Pusher
+  app.post("/api/table/cart-update", async (req, res) => {
+    try {
+      const { channel, cart } = req.body;
+      if (!channel || !Array.isArray(cart))
+        return res.status(400).json({ message: "Missing fields" });
+      tableRooms.set(channel, { cart });
+      await pusherServer.trigger(channel, "cart-update", { cart });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("cart-update error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get current cart for a channel
+  app.get("/api/table/:pin/cart", (req, res) => {
+    const room = tableRooms.get(req.params.pin);
+    res.json({ cart: room?.cart || [] });
+  });
+
+  // Place order — notify via Pusher and clear cart
+  app.post("/api/table/place-order", async (req, res) => {
+    try {
+      const { channel, cart, tableNumber } = req.body;
+      await pusherServer.trigger(channel, "order-placed", {
+        cart,
+        tableNumber,
+      });
+      // Clear cart after order
+      tableRooms.set(channel, { cart: [] });
+      await pusherServer.trigger(channel, "cart-update", { cart: [] });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("place-order error:", err);
+      res.status(500).json({ message: err.message });
     }
   });
 
@@ -283,7 +306,11 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Forbidden" });
       const result = api.restaurants.update.input.safeParse(req.body);
       if (!result.success)
-        return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+        return res
+          .status(400)
+          .json({
+            message: result.error.errors[0]?.message || "Invalid input",
+          });
       const updated = await storage.updateRestaurant(id, result.data);
       res.json(updated);
     } catch (err: any) {
@@ -372,102 +399,7 @@ export async function registerRoutes(
     res.sendStatus(204);
   });
 
-  // === TABLE CHAT WEBSOCKET ===
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws/table" });
-
-  wss.on("connection", (ws) => {
-    let currentPin: string | null = null;
-
-    ws.on("message", (raw) => {
-      try {
-        const msg = JSON.parse(raw.toString());
-
-        if (msg.type === "join") {
-          const pin = String(msg.pin).trim();
-          const restaurantId = Number(msg.restaurantId);
-          if (!pin || !restaurantId) return;
-
-          currentPin = pin;
-
-          if (!tableRooms.has(pin)) {
-            tableRooms.set(pin, {
-              pin,
-              restaurantId,
-              cart: [],
-              clients: new Set(),
-            });
-          }
-          const room = tableRooms.get(pin)!;
-          room.clients.add(ws);
-
-          // Send current cart to new joiner
-          ws.send(JSON.stringify({ type: "cart_update", cart: room.cart }));
-
-          // Broadcast peer count
-          broadcastPeerCount(room);
-        }
-
-        if (msg.type === "cart_update" && currentPin) {
-          const room = tableRooms.get(currentPin);
-          if (!room) return;
-          room.cart = msg.cart;
-          broadcastRoom(room, ws);
-        }
-
-        if (msg.type === "clear_cart" && currentPin) {
-          const room = tableRooms.get(currentPin);
-          if (!room) return;
-          room.cart = [];
-          broadcastRoom(room, ws);
-        }
-      } catch {
-        /* ignore malformed messages */
-      }
-    });
-
-    ws.on("close", () => {
-      if (currentPin) {
-        const room = tableRooms.get(currentPin);
-        if (room) {
-          room.clients.delete(ws);
-          // Broadcast updated peer count
-          broadcastPeerCount(room);
-          if (room.clients.size === 0) {
-            // Keep cart alive for 30min even if everyone leaves
-            setTimeout(
-              () => {
-                const r = tableRooms.get(currentPin!);
-                if (r && r.clients.size === 0) tableRooms.delete(currentPin!);
-              },
-              30 * 60 * 1000,
-            );
-          }
-        }
-      }
-    });
-  });
-
-  // REST: Generate PIN for a table (admin or public)
-  app.post("/api/table/pin", (req, res) => {
-    const { tableNumber, restaurantId } = req.body;
-    if (!tableNumber || !restaurantId)
-      return res.status(400).json({ message: "Missing fields" });
-    const pin = String(tableNumber).padStart(4, "0");
-    if (!tableRooms.has(pin)) {
-      tableRooms.set(pin, { pin, restaurantId, cart: [], clients: new Set() });
-    }
-    res.json({ pin });
-  });
-
-  // REST: Get current cart for a PIN
-  app.get("/api/table/:pin/cart", (req, res) => {
-    const room = tableRooms.get(req.params.pin);
-    if (!room) return res.json({ cart: [] });
-    res.json({ cart: room.cart });
-  });
-
   // === SEED DATA ===
-  // Seed is non-critical — don't crash server if DB connection is slow on cold start
   seedDatabase(hashPassword).catch((err) => {
     console.warn("[seed] Skipped:", err?.message ?? err);
   });
