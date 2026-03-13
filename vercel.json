@@ -36,6 +36,14 @@
       }
     },
     {
+      "src": "^/registerSW\\.js$",
+      "dest": "/registerSW.js",
+      "headers": {
+        "Content-Type": "application/javascript",
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
       "src": "^/icon-192\\.png$",
       "dest": "/icon-192.png"
     },
