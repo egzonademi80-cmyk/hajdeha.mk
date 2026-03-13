@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface MenuItem {
   id: number;
   name: string;
@@ -42,13 +43,142 @@ interface Props {
   tableNumber: number;
 }
 
+type View = "menu" | "cart";
+type Lang = "al" | "mk" | "en";
+
+// ─── Translations ─────────────────────────────────────────────────────────────
+const t = {
+  al: {
+    table: "Tavolina",
+    loading: "Duke ngarkuar menunë…",
+    notFound: "Restoranti nuk u gjet. Kontrolloni URL-në dhe provoni përsëri.",
+    allCategories: "Të gjitha",
+    emptyCategory: "Nuk ka artikuj në këtë kategori",
+    viewCart: "Shiko shportën",
+    cart: "Shporta",
+    cartItems: (n: number) => `${n} artikuj`,
+    yourOrder: (t: number) => `Porosia juaj · Tavolina ${t}`,
+    emptyCart: "Shporta është bosh",
+    addItems: "Shto artikuj",
+    placeOrder: (total: number) => `Porosit · ${total} DEN`,
+    orderSent: "Porosia u dërgua!",
+    aiTitle: "Kamarierin AI",
+    aiPlaceholder: "Pyetni për menunë...",
+    aiGreeting: (name: string, table: number) =>
+      `Përshëndetje! Jam kamarierin tuaj AI për **${name}** 👋\n\nJu ndodhet në Tavolinën ${table}. Pyetni çfarë të doni — e njoh menunë plotësisht!`,
+    aiError: "Na vjen keq, pati një problem. 🙏",
+    quickActions: [
+      { label: "⭐ Popullore", prompt: "Çfarë rekomandoni sot?" },
+      { label: "🌱 Vegane", prompt: "Keni opsione vegjetariane ose vegane?" },
+      { label: "💰 Ekonomike", prompt: "Cilat janë pjatat më të lira?" },
+      { label: "🍹 Pije", prompt: "Çfarë pijesh keni?" },
+    ],
+    aiSystemRules: `1. Përgjigju GJITHMONË në shqip.
+2. Kur rekomandon pjata, përmend emrat SAKTË si janë në meni me çmimet.
+3. Nëse shporta ka artikuj, suggjero diçka plotësuese (pije, ëmbëlsirë).
+4. Përgjigjet duhet të jenë TË SHKURTRA — max 3-4 fjali.
+5. Mos huto informacione për pjata që nuk janë në meni.
+6. Përdor emoji me moderim.`,
+  },
+  mk: {
+    table: "Маса",
+    loading: "Се вчитува мениот…",
+    notFound:
+      "Ресторанот не е пронајден. Проверете ја URL-то и обидете се повторно.",
+    allCategories: "Сите",
+    emptyCategory: "Нема артикли во оваа категорија",
+    viewCart: "Кошничка",
+    cart: "Кошничка",
+    cartItems: (n: number) => `${n} артикли`,
+    yourOrder: (t: number) => `Вашата нарачка · Маса ${t}`,
+    emptyCart: "Кошничката е празна",
+    addItems: "Додај артикли",
+    placeOrder: (total: number) => `Нарачај · ${total} ДЕН`,
+    orderSent: "Нарачката е испратена!",
+    aiTitle: "AI Келнер",
+    aiPlaceholder: "Прашајте за менито...",
+    aiGreeting: (name: string, table: number) =>
+      `Добредојдовте! Јас сум вашиот AI келнер за **${name}** 👋\n\nСедите на Маса ${table}. Прашајте ме за менито — го знам целосно!`,
+    aiError: "Жалиме, се случи проблем. 🙏",
+    quickActions: [
+      { label: "⭐ Популарно", prompt: "Што препорачувате денес?" },
+      { label: "🌱 Вегетаријанско", prompt: "Имате ли вегетаријански опции?" },
+      { label: "💰 Поевтино", prompt: "Кои се најевтините јадења?" },
+      { label: "🍹 Пијалоци", prompt: "Какви пијалоци имате?" },
+    ],
+    aiSystemRules: `1. Одговарај СЕКОГАШ на македонски.
+2. Кога препорачуваш јадења, наведи ги имињата ТОЧНО како во менито со цените.
+3. Ако кошничката има артикли, предложи нешто комплементарно (пијалок, десерт).
+4. Одговорите треба да бидат КРАТКИ — макс 3-4 реченици.
+5. Не измислувај информации за јадења кои не се во менито.
+6. Користи емоџи умерено.`,
+  },
+  en: {
+    table: "Table",
+    loading: "Loading menu…",
+    notFound: "Restaurant not found. Check the URL and try again.",
+    allCategories: "All",
+    emptyCategory: "No items in this category",
+    viewCart: "View Cart",
+    cart: "Cart",
+    cartItems: (n: number) => `${n} items`,
+    yourOrder: (t: number) => `Your order · Table ${t}`,
+    emptyCart: "Your cart is empty",
+    addItems: "Add items",
+    placeOrder: (total: number) => `Order · ${total} DEN`,
+    orderSent: "Order placed!",
+    aiTitle: "AI Waiter",
+    aiPlaceholder: "Ask about the menu...",
+    aiGreeting: (name: string, table: number) =>
+      `Hello! I'm your AI waiter at **${name}** 👋\n\nYou're at Table ${table}. Ask me anything — I know the menu inside out!`,
+    aiError: "Sorry, something went wrong. 🙏",
+    quickActions: [
+      { label: "⭐ Popular", prompt: "What do you recommend today?" },
+      { label: "🌱 Vegan", prompt: "Do you have vegetarian or vegan options?" },
+      { label: "💰 Budget", prompt: "What are the cheapest dishes?" },
+      { label: "🍹 Drinks", prompt: "What drinks do you have?" },
+    ],
+    aiSystemRules: `1. ALWAYS reply in English.
+2. When recommending dishes, mention names EXACTLY as in the menu with prices.
+3. If the cart has items, suggest something complementary (drink, dessert).
+4. Keep answers SHORT — max 3-4 sentences.
+5. Don't make up dishes not on the menu.
+6. Use emoji sparingly.`,
+  },
+} as const;
+
 function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
 }
 
-type View = "menu" | "cart";
+// ─── Language Selector ────────────────────────────────────────────────────────
+function LangSelector({
+  lang,
+  onChange,
+}: {
+  lang: Lang;
+  onChange: (l: Lang) => void;
+}) {
+  return (
+    <div className="bg-muted rounded-xl p-0.5 flex">
+      {(["al", "mk", "en"] as Lang[]).map((l) => (
+        <button
+          key={l}
+          onClick={() => onChange(l)}
+          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all ${
+            lang === l
+              ? "bg-white dark:bg-stone-700 text-primary shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-// ─── AI Message type ──────────────────────────────────────────────────────────
+// ─── AI Waiter Panel ──────────────────────────────────────────────────────────
 interface AIMessage {
   id: string;
   role: "user" | "assistant";
@@ -56,7 +186,6 @@ interface AIMessage {
   recommendedItems?: MenuItem[];
 }
 
-// ─── AI Waiter Panel (bottom sheet) ──────────────────────────────────────────
 function AIWaiterPanel({
   open,
   onClose,
@@ -65,6 +194,7 @@ function AIWaiterPanel({
   cart,
   tableNumber,
   onAddItem,
+  lang,
 }: {
   open: boolean;
   onClose: () => void;
@@ -73,7 +203,9 @@ function AIWaiterPanel({
   cart: CartItem[];
   tableNumber: number;
   onAddItem: (item: MenuItem) => void;
+  lang: Lang;
 }) {
+  const tr = t[lang];
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -96,12 +228,25 @@ function AIWaiterPanel({
         {
           id: "greeting",
           role: "assistant",
-          content: `Përshëndetje! Jam kamarierin tuaj AI për **${restaurantName}** 👋\n\nJu ndodhet në Tavolinën ${tableNumber}. Pyetni çfarë të doni — e njoh menunë plotësisht dhe mund t'ju ndihmoj të zgjidhni!`,
+          content: tr.aiGreeting(restaurantName, tableNumber),
         },
       ]);
     }
     if (open) setTimeout(() => inputRef.current?.focus(), 350);
   }, [open]);
+
+  // Reset greeting when language changes
+  useEffect(() => {
+    if (initialized.current) {
+      setMessages([
+        {
+          id: `greeting-${lang}`,
+          role: "assistant",
+          content: tr.aiGreeting(restaurantName, tableNumber),
+        },
+      ]);
+    }
+  }, [lang]);
 
   const buildSystemPrompt = useCallback(() => {
     const menuText = menuItems
@@ -113,33 +258,21 @@ function AIWaiterPanel({
     const cartText =
       cart.length > 0
         ? cart.map((i) => `  - ${i.qty}x ${i.name} (${i.price} DEN)`).join("\n")
-        : "Shporta është bosh";
+        : "Empty";
     const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-    return `Ti je një kamarier AI miqësor për restorantin "${restaurantName}".
-Klienti ndodhet në Tavolinën ${tableNumber}.
+    return `You are a friendly AI waiter for restaurant "${restaurantName}".
+The customer is at Table ${tableNumber}.
 
-## Menyja
+## Menu
 ${menuText}
 
-## Shporta aktuale e klientit
+## Customer's current cart
 ${cartText}
 ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
 
-## Rregullat
-1. Përgjigju GJITHMONË në gjuhën që shkruan klienti (shqip, maqedonisht, anglisht).
-2. Kur rekomandon pjata, përmend emrat SAKTË si janë në meni me çmimet.
-3. Nëse shporta ka artikuj, suggjero diçka plotësuese (pije, ëmbëlsirë).
-4. Përgjigjet duhet të jenë TË SHKURTRA — max 3-4 fjali.
-5. Mos huto informacione për pjata që nuk janë në meni.
-6. Përdor emoji me moderim.`;
-  }, [restaurantName, tableNumber, menuItems, cart]);
-
-  const quickActions = [
-    { label: "⭐ Popullore", prompt: "Çfarë rekomandoni sot?" },
-    { label: "🌱 Vegane", prompt: "Keni opsione vegjetariane ose vegane?" },
-    { label: "💰 Ekonomike", prompt: "Cilat janë pjatat më të lira?" },
-    { label: "🍹 Pije", prompt: "Çfarë pijesh keni?" },
-  ];
+## Rules
+${tr.aiSystemRules}`;
+  }, [restaurantName, tableNumber, menuItems, cart, lang]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -196,7 +329,7 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
           {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: `Na vjen keq, pati një problem. 🙏\n_(${err?.message || "unknown"})_`,
+            content: `${tr.aiError}\n_(${err?.message || "unknown"})_`,
           },
         ]);
       } finally {
@@ -239,10 +372,10 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
                 </div>
                 <div>
                   <p className="text-sm font-bold text-foreground leading-tight">
-                    Kamarierin AI
+                    {tr.aiTitle}
                   </p>
                   <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
-                    Tavolina {tableNumber}
+                    {tr.table} {tableNumber}
                   </p>
                 </div>
               </div>
@@ -254,7 +387,7 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
               </button>
             </div>
             <div className="flex gap-1.5 px-4 py-2 overflow-x-auto flex-shrink-0 border-b border-border">
-              {quickActions.map((a) => (
+              {tr.quickActions.map((a) => (
                 <button
                   key={a.label}
                   onClick={() => sendMessage(a.prompt)}
@@ -362,7 +495,7 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-                  placeholder="Pyetni për menunë..."
+                  placeholder={tr.aiPlaceholder}
                   disabled={isTyping}
                   className="flex-1 h-10 px-4 rounded-full text-sm bg-muted border-0 outline-none focus:ring-2 focus:ring-primary text-foreground placeholder:text-muted-foreground disabled:opacity-50"
                 />
@@ -385,9 +518,20 @@ ${cart.length > 0 ? `Total: ${cartTotal} DEN` : ""}
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const channelName = `table-${restaurantSlug}-${tableNumber}`;
+
+  const getDefaultLang = (): Lang => {
+    const bl = navigator.language.toLowerCase();
+    if (bl.startsWith("sq")) return "al";
+    if (bl.startsWith("mk")) return "mk";
+    return "en";
+  };
+
+  const [lang, setLang] = useState<Lang>(getDefaultLang);
+  const tr = t[lang];
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<View>("menu");
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState(tr.allCategories);
   const [connected, setConnected] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
   const [justAdded, setJustAdded] = useState<number | null>(null);
@@ -412,18 +556,22 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(menuItems.map((i) => i.category)));
-    return ["All", ...cats];
-  }, [menuItems]);
+    return [tr.allCategories, ...cats];
+  }, [menuItems, lang]);
 
   const filtered = useMemo(
     () =>
-      activeCategory === "All"
+      activeCategory === tr.allCategories
         ? menuItems
         : menuItems.filter((i) => i.category === activeCategory),
-    [menuItems, activeCategory],
+    [menuItems, activeCategory, lang],
   );
 
-  // ── Pusher setup ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    setActiveCategory(tr.allCategories);
+  }, [lang]);
+
+  // ── Pusher setup ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const pusherKey = import.meta.env.VITE_PUSHER_KEY;
     const pusherCluster = import.meta.env.VITE_PUSHER_CLUSTER;
@@ -431,40 +579,23 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       console.warn("Pusher env vars missing");
       return;
     }
-
-    const pusher = new Pusher(pusherKey, {
-      cluster: pusherCluster,
-    });
+    const pusher = new Pusher(pusherKey, { cluster: pusherCluster });
     pusherRef.current = pusher;
-
     const channel = pusher.subscribe(channelName);
-
     pusher.connection.bind("connected", () => setConnected(true));
     pusher.connection.bind("disconnected", () => setConnected(false));
     pusher.connection.bind("error", () => setConnected(false));
-
-    // Receive cart updates from other clients
-    channel.bind(
-      "cart-update",
-      (data: { cart: CartItem[]; peerId: string }) => {
-        if (isLocal.current) return;
-        setCart(data.cart);
-      },
-    );
-
-    // Peer count via presence info
-    channel.bind("pusher:subscription_succeeded", () => {
-      setConnected(true);
+    channel.bind("cart-update", (data: { cart: CartItem[] }) => {
+      if (isLocal.current) return;
+      setCart(data.cart);
     });
-
-    // Fetch initial cart from server
+    channel.bind("pusher:subscription_succeeded", () => setConnected(true));
     fetch(`/api/table/${channelName}/cart`)
       .then((r) => r.json())
       .then((d) => {
         if (d.cart) setCart(d.cart);
       })
       .catch(() => {});
-
     return () => {
       channel.unbind_all();
       pusher.unsubscribe(channelName);
@@ -551,7 +682,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         >
           <Loader2 className="h-9 w-9 text-primary" />
         </motion.div>
-        <p className="text-sm font-medium">Duke ngarkuar menunë…</p>
+        <p className="text-sm font-medium">{tr.loading}</p>
       </div>
     );
   }
@@ -560,9 +691,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     return (
       <div className="h-[100dvh] w-full bg-background flex flex-col items-center justify-center gap-4 p-8 text-center">
         <UtensilsCrossed className="h-12 w-12 text-muted-foreground/40" />
-        <p className="text-sm text-muted-foreground max-w-xs">
-          Restoranti nuk u gjet. Kontrolloni URL-në dhe provoni përsëri.
-        </p>
+        <p className="text-sm text-muted-foreground max-w-xs">{tr.notFound}</p>
       </div>
     );
   }
@@ -585,6 +714,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         cart={cart}
         tableNumber={tableNumber}
         onAddItem={addItem}
+        lang={lang}
       />
 
       {/* Floating AI button */}
@@ -627,11 +757,12 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               {restaurant.name}
             </p>
             <p className="text-[11px] text-muted-foreground font-mono mt-0.5 uppercase tracking-widest">
-              Tavolina {tableNumber}
+              {tr.table} {tableNumber}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <LangSelector lang={lang} onChange={setLang} />
           {peerCount > 0 && (
             <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-full">
               <Users className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
@@ -698,7 +829,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
                       <UtensilsCrossed className="h-10 w-10 text-muted-foreground/30" />
                       <p className="text-sm text-muted-foreground">
-                        Nuk ka artikuj në këtë kategori
+                        {tr.emptyCategory}
                       </p>
                     </div>
                   )}
@@ -823,7 +954,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         {itemCount}
                       </span>
                       <span className="text-sm font-bold text-primary-foreground">
-                        Shiko shportën
+                        {tr.viewCart}
                       </span>
                       <span className="text-sm font-bold text-primary-foreground/80 font-mono">
                         {total} DEN
@@ -855,10 +986,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 </button>
                 <div>
                   <p className="text-sm font-bold text-foreground leading-tight">
-                    Shporta
+                    {tr.cart}
                   </p>
                   <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider">
-                    Tavolina {tableNumber} · {itemCount} artikuj
+                    {tr.table} {tableNumber} · {tr.cartItems(itemCount)}
                   </p>
                 </div>
               </div>
@@ -875,20 +1006,20 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
                       <ShoppingBag className="h-12 w-12 text-muted-foreground/25" />
                       <p className="text-sm text-muted-foreground">
-                        Shporta është bosh
+                        {tr.emptyCart}
                       </p>
                       <Button
                         variant="outline"
                         className="rounded-xl border-primary/30 text-primary hover:bg-primary/5"
                         onClick={() => setView("menu")}
                       >
-                        Shto artikuj
+                        {tr.addItems}
                       </Button>
                     </div>
                   ) : (
                     <>
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 pb-1 font-mono">
-                        Porosia juaj · Tavolina {tableNumber}
+                        {tr.yourOrder(tableNumber)}
                       </p>
                       {cart.map((item) => (
                         <motion.div
@@ -946,7 +1077,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 >
                   <div className="flex items-center justify-between px-1">
                     <span className="text-sm text-muted-foreground">
-                      {itemCount} artikuj
+                      {tr.cartItems(itemCount)}
                     </span>
                     <span className="text-xl font-bold text-foreground font-mono">
                       {total}{" "}
@@ -966,7 +1097,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       >
                         <CheckCircle className="h-5 w-5 text-white" />
                         <span className="text-sm font-bold text-white">
-                          Porosia u dërgua!
+                          {tr.orderSent}
                         </span>
                       </motion.div>
                     ) : (
@@ -979,7 +1110,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         style={{ height: 52 }}
                       >
                         <span className="text-sm font-bold text-background dark:text-stone-900">
-                          Porosit · {total} DEN
+                          {tr.placeOrder(total)}
                         </span>
                       </motion.button>
                     )}
