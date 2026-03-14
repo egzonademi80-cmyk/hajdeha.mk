@@ -9,7 +9,7 @@ export type LoginInput = {
 
 export function useUser() {
   return useQuery({
-    queryKey: ["/api/auth?action=me"],
+    queryKey: ["/api/user"],
     queryFn: async () => {
       const token = getToken();
       const headers: HeadersInit = {};
@@ -17,7 +17,7 @@ export function useUser() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const res = await fetch("/api/auth?action=me", {
+      const res = await fetch("/api/user", {
         headers,
         credentials: "include",
       });
@@ -40,7 +40,7 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async (credentials: LoginInput) => {
-      const res = await fetch("/api/auth?action=login", {
+      const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
@@ -59,7 +59,7 @@ export function useLogin() {
       if (data.token) {
         setToken(data.token);
       }
-      queryClient.setQueryData(["/api/auth?action=me"], user);
+      queryClient.setQueryData(["/api/user"], user);
       setLocation("/admin/dashboard");
     },
   });
@@ -71,14 +71,14 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      await fetch("/api/auth?action=logout", {
+      await fetch("/api/logout", {
         method: "POST",
         credentials: "include",
       });
     },
     onSuccess: () => {
       removeToken();
-      queryClient.setQueryData(["/api/auth?action=me"], null);
+      queryClient.setQueryData(["/api/user"], null);
       setLocation("/");
     },
   });

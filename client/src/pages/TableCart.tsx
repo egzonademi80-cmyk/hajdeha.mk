@@ -577,7 +577,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["table-restaurant", restaurantSlug],
     queryFn: async () => {
-      const res = await fetch(`/api/restaurants?slug=${restaurantSlug}`);
+      const res = await fetch(`/api/restaurants/${restaurantSlug}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
