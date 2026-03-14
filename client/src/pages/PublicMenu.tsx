@@ -1351,7 +1351,6 @@ function AIRestaurantAssistant({
       added: "Added!",
       greeting: `Hi! I'm your AI waiter for **${restaurantName}** 👋\n\nAsk me anything — I know the full menu, can suggest dishes for your mood, diet, or budget, and I'm watching your cart in real time!`,
       errorMsg: "Sorry, I had a connection issue. Please try again!",
-      poweredBy: "Powered by Claude AI",
     },
     al: {
       aiAssistant: "Kamarieri AI",
@@ -1362,7 +1361,6 @@ function AIRestaurantAssistant({
       added: "U shtua!",
       greeting: `Përshëndetje! Jam kamarierin tuaj AI për **${restaurantName}** 👋\n\nPyetni çfarë të doni — e njoh menunë plotësisht, mund t'ju sugjeroj pjata sipas humorit, dietës ose buxhetit tuaj!`,
       errorMsg: "Na vjen keq, pati një problem. Ju lutemi provoni sërish!",
-      poweredBy: "Mundësuar nga Claude AI",
     },
     mk: {
       aiAssistant: "AI Келнер",
@@ -1373,7 +1371,6 @@ function AIRestaurantAssistant({
       added: "Додадено!",
       greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
       errorMsg: "Се извинуваме, имаше проблем. Обидете се повторно!",
-      poweredBy: "Овозможено од Claude AI",
     },
   };
 
@@ -1755,9 +1752,6 @@ _(debug: ${errText})_`,
                 {t.aiAssistant}
               </DialogTitle>
             </div>
-            <span className="text-[9px] text-stone-400 dark:text-stone-500 font-medium tracking-wide">
-              {t.poweredBy}
-            </span>
           </div>
           <div className="mt-2 space-y-1.5">
             <div className="grid grid-cols-3 gap-1">

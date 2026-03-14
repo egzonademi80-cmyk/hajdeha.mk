@@ -374,29 +374,54 @@ export async function registerRoutes(
   });
 
   app.post(api.menuItems.create.path, async (req, res) => {
-    const input = api.menuItems.create.input.parse(req.body);
-    const restaurant = await storage.getRestaurant(input.restaurantId);
-    if (!restaurant)
-      return res.status(404).json({ message: "Restaurant not found" });
-    const item = await storage.createMenuItem(input);
-    res.status(201).json(item);
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Not authenticated" });
+      const result = api.menuItems.create.input.safeParse(req.body);
+      if (!result.success)
+        return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+      const restaurant = await storage.getRestaurant(result.data.restaurantId);
+      if (!restaurant)
+        return res.status(404).json({ message: "Restaurant not found" });
+      const item = await storage.createMenuItem(result.data);
+      res.status(201).json(item);
+    } catch (err: any) {
+      console.error("Create menu item error:", err);
+      res.status(500).json({ message: err.message || "Failed to create item" });
+    }
   });
 
   app.put(api.menuItems.update.path, async (req, res) => {
-    const id = parseInt(req.params.id);
-    const item = await storage.getMenuItem(id);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-    const input = api.menuItems.update.input.parse(req.body);
-    const updated = await storage.updateMenuItem(id, input);
-    res.json(updated);
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Not authenticated" });
+      const id = parseInt(req.params.id);
+      const item = await storage.getMenuItem(id);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+      const result = api.menuItems.update.input.safeParse(req.body);
+      if (!result.success)
+        return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+      const updated = await storage.updateMenuItem(id, result.data);
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Update menu item error:", err);
+      res.status(500).json({ message: err.message || "Failed to update item" });
+    }
   });
 
   app.delete(api.menuItems.delete.path, async (req, res) => {
-    const id = parseInt(req.params.id);
-    const item = await storage.getMenuItem(id);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-    await storage.deleteMenuItem(id);
-    res.sendStatus(204);
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Not authenticated" });
+      const id = parseInt(req.params.id);
+      const item = await storage.getMenuItem(id);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+      await storage.deleteMenuItem(id);
+      res.sendStatus(204);
+    } catch (err: any) {
+      console.error("Delete menu item error:", err);
+      res.status(500).json({ message: err.message || "Failed to delete item" });
+    }
   });
 
   // === SEED DATA ===
