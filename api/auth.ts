@@ -6,9 +6,7 @@ import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { compare } from "bcryptjs";
 
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
+const JWT_SECRET = process.env.JWT_SECRET || "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
 
 const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -29,24 +27,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     switch (action) {
-      case "login":
+      case 'login':
         return await handleLogin(req, res);
-      case "logout":
+      case 'logout':
         return await handleLogout(req, res);
-      case "me":
+      case 'me':
         return await handleGetUser(req, res);
-      case "list":
+      case 'list':
         return await handleListUsers(req, res);
       default:
-        return res
-          .status(400)
-          .json({ message: "Invalid action. Use: login, logout, me, list" });
+        return res.status(400).json({ message: 'Invalid action. Use: login, logout, me, list' });
     }
   } catch (error) {
     console.error(`Auth ${action} error:`, error);
-    return res
-      .status(500)
-      .json({ message: "Internal server error", error: String(error) });
+    return res.status(500).json({ message: 'Internal server error', error: String(error) });
   }
 }
 
@@ -58,15 +52,10 @@ async function handleLogin(req: VercelRequest, res: VercelResponse) {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res
-      .status(400)
-      .json({ message: "Username and password are required" });
+    return res.status(400).json({ message: "Username and password are required" });
   }
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.username, username));
+  const [user] = await db.select().from(users).where(eq(users.username, username));
 
   if (!user) {
     return res.status(401).json({ message: "Invalid username or password" });
@@ -78,9 +67,11 @@ async function handleLogin(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ message: "Invalid username or password" });
   }
 
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, {
-    expiresIn: "24h",
-  });
+  const token = jwt.sign(
+    { id: user.id, username: user.username },
+    JWT_SECRET,
+    { expiresIn: "24h" }
+  );
 
   return res.status(200).json({
     token,
