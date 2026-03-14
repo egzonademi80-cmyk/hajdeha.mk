@@ -76,6 +76,10 @@
       "dest": "api/admin/menu-items/index.ts"
     },
     {
+      "src": "^/api/admin/menu-items/reorder$",
+      "dest": "api/admin/menu-items/reorder.ts"
+    },
+    {
       "src": "^/api/admin/menu-items/([^/]+)$",
       "dest": "api/admin/menu-items/[id].ts?id=$1"
     },
