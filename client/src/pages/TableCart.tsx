@@ -24,11 +24,27 @@ import { Button } from "@/components/ui/button";
 interface MenuItem {
   id: number;
   name: string;
+  nameAl?: string | null;
+  nameMk?: string | null;
   price: string;
   category: string;
   active: boolean;
   imageUrl?: string | null;
   description?: string | null;
+  descriptionAl?: string | null;
+  descriptionMk?: string | null;
+}
+
+function getItemName(item: MenuItem, lang: Lang): string {
+  if (lang === "al" && item.nameAl) return item.nameAl;
+  if (lang === "mk" && item.nameMk) return item.nameMk;
+  return item.name;
+}
+
+function getItemDesc(item: MenuItem, lang: Lang): string | null | undefined {
+  if (lang === "al" && item.descriptionAl) return item.descriptionAl;
+  if (lang === "mk" && item.descriptionMk) return item.descriptionMk;
+  return item.description;
 }
 
 interface CartItem {
@@ -529,9 +545,27 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [lang, setLang] = useState<Lang>(getDefaultLang);
   const tr = t[lang];
 
+  // Apply system dark mode preference
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = (dark: boolean) => {
+      if (dark) {
+        document.documentElement.classList.add("dark");
+        document.documentElement.style.colorScheme = "dark";
+      } else {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.style.colorScheme = "light";
+      }
+    };
+    apply(mq.matches);
+    const handler = (e: MediaQueryListEvent) => apply(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<View>("menu");
-  const [activeCategory, setActiveCategory] = useState(tr.allCategories);
+  const [activeCategory, setActiveCategory] = useState<string>(tr.allCategories);
   const [connected, setConnected] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
   const [justAdded, setJustAdded] = useState<number | null>(null);
@@ -846,7 +880,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         {item.imageUrl ? (
                           <img
                             src={item.imageUrl}
-                            alt={item.name}
+                            alt={getItemName(item, lang)}
                             className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
                           />
                         ) : (
@@ -856,11 +890,13 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
-                            {item.name}
+                            {getItemName(item, lang)}
                           </p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            {item.category}
-                          </p>
+                          {getItemDesc(item, lang) && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2 leading-snug">
+                              {getItemDesc(item, lang)}
+                            </p>
+                          )}
                           <p className="text-sm font-bold text-primary mt-1">
                             {parsePrice(item.price)}{" "}
                             <span className="text-[10px] text-muted-foreground font-normal">
@@ -1021,7 +1057,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 pb-1 font-mono">
                         {tr.yourOrder(tableNumber)}
                       </p>
-                      {cart.map((item) => (
+                      {cart.map((item) => {
+                        const menuItem = menuItems.find((m) => m.id === item.id);
+                        const displayName = menuItem ? getItemName(menuItem, lang) : item.name;
+                        return (
                         <motion.div
                           key={item.id}
                           initial={{ opacity: 0, y: 8 }}
@@ -1031,7 +1070,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-foreground truncate">
-                              {item.name}
+                              {displayName}
                             </p>
                             <p className="text-xs text-primary font-mono mt-0.5">
                               {item.price} × {item.qty} ={" "}
@@ -1061,7 +1100,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             </button>
                           </div>
                         </motion.div>
-                      ))}
+                        );
+                      })}
                     </>
                   )}
                 </div>
