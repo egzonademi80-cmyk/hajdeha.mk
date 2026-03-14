@@ -128,7 +128,6 @@ export default defineConfig({
       "framer-motion",
       "leaflet",
     ],
-    exclude: ["@vercel/speed-insights"], // Add this line
   },
   esbuild: {
     drop: process.env.NODE_ENV === "production" ? ["console", "debugger"] : [],
