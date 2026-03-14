@@ -69,7 +69,7 @@
     },
     {
       "src": "^/api/admin/restaurants/([^/]+)$",
-      "dest": "api/admin/restaurants/[id].ts"
+      "dest": "api/admin/restaurants/[id].ts?id=$1"
     },
     {
       "src": "^/api/admin/menu-items$",
@@ -77,7 +77,7 @@
     },
     {
       "src": "^/api/admin/menu-items/([^/]+)$",
-      "dest": "api/admin/menu-items/[id].ts"
+      "dest": "api/admin/menu-items/[id].ts?id=$1"
     },
     {
       "src": "^/api/(.*)",

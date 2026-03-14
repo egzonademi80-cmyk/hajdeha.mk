@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import { compare } from "bcryptjs";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-fallback-secret";
+const JWT_SECRET = process.env.JWT_SECRET || "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
