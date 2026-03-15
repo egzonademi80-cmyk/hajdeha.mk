@@ -64,7 +64,7 @@ export default function POS() {
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["pos-restaurant"],
     queryFn: async () => {
-      const res = await fetch(`/api/restaurants/${RESTAURANT_SLUG}`);
+      const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
       if (!res.ok) throw new Error("Restaurant not found");
       return res.json();
     },
