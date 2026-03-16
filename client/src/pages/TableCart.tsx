@@ -88,7 +88,7 @@ const t = {
     aiTitle: "Kamarierin AI",
     aiPlaceholder: "Pyetni për menunë...",
     aiGreeting: (name: string, table: number) =>
-      `Përshëndetje! Jam kamarierin tuaj AI për **${name}** 👋\n\nJu ndodhet në Tavolinën ${table}. Pyetni çfarë të doni — e njoh menunë plotësisht!`,
+      `Përshëndetje! Jam kamarieri juaj AI për **${name}** 👋\n\nJu ndodhet në Tavolinën ${table}. Pyetni çfarë të doni — e njoh menunë plotësisht!`,
     aiError: "Na vjen keq, pati një problem. 🙏",
     quickActions: [
       { label: "⭐ Popullore", prompt: "Çfarë rekomandoni sot?" },
