@@ -29,7 +29,7 @@ export const api = {
   auth: {
     login: {
       method: "POST" as const,
-      path: "/api/login",
+      path: "/api/auth?action=login",
       input: z.object({
         username: z.string(),
         password: z.string(),
@@ -41,14 +41,14 @@ export const api = {
     },
     logout: {
       method: "POST" as const,
-      path: "/api/logout",
+      path: "/api/auth?action=logout",
       responses: {
         200: z.void(),
       },
     },
     user: {
       method: "GET" as const,
-      path: "/api/user",
+      path: "/api/auth?action=me",
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         401: errorSchemas.unauthorized,
@@ -118,7 +118,7 @@ export const api = {
     },
     getBySlug: {
       method: "GET" as const,
-      path: "/api/restaurants/:slug",
+      path: "/api/restaurants?slug=:slug",
       responses: {
         200: z.custom<
           typeof restaurants.$inferSelect & {
@@ -130,7 +130,7 @@ export const api = {
     },
     list: {
       method: "GET" as const,
-      path: "/api/admin/restaurants",
+      path: "/api/admin/restaurants?action=list",
       responses: {
         200: z.array(z.custom<typeof restaurants.$inferSelect>()),
         401: errorSchemas.unauthorized,
@@ -138,7 +138,7 @@ export const api = {
     },
     get: {
       method: "GET" as const,
-      path: "/api/admin/restaurants/:id",
+      path: "/api/admin/restaurants?action=get&id=:id",
       responses: {
         200: z.custom<
           typeof restaurants.$inferSelect & {
@@ -151,7 +151,7 @@ export const api = {
     },
     update: {
       method: "PUT" as const,
-      path: "/api/admin/restaurants/:id",
+      path: "/api/admin/restaurants?action=update&id=:id",
       input: insertRestaurantSchema.partial(),
       responses: {
         200: z.custom<typeof restaurants.$inferSelect>(),
@@ -161,7 +161,7 @@ export const api = {
     },
     create: {
       method: "POST" as const,
-      path: "/api/admin/restaurants",
+      path: "/api/admin/restaurants?action=create",
       input: insertRestaurantSchema.omit({ userId: true }),
       responses: {
         201: z.custom<typeof restaurants.$inferSelect>(),
@@ -170,9 +170,9 @@ export const api = {
     },
     delete: {
       method: "DELETE" as const,
-      path: "/api/admin/restaurants/:id",
+      path: "/api/admin/restaurants?action=delete&id=:id",
       responses: {
-        204: z.void(),
+        200: z.void(),
         403: errorSchemas.unauthorized,
         404: errorSchemas.notFound,
       },
@@ -182,7 +182,7 @@ export const api = {
   menuItems: {
     create: {
       method: "POST" as const,
-      path: "/api/admin/menu-items",
+      path: "/api/admin/menu?action=create",
       input: insertMenuItemSchema,
       responses: {
         201: z.custom<typeof menuItems.$inferSelect>(),
@@ -192,7 +192,7 @@ export const api = {
     },
     update: {
       method: "PUT" as const,
-      path: "/api/admin/menu-items/:id",
+      path: "/api/admin/menu?action=update&id=:id",
       input: insertMenuItemSchema.partial(),
       responses: {
         200: z.custom<typeof menuItems.$inferSelect>(),
@@ -202,7 +202,7 @@ export const api = {
     },
     delete: {
       method: "DELETE" as const,
-      path: "/api/admin/menu-items/:id",
+      path: "/api/admin/menu?action=delete&id=:id",
       responses: {
         204: z.void(),
         403: errorSchemas.unauthorized,
@@ -211,7 +211,7 @@ export const api = {
     },
     reorder: {
       method: "POST" as const,
-      path: "/api/admin/menu-items/reorder",
+      path: "/api/admin/menu?action=reorder",
       input: z.object({
         items: z.array(
           z.object({

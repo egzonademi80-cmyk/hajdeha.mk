@@ -17,10 +17,6 @@ import {
   Sparkles,
   Send,
   X,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -28,27 +24,11 @@ import { Button } from "@/components/ui/button";
 interface MenuItem {
   id: number;
   name: string;
-  nameAl?: string | null;
-  nameMk?: string | null;
   price: string;
   category: string;
   active: boolean;
   imageUrl?: string | null;
   description?: string | null;
-  descriptionAl?: string | null;
-  descriptionMk?: string | null;
-}
-
-function getItemName(item: MenuItem, lang: Lang): string {
-  if (lang === "al" && item.nameAl) return item.nameAl;
-  if (lang === "mk" && item.nameMk) return item.nameMk;
-  return item.name;
-}
-
-function getItemDesc(item: MenuItem, lang: Lang): string | null | undefined {
-  if (lang === "al" && item.descriptionAl) return item.descriptionAl;
-  if (lang === "mk" && item.descriptionMk) return item.descriptionMk;
-  return item.description;
 }
 
 interface CartItem {
@@ -82,9 +62,6 @@ const t = {
     addItems: "Shto artikuj",
     placeOrder: (total: number) => `Porosit · ${total} DEN`,
     orderSent: "Porosia u dërgua!",
-    listening: "Duke dëgjuar...",
-    tapToSpeak: "Shtypni për të folur",
-    speaking: "Duke folur...",
     aiTitle: "Kamarierin AI",
     aiPlaceholder: "Pyetni për menunë...",
     aiGreeting: (name: string, table: number) =>
@@ -118,9 +95,6 @@ const t = {
     addItems: "Додај артикли",
     placeOrder: (total: number) => `Нарачај · ${total} ДЕН`,
     orderSent: "Нарачката е испратена!",
-    listening: "Слушам...",
-    tapToSpeak: "Притиснете за да зборувате",
-    speaking: "Зборувам...",
     aiTitle: "AI Келнер",
     aiPlaceholder: "Прашајте за менито...",
     aiGreeting: (name: string, table: number) =>
@@ -153,9 +127,6 @@ const t = {
     addItems: "Add items",
     placeOrder: (total: number) => `Order · ${total} DEN`,
     orderSent: "Order placed!",
-    listening: "Listening...",
-    tapToSpeak: "Tap to speak",
-    speaking: "Speaking...",
     aiTitle: "AI Waiter",
     aiPlaceholder: "Ask about the menu...",
     aiGreeting: (name: string, table: number) =>
@@ -238,16 +209,10 @@ function AIWaiterPanel({
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialized = useRef(false);
   const messagesRef = useRef<AIMessage[]>([]);
-  const recognitionRef = useRef<any>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
-
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -256,149 +221,32 @@ function AIWaiterPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Initialize speech synthesis
-  useEffect(() => {
-    if ("speechSynthesis" in window) {
-      synthRef.current = window.speechSynthesis;
-    }
-  }, []);
-
-  // Speech recognition setup
-  useEffect(() => {
-    if (
-      !("webkitSpeechRecognition" in window) &&
-      !("SpeechRecognition" in window)
-    ) {
-      console.warn("Speech recognition not supported");
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    const langCodes: Record<Lang, string> = {
-      al: "sq-AL",
-      mk: "mk-MK",
-      en: "en-US",
-    };
-    recognition.lang = langCodes[lang];
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setInput(transcript);
-      setIsListening(false);
-      setTimeout(() => sendMessage(transcript), 300);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-      }
-    };
-  }, [lang]);
-
-  const startListening = () => {
-    if (recognitionRef.current && !isListening) {
-      try {
-        recognitionRef.current.start();
-      } catch (error) {
-        console.error("Speech recognition error:", error);
-      }
-    }
-  };
-
-  const stopListening = () => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-    }
-  };
-
-  const speak = (text: string) => {
-    if (!synthRef.current || !voiceEnabled) return;
-    synthRef.current.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    const langCodes: Record<Lang, string> = {
-      al: "sq-AL",
-      mk: "mk-MK",
-      en: "en-US",
-    };
-    utterance.lang = langCodes[lang];
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    synthRef.current.speak(utterance);
-  };
-
-  const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
-      setIsSpeaking(false);
-    }
-  };
-
   useEffect(() => {
     if (open && !initialized.current) {
       initialized.current = true;
-      const greeting = tr.aiGreeting(restaurantName, tableNumber);
       setMessages([
         {
           id: "greeting",
           role: "assistant",
-          content: greeting,
+          content: tr.aiGreeting(restaurantName, tableNumber),
         },
       ]);
-      if (voiceEnabled) {
-        setTimeout(() => speak(greeting.replace(/\*\*/g, "")), 500);
-      }
     }
     if (open) setTimeout(() => inputRef.current?.focus(), 350);
   }, [open]);
 
+  // Reset greeting when language changes
   useEffect(() => {
     if (initialized.current) {
-      const greeting = tr.aiGreeting(restaurantName, tableNumber);
       setMessages([
         {
           id: `greeting-${lang}`,
           role: "assistant",
-          content: greeting,
+          content: tr.aiGreeting(restaurantName, tableNumber),
         },
       ]);
     }
   }, [lang]);
-
-  useEffect(() => {
-    return () => {
-      stopListening();
-      stopSpeaking();
-    };
-  }, []);
 
   const buildSystemPrompt = useCallback(() => {
     const menuText = menuItems
@@ -465,35 +313,30 @@ ${tr.aiSystemRules}`;
               rawText.toLowerCase().includes(item.name.toLowerCase()),
           )
           .slice(0, 3);
-
-        const assistantMsg: AIMessage = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: rawText,
-          recommendedItems: mentioned.length > 0 ? mentioned : undefined,
-        };
-
-        setMessages((prev) => [...prev, assistantMsg]);
-
-        if (voiceEnabled) {
-          speak(rawText.replace(/\*\*/g, ""));
-        }
-      } catch (err: any) {
-        console.error("[AI Waiter] error:", err?.message || err);
-        const errorMsg = `${tr.aiError}\n_(${err?.message || "unknown"})_`;
         setMessages((prev) => [
           ...prev,
           {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: errorMsg,
+            content: rawText,
+            recommendedItems: mentioned.length > 0 ? mentioned : undefined,
+          },
+        ]);
+      } catch (err: any) {
+        console.error("[AI Waiter] error:", err?.message || err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `${tr.aiError}\n_(${err?.message || "unknown"})_`,
           },
         ]);
       } finally {
         setIsTyping(false);
       }
     },
-    [isTyping, buildSystemPrompt, menuItems, voiceEnabled, lang],
+    [isTyping, buildSystemPrompt, menuItems],
   );
 
   return (
@@ -536,28 +379,12 @@ ${tr.aiSystemRules}`;
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setVoiceEnabled(!voiceEnabled)}
-                  className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                    voiceEnabled
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {voiceEnabled ? (
-                    <Volume2 className="h-4 w-4" />
-                  ) : (
-                    <VolumeX className="h-4 w-4" />
-                  )}
-                </button>
-                <button
-                  onClick={onClose}
-                  className="h-8 w-8 rounded-full bg-muted flex items-center justify-center active:bg-muted/70"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
+              <button
+                onClick={onClose}
+                className="h-8 w-8 rounded-full bg-muted flex items-center justify-center active:bg-muted/70"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
             </div>
             <div className="flex gap-1.5 px-4 py-2 overflow-x-auto flex-shrink-0 border-b border-border">
               {tr.quickActions.map((a) => (
@@ -611,7 +438,7 @@ ${tr.aiSystemRules}`;
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs font-semibold text-foreground truncate">
-                                    {getItemName(item, lang)}
+                                    {item.name}
                                   </p>
                                   <p className="text-xs font-bold text-primary">
                                     {item.price}
@@ -659,16 +486,6 @@ ${tr.aiSystemRules}`;
                   </motion.div>
                 )}
               </AnimatePresence>
-              {isSpeaking && (
-                <div className="flex justify-start">
-                  <div className="bg-primary/10 rounded-2xl px-3 py-2 flex items-center gap-2">
-                    <Volume2 className="h-3.5 w-3.5 text-primary animate-pulse" />
-                    <span className="text-xs text-primary font-medium">
-                      {tr.speaking}
-                    </span>
-                  </div>
-                </div>
-              )}
               <div ref={messagesEndRef} />
             </div>
             <div className="flex-shrink-0 px-4 py-3 border-t border-border bg-white dark:bg-stone-900">
@@ -679,22 +496,9 @@ ${tr.aiSystemRules}`;
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
                   placeholder={tr.aiPlaceholder}
-                  disabled={isTyping || isListening}
+                  disabled={isTyping}
                   className="flex-1 h-10 px-4 rounded-full text-sm bg-muted border-0 outline-none focus:ring-2 focus:ring-primary text-foreground placeholder:text-muted-foreground disabled:opacity-50"
                 />
-                <button
-                  onClick={isListening ? stopListening : startListening}
-                  disabled={isTyping}
-                  className={`h-10 w-10 rounded-full flex items-center justify-center shadow-sm active:scale-95 transition-transform flex-shrink-0 ${
-                    isListening ? "bg-red-500 animate-pulse" : "bg-primary"
-                  } disabled:opacity-40 disabled:pointer-events-none`}
-                >
-                  {isListening ? (
-                    <MicOff className="h-4 w-4 text-white" />
-                  ) : (
-                    <Mic className="h-4 w-4 text-primary-foreground" />
-                  )}
-                </button>
                 <button
                   onClick={() => sendMessage(input)}
                   disabled={!input.trim() || isTyping}
@@ -703,11 +507,6 @@ ${tr.aiSystemRules}`;
                   <Send className="h-4 w-4 text-primary-foreground" />
                 </button>
               </div>
-              {isListening && (
-                <p className="text-center text-xs text-primary font-medium mt-2 animate-pulse">
-                  {tr.listening}
-                </p>
-              )}
             </div>
           </motion.div>
         </>
@@ -732,9 +531,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<View>("menu");
-  const [activeCategory, setActiveCategory] = useState<string>(
-    tr.allCategories,
-  );
+  const [activeCategory, setActiveCategory] = useState(tr.allCategories);
   const [connected, setConnected] = useState(false);
   const [peerCount, setPeerCount] = useState(0);
   const [justAdded, setJustAdded] = useState<number | null>(null);
@@ -746,7 +543,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["table-restaurant", restaurantSlug],
     queryFn: async () => {
-      const res = await fetch(`/api/restaurants?slug=${restaurantSlug}`);
+      const res = await fetch(`/api/restaurants/${restaurantSlug}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
@@ -774,6 +571,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     setActiveCategory(tr.allCategories);
   }, [lang]);
 
+  // ── Pusher setup ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const pusherKey = import.meta.env.VITE_PUSHER_KEY;
     const pusherCluster = import.meta.env.VITE_PUSHER_CLUSTER;
@@ -919,6 +717,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         lang={lang}
       />
 
+      {/* Floating AI button */}
       <motion.button
         onClick={() => setAiOpen(true)}
         whileTap={{ scale: 0.9 }}
@@ -941,6 +740,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         </motion.span>
       </motion.button>
 
+      {/* Header */}
       <header
         className="flex-shrink-0 bg-white dark:bg-stone-900 border-b border-border px-4 flex items-center justify-between gap-3 shadow-sm"
         style={{
@@ -998,6 +798,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
       <div className="flex-1 relative overflow-hidden min-h-0">
         <AnimatePresence mode="sync">
+          {/* ══ MENU VIEW ══ */}
           {view === "menu" && (
             <motion.div
               key="menu"
@@ -1045,7 +846,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         {item.imageUrl ? (
                           <img
                             src={item.imageUrl}
-                            alt={getItemName(item, lang)}
+                            alt={item.name}
                             className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
                           />
                         ) : (
@@ -1055,13 +856,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
-                            {getItemName(item, lang)}
+                            {item.name}
                           </p>
-                          {getItemDesc(item, lang) && (
-                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2 leading-snug">
-                              {getItemDesc(item, lang)}
-                            </p>
-                          )}
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {item.category}
+                          </p>
                           <p className="text-sm font-bold text-primary mt-1">
                             {parsePrice(item.price)}{" "}
                             <span className="text-[10px] text-muted-foreground font-normal">
@@ -1167,6 +966,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             </motion.div>
           )}
 
+          {/* ══ CART VIEW ══ */}
           {view === "cart" && (
             <motion.div
               key="cart"
@@ -1221,55 +1021,47 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 pb-1 font-mono">
                         {tr.yourOrder(tableNumber)}
                       </p>
-                      {cart.map((item) => {
-                        const menuItem = menuItems.find(
-                          (m) => m.id === item.id,
-                        );
-                        const displayName = menuItem
-                          ? getItemName(menuItem, lang)
-                          : item.name;
-                        return (
-                          <motion.div
-                            key={item.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-border"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-foreground truncate">
-                                {displayName}
-                              </p>
-                              <p className="text-xs text-primary font-mono mt-0.5">
-                                {item.price} × {item.qty} ={" "}
-                                <span className="font-bold">
-                                  {item.price * item.qty}
-                                </span>{" "}
-                                DEN
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
-                              <button
-                                data-testid={`button-cart-decrease-${item.id}`}
-                                onClick={() => updateQty(item.id, -1)}
-                                className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                              >
-                                <Minus className="h-3 w-3 text-muted-foreground" />
-                              </button>
-                              <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
-                                {item.qty}
-                              </span>
-                              <button
-                                data-testid={`button-cart-increase-${item.id}`}
-                                onClick={() => updateQty(item.id, 1)}
-                                className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                              >
-                                <Plus className="h-3 w-3 text-muted-foreground" />
-                              </button>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
+                      {cart.map((item) => (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-border"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">
+                              {item.name}
+                            </p>
+                            <p className="text-xs text-primary font-mono mt-0.5">
+                              {item.price} × {item.qty} ={" "}
+                              <span className="font-bold">
+                                {item.price * item.qty}
+                              </span>{" "}
+                              DEN
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
+                            <button
+                              data-testid={`button-cart-decrease-${item.id}`}
+                              onClick={() => updateQty(item.id, -1)}
+                              className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                            >
+                              <Minus className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                            <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
+                              {item.qty}
+                            </span>
+                            <button
+                              data-testid={`button-cart-increase-${item.id}`}
+                              onClick={() => updateQty(item.id, 1)}
+                              className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                            >
+                              <Plus className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
                     </>
                   )}
                 </div>
