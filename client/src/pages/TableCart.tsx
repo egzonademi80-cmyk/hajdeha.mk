@@ -105,7 +105,12 @@ const t = {
 6. Përdor emoji me moderim.`,
     callWaiter: "Thirr kamarierin",
     waiterCalled: "Kamarieri po vjen!",
+    callWaiterToOrder: "Thirr kamarierin për të porositur",
     waiterSheetTitle: "Çfarë keni nevojë?",
+    dessertTitle: "Ju bëftë mirë! 🍽️",
+    dessertMsg: (items: string[]) =>
+      `A dëshironi ndonjë ëmbëlsirë si përfundim?\nKemi ${items.join(" dhe ")} si specialitet!`,
+    dessertDismiss: "Jo, faleminderit",
     waiterMessages: (table: number) => [
       { icon: "🙋", label: "Thirr kamarierin", text: `Përshëndetje! Tavolina ${table} ka nevojë për kamarierin, ju lutem.` },
       { icon: "🧾", label: "Mund të marr faturën?", text: `Përshëndetje! Tavolina ${table} dëshiron faturën, ju lutem.` },
@@ -151,7 +156,12 @@ const t = {
 6. Користи емоџи умерено.`,
     callWaiter: "Повикај келнер",
     waiterCalled: "Келнерот доаѓа!",
+    callWaiterToOrder: "Повикај келнер за нарачка",
     waiterSheetTitle: "Што ви треба?",
+    dessertTitle: "Добар апетит! 🍽️",
+    dessertMsg: (items: string[]) =>
+      `Дали сакате нешто за десерт?\nИмаме ${items.join(" и ")} како специјалитет!`,
+    dessertDismiss: "Не, фала",
     waiterMessages: (table: number) => [
       { icon: "🙋", label: "Повикај келнер", text: `Здраво! Маса ${table} има потреба од келнер, ве молам.` },
       { icon: "🧾", label: "Можам ли да ја добијам сметката?", text: `Здраво! Маса ${table} би сакала сметката, ве молам.` },
@@ -196,7 +206,12 @@ const t = {
 6. Use emoji sparingly.`,
     callWaiter: "Call Waiter",
     waiterCalled: "Waiter is on the way!",
+    callWaiterToOrder: "Call waiter to take your order",
     waiterSheetTitle: "What do you need?",
+    dessertTitle: "Hope you enjoyed it! 🍽️",
+    dessertMsg: (items: string[]) =>
+      `Would you like a dessert to finish?\nWe have ${items.join(" and ")} as specialties!`,
+    dessertDismiss: "No, thanks",
     waiterMessages: (table: number) => [
       { icon: "🙋", label: "Call a waiter", text: `Hi! Table ${table} needs a waiter, please.` },
       { icon: "🧾", label: "Can I have the bill?", text: `Hi! Table ${table} would like the bill, please.` },
@@ -954,6 +969,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [ordered, setOrdered] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [waiterSheetOpen, setWaiterSheetOpen] = useState(false);
+  const [dessertToast, setDessertToast] = useState(false);
+  const [dessertItems, setDessertItems] = useState<string[]>([]);
+  const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLocal = useRef(false);
   const pusherRef = useRef<Pusher | null>(null);
 
@@ -1089,6 +1107,37 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     }, 3000);
   };
 
+  useEffect(() => {
+    if (!restaurant || !menuItems.length) return;
+    if (dessertTimerRef.current) clearTimeout(dessertTimerRef.current);
+
+    const foodItems = cart.filter((c) => {
+      const mi = menuItems.find((m) => m.id === c.id);
+      return mi && !["drinks", "pije", "пијалоци", "beverages", "drinks"].includes(
+        (mi.category || "").toLowerCase()
+      );
+    });
+    const baseMinutes = 18;
+    const perItemMinutes = 2;
+    const delayMs = (baseMinutes + foodItems.length * perItemMinutes) * 60 * 1000;
+
+    dessertTimerRef.current = setTimeout(() => {
+      const dessertCats = ["dessert", "ëmbëlsirë", "desserts", "десерт", "десерти", "sweet", "sweets"];
+      const dessertPool = menuItems.filter((m) =>
+        dessertCats.includes((m.category || "").toLowerCase())
+      );
+      const pool = dessertPool.length >= 2 ? dessertPool : menuItems;
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
+      const picked = shuffled.slice(0, 2).map((m) => getItemName(m, lang));
+      setDessertItems(picked);
+      setDessertToast(true);
+    }, delayMs);
+
+    return () => {
+      if (dessertTimerRef.current) clearTimeout(dessertTimerRef.current);
+    };
+  }, [restaurant, menuItems.length, cart.length]);
+
 
   if (isLoading) {
     return (
@@ -1122,6 +1171,60 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
+
+      {/* Dessert / Upsell Toast */}
+      <AnimatePresence>
+        {dessertToast && dessertItems.length > 0 && (
+          <motion.div
+            initial={{ y: -80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            className="fixed top-0 left-0 right-0 z-50 px-3 pt-3"
+            style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+          >
+            <div className="max-w-lg mx-auto bg-white dark:bg-stone-900 border border-border rounded-2xl shadow-2xl overflow-hidden">
+              <div className="flex items-start gap-3 p-4">
+                <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-xl">🍰</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-foreground leading-tight">
+                    {tr.dessertTitle}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-snug whitespace-pre-line">
+                    {tr.dessertMsg(dessertItems)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDessertToast(false)}
+                  className="h-7 w-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0 active:bg-muted/70"
+                >
+                  <X className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </div>
+              <div className="flex border-t border-border">
+                <button
+                  onClick={() => { setWaiterSheetOpen(true); setDessertToast(false); }}
+                  className="flex-1 py-3 text-xs font-bold text-emerald-600 dark:text-emerald-400 active:bg-muted/50 transition-colors"
+                >
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Bell className="h-3.5 w-3.5" />
+                    {tr.callWaiter}
+                  </span>
+                </button>
+                <div className="w-px bg-border" />
+                <button
+                  onClick={() => setDessertToast(false)}
+                  className="flex-1 py-3 text-xs font-medium text-muted-foreground active:bg-muted/50 transition-colors"
+                >
+                  {tr.dessertDismiss}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <WaiterSheet
         open={waiterSheetOpen}
@@ -1535,35 +1638,18 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       </span>
                     </span>
                   </div>
-                  <AnimatePresence mode="wait">
-                    {ordered ? (
-                      <motion.div
-                        key="success"
-                        initial={{ scale: 0.92, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="w-full rounded-2xl bg-emerald-500 flex items-center justify-center gap-2 shadow-md"
-                        style={{ height: 52 }}
-                      >
-                        <CheckCircle className="h-5 w-5 text-white" />
-                        <span className="text-sm font-bold text-white">
-                          {tr.orderSent}
-                        </span>
-                      </motion.div>
-                    ) : (
-                      <motion.button
-                        key="place-order"
-                        data-testid="button-place-order"
-                        onClick={placeOrder}
-                        whileTap={{ scale: 0.97 }}
-                        className="w-full rounded-2xl bg-foreground dark:bg-stone-100 flex items-center justify-center active:opacity-80 transition-opacity shadow-md"
-                        style={{ height: 52 }}
-                      >
-                        <span className="text-sm font-bold text-background dark:text-stone-900">
-                          {tr.placeOrder(total)}
-                        </span>
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
+                  <motion.button
+                    data-testid="button-call-waiter-cart"
+                    onClick={() => setWaiterSheetOpen(true)}
+                    whileTap={{ scale: 0.97 }}
+                    className="w-full rounded-2xl bg-emerald-500 flex items-center justify-center gap-2.5 active:bg-emerald-600 transition-colors shadow-md"
+                    style={{ height: 52 }}
+                  >
+                    <Bell className="h-4 w-4 text-white flex-shrink-0" />
+                    <span className="text-sm font-bold text-white">
+                      {tr.callWaiterToOrder}
+                    </span>
+                  </motion.button>
                 </div>
               )}
             </motion.div>
