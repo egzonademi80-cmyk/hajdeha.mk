@@ -391,27 +391,45 @@ function AIWaiterPanel({
     return null;
   }, []);
 
+  // Strip emojis and markdown formatting before reading aloud
+  const cleanForSpeech = (text: string): string =>
+    text
+      .replace(/\*\*/g, "")
+      .replace(/[_~`]/g, "")
+      // Emoji ranges
+      .replace(/[\u{1F600}-\u{1F64F}]/gu, "")
+      .replace(/[\u{1F300}-\u{1F5FF}]/gu, "")
+      .replace(/[\u{1F680}-\u{1F6FF}]/gu, "")
+      .replace(/[\u{1F700}-\u{1F77F}]/gu, "")
+      .replace(/[\u{1F780}-\u{1F7FF}]/gu, "")
+      .replace(/[\u{1F800}-\u{1F8FF}]/gu, "")
+      .replace(/[\u{1F900}-\u{1F9FF}]/gu, "")
+      .replace(/[\u{1FA00}-\u{1FA6F}]/gu, "")
+      .replace(/[\u{1FA70}-\u{1FAFF}]/gu, "")
+      .replace(/[\u{2600}-\u{26FF}]/gu, "")
+      .replace(/[\u{2700}-\u{27BF}]/gu, "")
+      .replace(/[\u{FE00}-\u{FE0F}]/gu, "")
+      .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  // Voice is only reliable for English — browsers don't ship Albanian/Macedonian voices
+  const voiceAvailable = lang === "en";
+
   const speak = (text: string) => {
-    if (!synthRef.current || !voiceEnabled) return;
+    if (!synthRef.current || !voiceEnabled || !voiceAvailable) return;
     synthRef.current.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    const cleaned = cleanForSpeech(text);
+    if (!cleaned) return;
 
-    const langCodes: Record<Lang, string> = {
-      al: "sq-AL",
-      mk: "mk-MK",
-      en: "en-US",
-    };
+    const utterance = new SpeechSynthesisUtterance(cleaned);
+    utterance.lang = "en-US";
 
-    // Always set the correct language — this is what drives pronunciation
-    // even when no exact voice is installed on the device
-    utterance.lang = langCodes[lang];
-
-    // Only assign a voice if it genuinely matches the target language
     const voice = getBestVoice(lang);
     if (voice) utterance.voice = voice;
 
-    utterance.rate = 0.88;
+    utterance.rate = 1.0;   // natural conversational speed
     utterance.pitch = 0.95;
     utterance.volume = 1;
 
@@ -419,7 +437,6 @@ function AIWaiterPanel({
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
 
-    // Defer until after voices are confirmed loaded
     setTimeout(() => synthRef.current?.speak(utterance), 150);
   };
 
@@ -606,18 +623,18 @@ ${tr.aiSystemRules}`;
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setVoiceEnabled(!voiceEnabled)}
-                  className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                    voiceEnabled
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted text-muted-foreground"
+                  onClick={() => voiceAvailable && setVoiceEnabled(!voiceEnabled)}
+                  title={!voiceAvailable ? "Voice not available for this language" : undefined}
+                  className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors ${
+                    !voiceAvailable
+                      ? "bg-muted text-muted-foreground/40 cursor-not-allowed"
+                      : voiceEnabled
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {voiceEnabled ? (
-                    <Volume2 className="h-4 w-4" />
-                  ) : (
-                    <VolumeX className="h-4 w-4" />
-                  )}
+                  <VolumeX className="h-4 w-4" style={{ display: !voiceAvailable || !voiceEnabled ? undefined : "none" }} />
+                  <Volume2 className="h-4 w-4" style={{ display: voiceAvailable && voiceEnabled ? undefined : "none" }} />
                 </button>
                 <button
                   onClick={onClose}
