@@ -21,6 +21,8 @@ import {
   MicOff,
   Volume2,
   VolumeX,
+  Bell,
+  BellRing,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -102,6 +104,8 @@ const t = {
 4. Përgjigjet duhet të jenë TË SHKURTRA — max 3-4 fjali.
 5. Mos huto informacione për pjata që nuk janë në meni.
 6. Përdor emoji me moderim.`,
+    callWaiter: "Thirr kamarierin",
+    waiterCalled: "Kamarieri po vjen!",
   },
   mk: {
     table: "Маса",
@@ -138,6 +142,8 @@ const t = {
 4. Одговорите треба да бидат КРАТКИ — макс 3-4 реченици.
 5. Не измислувај информации за јадења кои не се во менито.
 6. Користи емоџи умерено.`,
+    callWaiter: "Повикај келнер",
+    waiterCalled: "Келнерот доаѓа!",
   },
   en: {
     table: "Table",
@@ -173,6 +179,8 @@ const t = {
 4. Keep answers SHORT — max 3-4 sentences.
 5. Don't make up dishes not on the menu.
 6. Use emoji sparingly.`,
+    callWaiter: "Call Waiter",
+    waiterCalled: "Waiter is on the way!",
   },
 } as const;
 
@@ -333,6 +341,36 @@ function AIWaiterPanel({
     }
   };
 
+  const getBestVoice = useCallback((targetLang: Lang): SpeechSynthesisVoice | null => {
+    if (!synthRef.current) return null;
+    const voices = synthRef.current.getVoices();
+    if (voices.length === 0) return null;
+    const prefixes: Record<Lang, string[]> = {
+      al: ["sq"],
+      mk: ["mk"],
+      en: ["en-US", "en-GB", "en"],
+    };
+    const langPrefixes = prefixes[targetLang];
+    // 1. Prefer Google or high-quality named voices for the target language
+    for (const prefix of langPrefixes) {
+      const googleVoice = voices.find(
+        (v) => v.lang.startsWith(prefix) && (v.name.includes("Google") || v.name.includes("Neural") || v.name.includes("Natural")),
+      );
+      if (googleVoice) return googleVoice;
+    }
+    // 2. Any voice matching target language
+    for (const prefix of langPrefixes) {
+      const match = voices.find((v) => v.lang.startsWith(prefix));
+      if (match) return match;
+    }
+    // 3. Fallback: best English Google voice
+    return (
+      voices.find((v) => v.lang.startsWith("en") && v.name.includes("Google")) ||
+      voices.find((v) => v.lang.startsWith("en")) ||
+      null
+    );
+  }, []);
+
   const speak = (text: string) => {
     if (!synthRef.current || !voiceEnabled) return;
     synthRef.current.cancel();
@@ -345,14 +383,21 @@ function AIWaiterPanel({
       en: "en-US",
     };
     utterance.lang = langCodes[lang];
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
+
+    // Pick the best available voice for a more natural, human sound
+    const voice = getBestVoice(lang);
+    if (voice) utterance.voice = voice;
+
+    utterance.rate = 0.88;   // slightly slower = more natural pacing
+    utterance.pitch = 0.95;  // slightly warmer, less robotic tone
+    utterance.volume = 1;
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
 
-    synthRef.current.speak(utterance);
+    // Small delay lets the browser fully load voices before speaking
+    setTimeout(() => synthRef.current?.speak(utterance), 100);
   };
 
   const stopSpeaking = () => {
@@ -740,6 +785,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [justAdded, setJustAdded] = useState<number | null>(null);
   const [ordered, setOrdered] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [waiterCalled, setWaiterCalled] = useState(false);
   const isLocal = useRef(false);
   const pusherRef = useRef<Pusher | null>(null);
 
@@ -875,6 +921,19 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     }, 3000);
   };
 
+  const callWaiter = async () => {
+    if (waiterCalled) return;
+    try {
+      await fetch("/api/table/call-waiter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: channelName, tableNumber }),
+      });
+    } catch {}
+    setWaiterCalled(true);
+    setTimeout(() => setWaiterCalled(false), 4000);
+  };
+
   if (isLoading) {
     return (
       <div className="h-[100dvh] w-full bg-background flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -919,6 +978,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         lang={lang}
       />
 
+      {/* AI Waiter FAB */}
       <motion.button
         onClick={() => setAiOpen(true)}
         whileTap={{ scale: 0.9 }}
@@ -941,19 +1001,58 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         </motion.span>
       </motion.button>
 
+      {/* Call Waiter FAB */}
+      <AnimatePresence mode="wait">
+        {waiterCalled ? (
+          <motion.div
+            key="waiter-called"
+            initial={{ scale: 0.8, opacity: 0, x: 10 }}
+            animate={{ scale: 1, opacity: 1, x: 0 }}
+            exit={{ scale: 0.8, opacity: 0, x: 10 }}
+            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+            className="fixed z-30 left-4 flex items-center gap-2 bg-emerald-500 text-white rounded-full shadow-xl px-4"
+            style={{
+              bottom: itemCount > 0 ? 88 : 24,
+              height: 50,
+              transition: "bottom 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+            }}
+          >
+            <BellRing className="h-4 w-4 flex-shrink-0" />
+            <span className="text-sm font-bold whitespace-nowrap">{tr.waiterCalled}</span>
+          </motion.div>
+        ) : (
+          <motion.button
+            key="call-waiter"
+            onClick={callWaiter}
+            whileTap={{ scale: 0.9 }}
+            data-testid="button-call-waiter"
+            className="fixed z-30 bg-white dark:bg-stone-800 border border-border shadow-xl flex items-center gap-2 rounded-full px-4"
+            style={{
+              bottom: itemCount > 0 ? 88 : 24,
+              left: 16,
+              height: 50,
+              transition: "bottom 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+            }}
+          >
+            <Bell className="h-4 w-4 text-foreground flex-shrink-0" />
+            <span className="text-sm font-semibold text-foreground whitespace-nowrap">{tr.callWaiter}</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <header
-        className="flex-shrink-0 bg-white dark:bg-stone-900 border-b border-border px-4 flex items-center justify-between gap-3 shadow-sm"
+        className="flex-shrink-0 bg-white dark:bg-stone-900 border-b border-border px-3 sm:px-4 flex items-center justify-between gap-2 shadow-sm"
         style={{
           paddingTop: "max(12px, env(safe-area-inset-top, 12px))",
           paddingBottom: 12,
         }}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
             <UtensilsCrossed className="h-4 w-4 text-primary-foreground" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-foreground leading-tight truncate">
+            <p className="text-sm font-bold text-foreground leading-tight truncate max-w-[120px] sm:max-w-none">
               {restaurant.name}
             </p>
             <p className="text-[11px] text-muted-foreground font-mono mt-0.5 uppercase tracking-widest">
@@ -961,7 +1060,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <LangSelector lang={lang} onChange={setLang} />
           {peerCount > 0 && (
             <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-full">
@@ -972,14 +1071,14 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             </div>
           )}
           <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${connected ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" : "bg-red-50 dark:bg-red-900/30 text-red-500"}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${connected ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" : "bg-red-50 dark:bg-red-900/30 text-red-500"}`}
           >
             {connected ? (
               <Wifi className="h-3 w-3" />
             ) : (
               <WifiOff className="h-3 w-3" />
             )}
-            {connected ? "LIVE" : "OFF"}
+            <span className="hidden sm:inline">{connected ? "LIVE" : "OFF"}</span>
           </div>
           {itemCount > 0 && (
             <button

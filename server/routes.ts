@@ -173,6 +173,18 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/table/call-waiter", async (req, res) => {
+    try {
+      const { channel, tableNumber } = req.body;
+      if (!channel) return res.status(400).json({ message: "Missing channel" });
+      await pusherServer.trigger(channel, "waiter-called", { tableNumber, timestamp: Date.now() });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("call-waiter error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // === ANALYTICS ROUTES ===
   app.post(api.analytics.track.path, async (req, res) => {
     try {
