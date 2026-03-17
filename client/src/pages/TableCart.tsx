@@ -22,7 +22,6 @@ import {
   Volume2,
   VolumeX,
   Bell,
-  BellRing,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -106,6 +105,14 @@ const t = {
 6. Përdor emoji me moderim.`,
     callWaiter: "Thirr kamarierin",
     waiterCalled: "Kamarieri po vjen!",
+    waiterSheetTitle: "Çfarë keni nevojë?",
+    waiterMessages: (table: number) => [
+      { icon: "🙋", label: "Thirr kamarierin", text: `Përshëndetje! Tavolina ${table} ka nevojë për kamarierin, ju lutem.` },
+      { icon: "🧾", label: "Mund të marr faturën?", text: `Përshëndetje! Tavolina ${table} dëshiron faturën, ju lutem.` },
+      { icon: "🍽️", label: "Gati për të porositur", text: `Përshëndetje! Tavolina ${table} është gati të porositë.` },
+      { icon: "🥤", label: "Na duhen pije shtesë", text: `Përshëndetje! Tavolina ${table} ka nevojë për pije shtesë, ju lutem.` },
+      { icon: "❓", label: "Kam një pyetje", text: `Përshëndetje! Tavolina ${table} ka një pyetje.` },
+    ],
   },
   mk: {
     table: "Маса",
@@ -144,6 +151,14 @@ const t = {
 6. Користи емоџи умерено.`,
     callWaiter: "Повикај келнер",
     waiterCalled: "Келнерот доаѓа!",
+    waiterSheetTitle: "Што ви треба?",
+    waiterMessages: (table: number) => [
+      { icon: "🙋", label: "Повикај келнер", text: `Здраво! Маса ${table} има потреба од келнер, ве молам.` },
+      { icon: "🧾", label: "Можам ли да ја добијам сметката?", text: `Здраво! Маса ${table} би сакала сметката, ве молам.` },
+      { icon: "🍽️", label: "Подготвени за нарачка", text: `Здраво! Маса ${table} е подготвена да нарача.` },
+      { icon: "🥤", label: "Треба ни пијалоци", text: `Здраво! Маса ${table} треба дополнителни пијалоци, ве молам.` },
+      { icon: "❓", label: "Имам прашање", text: `Здраво! Маса ${table} има прашање.` },
+    ],
   },
   en: {
     table: "Table",
@@ -181,6 +196,14 @@ const t = {
 6. Use emoji sparingly.`,
     callWaiter: "Call Waiter",
     waiterCalled: "Waiter is on the way!",
+    waiterSheetTitle: "What do you need?",
+    waiterMessages: (table: number) => [
+      { icon: "🙋", label: "Call a waiter", text: `Hi! Table ${table} needs a waiter, please.` },
+      { icon: "🧾", label: "Can I have the bill?", text: `Hi! Table ${table} would like the bill, please.` },
+      { icon: "🍽️", label: "Ready to order", text: `Hi! Table ${table} is ready to order.` },
+      { icon: "🥤", label: "Need more drinks", text: `Hi! Table ${table} needs more drinks, please.` },
+      { icon: "❓", label: "I have a question", text: `Hi! Table ${table} has a question.` },
+    ],
   },
 } as const;
 
@@ -212,6 +235,111 @@ function LangSelector({
         </button>
       ))}
     </div>
+  );
+}
+
+// ─── Waiter Sheet ─────────────────────────────────────────────────────────────
+function WaiterSheet({
+  open,
+  onClose,
+  phoneNumber,
+  tableNumber,
+  lang,
+}: {
+  open: boolean;
+  onClose: () => void;
+  phoneNumber?: string | null;
+  tableNumber: number;
+  lang: Lang;
+}) {
+  const tr = t[lang];
+
+  const cleanPhone = (phone: string) =>
+    phone.replace(/\D/g, "");
+
+  const openWhatsApp = (message: string) => {
+    const phone = phoneNumber ? cleanPhone(phoneNumber) : "";
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
+    onClose();
+  };
+
+  const messages = tr.waiterMessages(tableNumber);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/40 z-40"
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", stiffness: 340, damping: 32 }}
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-stone-900 rounded-t-3xl shadow-2xl overflow-hidden"
+            style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+          >
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-stone-200 dark:bg-stone-700" />
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                  <Bell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground leading-tight">
+                    {tr.waiterSheetTitle}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
+                    {tr.table} {tableNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="h-8 w-8 rounded-full bg-muted flex items-center justify-center active:bg-muted/70"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2.5 pb-6">
+              {messages.map((msg) => (
+                <motion.button
+                  key={msg.label}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => openWhatsApp(msg.text)}
+                  className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
+                >
+                  <span className="text-2xl flex-shrink-0">{msg.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-snug">
+                      {msg.label}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                      {msg.text}
+                    </p>
+                  </div>
+                  <svg className="h-4 w-4 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.554 4.122 1.527 5.855L.057 23.04a.75.75 0 00.903.903l5.185-1.47A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.698-.513-5.238-1.406l-.374-.222-3.878 1.1 1.1-3.878-.222-.374A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                  </svg>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -825,7 +953,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [justAdded, setJustAdded] = useState<number | null>(null);
   const [ordered, setOrdered] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [waiterCalled, setWaiterCalled] = useState(false);
+  const [waiterSheetOpen, setWaiterSheetOpen] = useState(false);
   const isLocal = useRef(false);
   const pusherRef = useRef<Pusher | null>(null);
 
@@ -961,18 +1089,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     }, 3000);
   };
 
-  const callWaiter = async () => {
-    if (waiterCalled) return;
-    try {
-      await fetch("/api/table/call-waiter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel: channelName, tableNumber }),
-      });
-    } catch {}
-    setWaiterCalled(true);
-    setTimeout(() => setWaiterCalled(false), 4000);
-  };
 
   if (isLoading) {
     return (
@@ -1006,6 +1122,14 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         ::-webkit-scrollbar { display: none; }
       `}</style>
+
+      <WaiterSheet
+        open={waiterSheetOpen}
+        onClose={() => setWaiterSheetOpen(false)}
+        phoneNumber={restaurant.phoneNumber}
+        tableNumber={tableNumber}
+        lang={lang}
+      />
 
       <AIWaiterPanel
         open={aiOpen}
@@ -1042,43 +1166,21 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       </motion.button>
 
       {/* Call Waiter FAB */}
-      <AnimatePresence mode="wait">
-        {waiterCalled ? (
-          <motion.div
-            key="waiter-called"
-            initial={{ scale: 0.8, opacity: 0, x: 10 }}
-            animate={{ scale: 1, opacity: 1, x: 0 }}
-            exit={{ scale: 0.8, opacity: 0, x: 10 }}
-            transition={{ type: "spring", stiffness: 380, damping: 28 }}
-            className="fixed z-30 left-4 flex items-center gap-2 bg-emerald-500 text-white rounded-full shadow-xl px-4"
-            style={{
-              bottom: itemCount > 0 ? 88 : 24,
-              height: 50,
-              transition: "bottom 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-            }}
-          >
-            <BellRing className="h-4 w-4 flex-shrink-0" />
-            <span className="text-sm font-bold whitespace-nowrap">{tr.waiterCalled}</span>
-          </motion.div>
-        ) : (
-          <motion.button
-            key="call-waiter"
-            onClick={callWaiter}
-            whileTap={{ scale: 0.9 }}
-            data-testid="button-call-waiter"
-            className="fixed z-30 bg-white dark:bg-stone-800 border border-border shadow-xl flex items-center gap-2 rounded-full px-4"
-            style={{
-              bottom: itemCount > 0 ? 88 : 24,
-              left: 16,
-              height: 50,
-              transition: "bottom 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-            }}
-          >
-            <Bell className="h-4 w-4 text-foreground flex-shrink-0" />
-            <span className="text-sm font-semibold text-foreground whitespace-nowrap">{tr.callWaiter}</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
+      <motion.button
+        onClick={() => setWaiterSheetOpen(true)}
+        whileTap={{ scale: 0.93 }}
+        data-testid="button-call-waiter"
+        className="fixed z-30 bg-white dark:bg-stone-800 border border-border shadow-xl flex items-center gap-2 rounded-full px-4"
+        style={{
+          bottom: itemCount > 0 ? 88 : 24,
+          left: 16,
+          height: 50,
+          transition: "bottom 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+        }}
+      >
+        <Bell className="h-4 w-4 text-foreground flex-shrink-0" />
+        <span className="text-sm font-semibold text-foreground whitespace-nowrap">{tr.callWaiter}</span>
+      </motion.button>
 
       <header
         className="flex-shrink-0 bg-white dark:bg-stone-900 border-b border-border px-3 sm:px-4 flex items-center justify-between gap-2 shadow-sm"
