@@ -255,6 +255,7 @@ function AIWaiterPanel({
   const messagesRef = useRef<AIMessage[]>([]);
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -264,11 +265,21 @@ function AIWaiterPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  // Initialize speech synthesis
+  // Initialize speech synthesis and load voices
   useEffect(() => {
-    if ("speechSynthesis" in window) {
-      synthRef.current = window.speechSynthesis;
-    }
+    if (!("speechSynthesis" in window)) return;
+    synthRef.current = window.speechSynthesis;
+
+    const loadVoices = () => {
+      voicesRef.current = window.speechSynthesis.getVoices();
+    };
+
+    // Voices may already be available synchronously (Firefox) or need the event (Chrome)
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+    };
   }, []);
 
   // Speech recognition setup
@@ -341,34 +352,43 @@ function AIWaiterPanel({
     }
   };
 
+  // Find the best voice for the target language.
+  // NEVER falls back to a different language — setting only the lang attribute
+  // is better than using the wrong language's voice.
   const getBestVoice = useCallback((targetLang: Lang): SpeechSynthesisVoice | null => {
-    if (!synthRef.current) return null;
-    const voices = synthRef.current.getVoices();
+    const voices = voicesRef.current;
     if (voices.length === 0) return null;
-    const prefixes: Record<Lang, string[]> = {
-      al: ["sq"],
-      mk: ["mk"],
-      en: ["en-US", "en-GB", "en"],
+
+    const langPrefixes: Record<Lang, string[]> = {
+      al: ["sq-AL", "sq"],
+      mk: ["mk-MK", "mk"],
+      en: ["en-US", "en-GB", "en-AU", "en"],
     };
-    const langPrefixes = prefixes[targetLang];
-    // 1. Prefer Google or high-quality named voices for the target language
-    for (const prefix of langPrefixes) {
-      const googleVoice = voices.find(
-        (v) => v.lang.startsWith(prefix) && (v.name.includes("Google") || v.name.includes("Neural") || v.name.includes("Natural")),
+
+    const prefixes = langPrefixes[targetLang];
+
+    // 1. Exact match with a high-quality (Google/Neural/Natural) voice
+    for (const prefix of prefixes) {
+      const premium = voices.find(
+        (v) =>
+          v.lang.startsWith(prefix) &&
+          (v.name.includes("Google") ||
+            v.name.includes("Neural") ||
+            v.name.includes("Natural") ||
+            v.name.includes("Wavenet")),
       );
-      if (googleVoice) return googleVoice;
+      if (premium) return premium;
     }
-    // 2. Any voice matching target language
-    for (const prefix of langPrefixes) {
+
+    // 2. Any voice that matches the target language — even a basic one
+    for (const prefix of prefixes) {
       const match = voices.find((v) => v.lang.startsWith(prefix));
       if (match) return match;
     }
-    // 3. Fallback: best English Google voice
-    return (
-      voices.find((v) => v.lang.startsWith("en") && v.name.includes("Google")) ||
-      voices.find((v) => v.lang.startsWith("en")) ||
-      null
-    );
+
+    // 3. No matching voice found — return null so the browser decides
+    //    (it will use the lang attribute to attempt the correct phonetics)
+    return null;
   }, []);
 
   const speak = (text: string) => {
@@ -382,22 +402,25 @@ function AIWaiterPanel({
       mk: "mk-MK",
       en: "en-US",
     };
+
+    // Always set the correct language — this is what drives pronunciation
+    // even when no exact voice is installed on the device
     utterance.lang = langCodes[lang];
 
-    // Pick the best available voice for a more natural, human sound
+    // Only assign a voice if it genuinely matches the target language
     const voice = getBestVoice(lang);
     if (voice) utterance.voice = voice;
 
-    utterance.rate = 0.88;   // slightly slower = more natural pacing
-    utterance.pitch = 0.95;  // slightly warmer, less robotic tone
+    utterance.rate = 0.88;
+    utterance.pitch = 0.95;
     utterance.volume = 1;
 
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
 
-    // Small delay lets the browser fully load voices before speaking
-    setTimeout(() => synthRef.current?.speak(utterance), 100);
+    // Defer until after voices are confirmed loaded
+    setTimeout(() => synthRef.current?.speak(utterance), 150);
   };
 
   const stopSpeaking = () => {
