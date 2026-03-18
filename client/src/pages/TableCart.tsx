@@ -1175,12 +1175,26 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       if (!isLocal.current) setCart(data.cart);
     });
     channel.bind("pusher:subscription_succeeded", () => setConnected(true));
-    fetch(`/api/table/${channelName}/cart`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.cart) setCart(d.cart);
-      })
-      .catch(() => {});
+
+    // Session isolation: each new browser session (new customer) starts fresh
+    const sessionKey = `hajde-session-${channelName}`;
+    const isNewSession = !sessionStorage.getItem(sessionKey);
+    sessionStorage.setItem(sessionKey, "1");
+
+    if (isNewSession) {
+      // New customer — clear whatever the previous customer left behind
+      fetch("/api/table/cart-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: channelName, cart: [] }),
+      }).catch(() => {});
+    } else {
+      // Same customer refreshed — restore their in-progress cart
+      fetch(`/api/table/${channelName}/cart`)
+        .then((r) => r.json())
+        .then((d) => { if (d.cart) setCart(d.cart); })
+        .catch(() => {});
+    }
     return () => {
       channel.unbind_all();
       pusher.unsubscribe(channelName);
@@ -1204,6 +1218,21 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     },
     [channelName],
   );
+
+  // After order is confirmed: clear cart & reset so the table is ready for the next customer
+  useEffect(() => {
+    if (!orderConfirmedDone) return;
+    const timer = setTimeout(() => {
+      setCart([]);
+      syncCart([]);
+      setWaiterCalledFromCart(false);
+      setOrderConfirmedDone(false);
+      setOrderConfirming(false);
+      // Remove session key so the next fresh open is treated as a new customer
+      sessionStorage.removeItem(`hajde-session-${channelName}`);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [orderConfirmedDone, syncCart, channelName]);
 
   const addItem = (item: MenuItem) => {
     setCart((prev) => {
