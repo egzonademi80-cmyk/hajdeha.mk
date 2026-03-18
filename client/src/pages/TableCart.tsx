@@ -97,6 +97,9 @@ const t = {
     aiSystemRules: `1. Përgjigju GJITHMONË në shqip.\n2. Kur rekomandon pjata, përmend emrat SAKTË si janë në meni me çmimet.\n3. Nëse shporta ka artikuj, suggjero diçka plotësuese (pije, ëmbëlsirë).\n4. Përgjigjet duhet të jenë TË SHKURTRA — max 3-4 fjali.\n5. Mos huto informacione për pjata që nuk janë në meni.\n6. Përdor emoji me moderim.`,
     callWaiter: "Thirr kamarierin",
     callWaiterToOrder: "Thirr kamarierin për të porositur",
+    orderPlaced: "Porosia u dërgua",
+    confirmingOrder: "Duke konfirmuar porosinë…",
+    orderConfirmed: "Porosia juaj u vendos! ✓",
     waiterSheetTitle: "Çfarë keni nevojë?",
     dessertTitle: "Ju bëftë mirë! 🍽️",
     dessertMsg: (items: string[]) =>
@@ -166,6 +169,9 @@ const t = {
     aiSystemRules: `1. Одговарај СЕКОГАШ на македонски.\n2. Кога препорачуваш јадења, наведи ги имињата ТОЧНО како во менито со цените.\n3. Ако кошничката има артикли, предложи нешто комплементарно (пијалок, десерт).\n4. Одговорите треба да бидат КРАТКИ — макс 3-4 реченици.\n5. Не измислувај информации за јадења кои не се во менито.\n6. Користи емоџи умерено.`,
     callWaiter: "Повикај келнер",
     callWaiterToOrder: "Повикај келнер за нарачка",
+    orderPlaced: "Нарачката е дадена",
+    confirmingOrder: "Нарачката се потврдува…",
+    orderConfirmed: "Вашата нарачка е примена! ✓",
     waiterSheetTitle: "Што ви треба?",
     dessertTitle: "Добар апетит! 🍽️",
     dessertMsg: (items: string[]) =>
@@ -234,6 +240,9 @@ const t = {
     aiSystemRules: `1. ALWAYS reply in English.\n2. When recommending dishes, mention names EXACTLY as in the menu with prices.\n3. If the cart has items, suggest something complementary (drink, dessert).\n4. Keep answers SHORT — max 3-4 sentences.\n5. Don't make up dishes not on the menu.\n6. Use emoji sparingly.`,
     callWaiter: "Call Waiter",
     callWaiterToOrder: "Call waiter to take your order",
+    orderPlaced: "Order placed",
+    confirmingOrder: "Confirming your order…",
+    orderConfirmed: "Your order is placed! ✓",
     waiterSheetTitle: "What do you need?",
     dessertTitle: "Hope you enjoyed it! 🍽️",
     dessertMsg: (items: string[]) =>
@@ -1102,6 +1111,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [justAdded, setJustAdded] = useState<number | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [waiterSheetOpen, setWaiterSheetOpen] = useState(false);
+  const [waiterCalledFromCart, setWaiterCalledFromCart] = useState(false);
+  const [orderConfirming, setOrderConfirming] = useState(false);
+  const [orderConfirmedDone, setOrderConfirmedDone] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [dessertToast, setDessertToast] = useState(false);
   const [dessertItems, setDessertItems] = useState<string[]>([]);
@@ -1836,12 +1848,14 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     {/* Call Waiter button */}
                     <motion.button
                       data-testid="button-call-waiter-cart"
-                      onClick={() => setWaiterSheetOpen(true)}
+                      onClick={() => {
+                        setWaiterSheetOpen(true);
+                        setWaiterCalledFromCart(true);
+                      }}
                       whileTap={{ scale: 0.97 }}
                       className="flex-1 rounded-2xl bg-emerald-500 active:bg-emerald-600 transition-colors shadow-md relative"
                       style={{ height: 52 }}
                     >
-                      {/* Bell pill — absolute left so text can be truly centered */}
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-xl bg-white/20 flex items-center justify-center">
                         <Bell className="h-3.5 w-3.5 text-white" />
                       </div>
@@ -1850,6 +1864,64 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       </span>
                     </motion.button>
                   </div>
+
+                  {/* Order placed button — appears after waiter is called */}
+                  <AnimatePresence>
+                    {waiterCalledFromCart && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 12 }}
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      >
+                        <AnimatePresence mode="wait">
+                          {orderConfirmedDone ? (
+                            <motion.div
+                              key="confirmed"
+                              initial={{ scale: 0.92, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="w-full rounded-2xl bg-primary flex items-center justify-center gap-2 shadow-sm"
+                              style={{ height: 52 }}
+                            >
+                              <CheckCircle className="h-4 w-4 text-primary-foreground" />
+                              <span className="text-sm font-bold text-primary-foreground">
+                                {tr.orderConfirmed}
+                              </span>
+                            </motion.div>
+                          ) : (
+                            <motion.button
+                              key="place"
+                              data-testid="button-order-placed"
+                              whileTap={{ scale: 0.97 }}
+                              disabled={orderConfirming}
+                              onClick={() => {
+                                setOrderConfirming(true);
+                                setTimeout(() => {
+                                  setOrderConfirming(false);
+                                  setOrderConfirmedDone(true);
+                                }, 2000);
+                              }}
+                              className="w-full rounded-2xl bg-foreground dark:bg-stone-100 flex items-center justify-center gap-2.5 active:opacity-80 transition-opacity shadow-sm disabled:opacity-80"
+                              style={{ height: 52 }}
+                            >
+                              {orderConfirming ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 text-background dark:text-stone-900 animate-spin" />
+                                  <span className="text-sm font-bold text-background dark:text-stone-900">
+                                    {tr.confirmingOrder}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-sm font-bold text-background dark:text-stone-900">
+                                  {tr.orderPlaced}
+                                </span>
+                              )}
+                            </motion.button>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
             </motion.div>
