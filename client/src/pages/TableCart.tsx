@@ -1467,7 +1467,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         </motion.span>
       </motion.button>
 
-      {/* Call Waiter FAB */}
+      {/* Call Waiter FAB — hidden in cart view (has its own button there) */}
       <motion.button
         onClick={() => setWaiterSheetOpen(true)}
         whileTap={{ scale: 0.93 }}
@@ -1478,6 +1478,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
           left: 16,
           height: 50,
           transition: "bottom 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+          display: view === "cart" ? "none" : "flex",
         }}
       >
         <Bell className="h-4 w-4 text-foreground flex-shrink-0" />
