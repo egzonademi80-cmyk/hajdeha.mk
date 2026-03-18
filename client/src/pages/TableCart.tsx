@@ -55,6 +55,7 @@ interface CartItem {
   name: string;
   price: number;
   qty: number;
+  addedBy?: string; // per-device identity — used for auto-grouping in split bill
 }
 interface Props {
   restaurantSlug: string;
@@ -114,6 +115,7 @@ const t = {
     splitClose: "Mbyll",
     splitPerson: (n: number) => `Personi ${n}`,
     splitUnassigned: "Pa caktuar",
+    splitYou: "Ti",
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -188,6 +190,7 @@ const t = {
     splitClose: "Затвори",
     splitPerson: (n: number) => `Лице ${n}`,
     splitUnassigned: "Недоделено",
+    splitYou: "Ти",
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -261,6 +264,7 @@ const t = {
     splitClose: "Close",
     splitPerson: (n: number) => `Person ${n}`,
     splitUnassigned: "Unassigned",
+    splitYou: "You",
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -307,55 +311,27 @@ function BillSplitDrawer({
   open,
   onClose,
   cart,
+  myId,
   lang,
 }: {
   open: boolean;
   onClose: () => void;
   cart: CartItem[];
+  myId: string;
   lang: Lang;
 }) {
   const tr = t[lang];
-  const [people, setPeople] = useState(2);
-  const [assignments, setAssignments] = useState<Record<string, number | null>>({});
 
-  // Expand cart items into individual units (Pizza ×2 → two separate rows)
-  const units = cart.flatMap((item) =>
-    Array.from({ length: item.qty }, (_, unitIdx) => ({
-      key: `${item.id}-${unitIdx}`,
-      name: item.name,
-      price: item.price,
-    }))
-  );
+  // Group cart items by who added them, preserving insertion order
+  const uniqueIds = Array.from(new Set(cart.map((i) => i.addedBy).filter(Boolean))) as string[];
+  const unassigned = cart.filter((i) => !i.addedBy);
 
-  // When people count drops, remove out-of-range assignments
-  useEffect(() => {
-    setAssignments((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((k) => {
-        const v = next[k];
-        if (v !== null && v !== undefined && v >= people) delete next[k];
-      });
-      return next;
-    });
-  }, [people]);
+  const groupTotal = (id: string) =>
+    cart.filter((i) => i.addedBy === id).reduce((s, i) => s + i.price * i.qty, 0);
+  const unassignedTotal = unassigned.reduce((s, i) => s + i.price * i.qty, 0);
+  const grandTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
-  // Reset when drawer reopens
-  useEffect(() => {
-    if (open) setAssignments({});
-  }, [open]);
-
-  const assign = (key: string, personIdx: number) =>
-    setAssignments((prev) => ({
-      ...prev,
-      [key]: prev[key] === personIdx ? null : personIdx,
-    }));
-
-  const personTotals = Array.from({ length: people }, (_, i) =>
-    units.filter((u) => assignments[u.key] === i).reduce((s, u) => s + u.price, 0)
-  );
-  const unassignedTotal = units
-    .filter((u) => assignments[u.key] == null)
-    .reduce((s, u) => s + u.price, 0);
+  const isEmpty = cart.length === 0;
 
   return (
     <AnimatePresence>
@@ -388,7 +364,14 @@ function BillSplitDrawer({
                 <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Divide className="h-4 w-4 text-primary" />
                 </div>
-                <p className="text-base font-bold text-foreground">{tr.splitBill}</p>
+                <div>
+                  <p className="text-base font-bold text-foreground">{tr.splitBill}</p>
+                  {!isEmpty && (
+                    <p className="text-[11px] text-muted-foreground font-mono">
+                      {grandTotal} DEN · {uniqueIds.length + (unassigned.length > 0 ? 1 : 0)} {tr.splitPeople.toLowerCase()}
+                    </p>
+                  )}
+                </div>
               </div>
               <button
                 onClick={onClose}
@@ -398,109 +381,79 @@ function BillSplitDrawer({
               </button>
             </div>
 
-            {/* People selector */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border flex-shrink-0">
-              <p className="text-sm font-semibold text-foreground">{tr.splitPeople}</p>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setPeople((p) => Math.max(2, p - 1))}
-                  disabled={people <= 2}
-                  className="h-8 w-8 rounded-xl bg-muted flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: people }).map((_, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 24 }}
-                      className={`h-6 w-6 rounded-full ${PERSON_COLORS[i]?.dot ?? "bg-stone-400"} flex items-center justify-center text-white text-[10px] font-bold`}
-                    >
-                      {i + 1}
-                    </motion.div>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setPeople((p) => Math.min(8, p + 1))}
-                  disabled={people >= 8}
-                  className="h-8 w-8 rounded-xl bg-muted flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Item list — tap a person number to claim each dish */}
-            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-              {units.length === 0 ? (
+            {/* Person groups */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {isEmpty ? (
                 <p className="text-center text-muted-foreground text-sm py-10">{tr.emptyCart}</p>
               ) : (
-                units.map((unit) => {
-                  const assigned = assignments[unit.key];
-                  const color = assigned != null ? PERSON_COLORS[assigned] : null;
-                  return (
-                    <div
-                      key={unit.key}
-                      className={`flex items-center gap-3 px-3.5 py-3 rounded-2xl border transition-colors ${
-                        color ? color.soft : "border-border bg-muted/20"
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{unit.name}</p>
-                        <p className={`text-xs font-mono font-bold mt-0.5 ${color ? color.label : "text-muted-foreground"}`}>
-                          {unit.price} DEN
-                        </p>
-                      </div>
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        {Array.from({ length: people }, (_, i) => {
-                          const c = PERSON_COLORS[i];
-                          const isMe = assigned === i;
-                          return (
-                            <button
-                              key={i}
-                              onClick={() => assign(unit.key, i)}
-                              className={`h-8 w-8 rounded-full text-[11px] font-bold transition-all ${
-                                isMe
-                                  ? `${c.dot} text-white ring-2 ring-offset-1 ${c.ring} scale-110`
-                                  : "bg-muted text-muted-foreground active:scale-95"
-                              }`}
+                <>
+                  {uniqueIds.map((id, idx) => {
+                    const color = PERSON_COLORS[idx % PERSON_COLORS.length];
+                    const isMe = id === myId;
+                    const items = cart.filter((i) => i.addedBy === id);
+                    const subtotal = groupTotal(id);
+                    return (
+                      <div key={id}>
+                        {/* Person header */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`h-7 w-7 rounded-full ${color.dot} flex items-center justify-center text-white text-[11px] font-bold`}>
+                              {idx + 1}
+                            </div>
+                            <span className="text-sm font-bold text-foreground">
+                              {isMe ? tr.splitYou : tr.splitPerson(idx + 1)}
+                            </span>
+                          </div>
+                          <span className={`text-sm font-black font-mono ${color.label}`}>
+                            {subtotal} <span className="text-xs font-normal text-muted-foreground">DEN</span>
+                          </span>
+                        </div>
+                        {/* Items */}
+                        <div className={`rounded-2xl border overflow-hidden ${color.soft}`}>
+                          {items.map((item, i) => (
+                            <div
+                              key={`${item.id}-${i}`}
+                              className={`flex items-center justify-between px-3.5 py-2.5 ${i > 0 ? "border-t border-border/50" : ""}`}
                             >
-                              {i + 1}
-                            </button>
-                          );
-                        })}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                                {item.qty > 1 && (
+                                  <p className={`text-[11px] font-mono mt-0.5 ${color.label}`}>×{item.qty}</p>
+                                )}
+                              </div>
+                              <span className={`text-sm font-bold font-mono ml-3 flex-shrink-0 ${color.label}`}>
+                                {item.price * item.qty} DEN
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })}
 
-            {/* Per-person breakdown */}
-            <div className="px-5 pt-4 pb-5 border-t border-border space-y-2.5 flex-shrink-0">
-              {Array.from({ length: people }, (_, i) => {
-                const c = PERSON_COLORS[i];
-                return (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-6 w-6 rounded-full ${c.dot} flex items-center justify-center text-white text-[10px] font-bold`}>
-                        {i + 1}
+                  {/* Items without an addedBy (old entries before tracking) */}
+                  {unassigned.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-muted-foreground">{tr.splitUnassigned}</span>
+                        <span className="text-sm font-bold font-mono text-muted-foreground">
+                          {unassignedTotal} DEN
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-foreground">{tr.splitPerson(i + 1)}</span>
+                      <div className="rounded-2xl border border-border bg-muted/20 overflow-hidden">
+                        {unassigned.map((item, i) => (
+                          <div
+                            key={`u-${item.id}-${i}`}
+                            className={`flex items-center justify-between px-3.5 py-2.5 ${i > 0 ? "border-t border-border/50" : ""}`}
+                          >
+                            <p className="text-sm font-medium text-foreground truncate flex-1">{item.name}</p>
+                            <span className="text-sm font-bold font-mono text-muted-foreground ml-3">{item.price * item.qty} DEN</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <span className={`text-sm font-black font-mono ${c.label}`}>
-                      {personTotals[i]} <span className="text-xs font-normal text-muted-foreground">DEN</span>
-                    </span>
-                  </div>
-                );
-              })}
-              {unassignedTotal > 0 && (
-                <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <span className="text-xs text-muted-foreground">{tr.splitUnassigned}</span>
-                  <span className="text-xs font-mono font-semibold text-muted-foreground">{unassignedTotal} DEN</span>
-                </div>
+                  )}
+                </>
               )}
             </div>
           </motion.div>
@@ -1192,6 +1145,18 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLocal = useRef(false);
 
+  // Stable per-device identity — stored in localStorage so it survives refreshes
+  // Used to auto-group items in the split bill by who added them
+  const myId = useMemo(() => {
+    const key = `hajde-person-${channelName}`;
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = Math.random().toString(36).slice(2, 10);
+      localStorage.setItem(key, id);
+    }
+    return id;
+  }, [channelName]);
+
   // 🌙 Auto dark mode — dark between 20:00 and 07:00
   useEffect(() => {
     const apply = () => {
@@ -1311,7 +1276,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
   const addItem = (item: MenuItem) => {
     setCart((prev) => {
-      const idx = prev.findIndex((i) => i.id === item.id);
+      // Match by item id AND current user — each person's items stay separate
+      const idx = prev.findIndex((i) => i.id === item.id && i.addedBy === myId);
       const next =
         idx >= 0
           ? prev.map((i, n) => (n === idx ? { ...i, qty: i.qty + 1 } : i))
@@ -1322,6 +1288,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 name: item.name,
                 price: parsePrice(item.price),
                 qty: 1,
+                addedBy: myId,
               },
             ];
       syncCart(next);
@@ -1331,10 +1298,14 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     setTimeout(() => setJustAdded(null), 600);
   };
 
-  const updateQty = (id: number, delta: number) => {
+  // When addedBy is provided, only affect that person's entry; otherwise affect any
+  const updateQty = (id: number, delta: number, addedBy?: string) => {
     setCart((prev) => {
       const next = prev
-        .map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i))
+        .map((i) => {
+          const match = i.id === id && (addedBy === undefined || i.addedBy === addedBy);
+          return match ? { ...i, qty: i.qty + delta } : i;
+        })
         .filter((i) => i.qty > 0);
       syncCart(next);
       return next;
@@ -1470,6 +1441,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         open={splitOpen}
         onClose={() => setSplitOpen(false)}
         cart={cart}
+        myId={myId}
         lang={lang}
       />
 
@@ -1687,8 +1659,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     </div>
                   )}
                   {filtered.map((item) => {
-                    const inCart = cart.find((c) => c.id === item.id);
-                    const qty = inCart?.qty ?? 0;
+                    const allForItem = cart.filter((c) => c.id === item.id);
+                    const totalQty = allForItem.reduce((s, c) => s + c.qty, 0);
+                    const myQty = allForItem.find((c) => c.addedBy === myId)?.qty ?? 0;
+                    const inCart = totalQty > 0;
+                    const qty = totalQty;
                     const isJust = justAdded === item.id;
                     return (
                       <motion.div
@@ -1736,8 +1711,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                               >
                                 <button
                                   data-testid={`button-decrease-${item.id}`}
-                                  onClick={() => updateQty(item.id, -1)}
-                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                                  onClick={() => updateQty(item.id, -1, myId)}
+                                  disabled={myQty === 0}
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10 disabled:opacity-30"
                                 >
                                   <Minus className="h-3 w-3 text-muted-foreground" />
                                 </button>
@@ -1863,55 +1839,67 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 pb-1 font-mono">
                         {tr.yourOrder(tableNumber)}
                       </p>
-                      {cart.map((item) => {
-                        const menuItem = menuItems.find(
-                          (m) => m.id === item.id,
-                        );
-                        const displayName = menuItem
-                          ? getItemName(menuItem, lang)
-                          : item.name;
-                        return (
-                          <motion.div
-                            key={item.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-border"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-foreground truncate">
-                                {displayName}
-                              </p>
-                              <p className="text-xs text-primary font-mono mt-0.5">
-                                {item.price} × {item.qty} ={" "}
-                                <span className="font-bold">
-                                  {item.price * item.qty}
-                                </span>{" "}
-                                DEN
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
-                              <button
-                                data-testid={`button-cart-decrease-${item.id}`}
-                                onClick={() => updateQty(item.id, -1)}
-                                className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                              >
-                                <Minus className="h-3 w-3 text-muted-foreground" />
-                              </button>
-                              <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
-                                {item.qty}
-                              </span>
-                              <button
-                                data-testid={`button-cart-increase-${item.id}`}
-                                onClick={() => updateQty(item.id, 1)}
-                                className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                              >
-                                <Plus className="h-3 w-3 text-muted-foreground" />
-                              </button>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
+                      {(() => {
+                        // Assign a stable color to each unique person in the cart
+                        const uniqueIds = Array.from(new Set(cart.map((i) => i.addedBy).filter(Boolean)));
+                        const personColor = (id?: string) =>
+                          id != null ? PERSON_COLORS[uniqueIds.indexOf(id) % PERSON_COLORS.length] : null;
+                        return cart.map((item) => {
+                          const menuItem = menuItems.find((m) => m.id === item.id);
+                          const displayName = menuItem ? getItemName(menuItem, lang) : item.name;
+                          const color = personColor(item.addedBy);
+                          const isMe = item.addedBy === myId;
+                          return (
+                            <motion.div
+                              key={`${item.id}-${item.addedBy ?? "shared"}`}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-border"
+                            >
+                              {/* Person color dot */}
+                              {color && (
+                                <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${color.dot}`} />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <p className="text-sm font-semibold text-foreground truncate">
+                                    {displayName}
+                                  </p>
+                                  {isMe && (
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-muted text-muted-foreground`}>
+                                      {tr.splitYou}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-primary font-mono mt-0.5">
+                                  {item.price} × {item.qty} ={" "}
+                                  <span className="font-bold">{item.price * item.qty}</span> DEN
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
+                                <button
+                                  data-testid={`button-cart-decrease-${item.id}`}
+                                  onClick={() => updateQty(item.id, -1, item.addedBy)}
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                                >
+                                  <Minus className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                                <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
+                                  {item.qty}
+                                </span>
+                                <button
+                                  data-testid={`button-cart-increase-${item.id}`}
+                                  onClick={() => updateQty(item.id, 1, item.addedBy)}
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                                >
+                                  <Plus className="h-3 w-3 text-muted-foreground" />
+                                </button>
+                              </div>
+                            </motion.div>
+                          );
+                        });
+                      })()}
                     </>
                   )}
                 </div>
