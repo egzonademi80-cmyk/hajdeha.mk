@@ -103,15 +103,17 @@ const t = {
     confirmingOrder: "Duke konfirmuar porosinë…",
     orderConfirmed: "Porosia juaj u vendos! ✓",
     waiterSheetTitle: "Çfarë keni nevojë?",
-    dessertTitle: "Ju bëftë mirë! 🍽️",
+    dessertTitle: "Ëmbëlsira e shtëpisë 🍰",
     dessertMsg: (items: string[]) =>
-      `A dëshironi ndonjë ëmbëlsirë si përfundim?\nKemi ${items.join(" dhe ")} si specialitet!`,
+      `A mund t'ju ofrojmë diçka të ëmbël si përfundim?\nSot rekomandojmë: ${items.join(" dhe ")}.`,
     dessertDismiss: "Jo, faleminderit",
     splitBill: "Ndaj faturën",
     splitPeople: "Persona",
     splitEach: "Secili paguan",
     splitTotal: "Totali",
     splitClose: "Mbyll",
+    splitPerson: (n: number) => `Personi ${n}`,
+    splitUnassigned: "Pa caktuar",
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -175,15 +177,17 @@ const t = {
     confirmingOrder: "Нарачката се потврдува…",
     orderConfirmed: "Вашата нарачка е примена! ✓",
     waiterSheetTitle: "Што ви треба?",
-    dessertTitle: "Добар апетит! 🍽️",
+    dessertTitle: "Десерт на куќата 🍰",
     dessertMsg: (items: string[]) =>
-      `Дали сакате нешто за десерт?\nИмаме ${items.join(" и ")} како специјалитет!`,
+      `Може ли да ви предложиме нешто слатко за крај?\nДенес препорачуваме: ${items.join(" и ")}.`,
     dessertDismiss: "Не, фала",
     splitBill: "Подели сметка",
     splitPeople: "Луѓе",
     splitEach: "Секој плаќа",
     splitTotal: "Вкупно",
     splitClose: "Затвори",
+    splitPerson: (n: number) => `Лице ${n}`,
+    splitUnassigned: "Недоделено",
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -246,15 +250,17 @@ const t = {
     confirmingOrder: "Confirming your order…",
     orderConfirmed: "Your order is placed! ✓",
     waiterSheetTitle: "What do you need?",
-    dessertTitle: "Hope you enjoyed it! 🍽️",
+    dessertTitle: "A little something sweet? 🍰",
     dessertMsg: (items: string[]) =>
-      `Would you like a dessert to finish?\nWe have ${items.join(" and ")} as specialties!`,
-    dessertDismiss: "No, thanks",
+      `May we tempt you with a dessert to finish?\nToday we recommend: ${items.join(" and ")}.`,
+    dessertDismiss: "No, thank you",
     splitBill: "Split Bill",
     splitPeople: "People",
     splitEach: "Each person pays",
     splitTotal: "Total",
     splitClose: "Close",
+    splitPerson: (n: number) => `Person ${n}`,
+    splitUnassigned: "Unassigned",
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -286,21 +292,70 @@ const t = {
 } as const;
 
 // ─── Bill Split Drawer ────────────────────────────────────────────────────────
+const PERSON_COLORS = [
+  { dot: "bg-blue-500", ring: "ring-blue-400", label: "text-blue-600 dark:text-blue-400", soft: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" },
+  { dot: "bg-rose-500", ring: "ring-rose-400", label: "text-rose-600 dark:text-rose-400", soft: "bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800" },
+  { dot: "bg-amber-500", ring: "ring-amber-400", label: "text-amber-600 dark:text-amber-400", soft: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800" },
+  { dot: "bg-emerald-500", ring: "ring-emerald-400", label: "text-emerald-600 dark:text-emerald-400", soft: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800" },
+  { dot: "bg-violet-500", ring: "ring-violet-400", label: "text-violet-600 dark:text-violet-400", soft: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800" },
+  { dot: "bg-orange-500", ring: "ring-orange-400", label: "text-orange-600 dark:text-orange-400", soft: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800" },
+  { dot: "bg-pink-500", ring: "ring-pink-400", label: "text-pink-600 dark:text-pink-400", soft: "bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800" },
+  { dot: "bg-teal-500", ring: "ring-teal-400", label: "text-teal-600 dark:text-teal-400", soft: "bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800" },
+];
+
 function BillSplitDrawer({
   open,
   onClose,
-  total,
+  cart,
   lang,
 }: {
   open: boolean;
   onClose: () => void;
-  total: number;
+  cart: CartItem[];
   lang: Lang;
 }) {
   const tr = t[lang];
   const [people, setPeople] = useState(2);
+  const [assignments, setAssignments] = useState<Record<string, number | null>>({});
 
-  const perPerson = Math.ceil(total / people);
+  // Expand cart items into individual units (Pizza ×2 → two separate rows)
+  const units = cart.flatMap((item) =>
+    Array.from({ length: item.qty }, (_, unitIdx) => ({
+      key: `${item.id}-${unitIdx}`,
+      name: item.name,
+      price: item.price,
+    }))
+  );
+
+  // When people count drops, remove out-of-range assignments
+  useEffect(() => {
+    setAssignments((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        const v = next[k];
+        if (v !== null && v !== undefined && v >= people) delete next[k];
+      });
+      return next;
+    });
+  }, [people]);
+
+  // Reset when drawer reopens
+  useEffect(() => {
+    if (open) setAssignments({});
+  }, [open]);
+
+  const assign = (key: string, personIdx: number) =>
+    setAssignments((prev) => ({
+      ...prev,
+      [key]: prev[key] === personIdx ? null : personIdx,
+    }));
+
+  const personTotals = Array.from({ length: people }, (_, i) =>
+    units.filter((u) => assignments[u.key] === i).reduce((s, u) => s + u.price, 0)
+  );
+  const unassignedTotal = units
+    .filter((u) => assignments[u.key] == null)
+    .reduce((s, u) => s + u.price, 0);
 
   return (
     <AnimatePresence>
@@ -319,23 +374,21 @@ function BillSplitDrawer({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 360, damping: 34 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-stone-900 rounded-t-3xl shadow-2xl overflow-hidden"
-            style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-stone-900 rounded-t-3xl shadow-2xl flex flex-col"
+            style={{ maxHeight: "85dvh", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
           >
             {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
+            <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
               <div className="w-10 h-1 rounded-full bg-stone-200 dark:bg-stone-700" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Divide className="h-4 w-4 text-primary" />
                 </div>
-                <p className="text-base font-bold text-foreground">
-                  {tr.splitBill}
-                </p>
+                <p className="text-base font-bold text-foreground">{tr.splitBill}</p>
               </div>
               <button
                 onClick={onClose}
@@ -345,93 +398,110 @@ function BillSplitDrawer({
               </button>
             </div>
 
-            <div className="px-5 py-6 space-y-6">
-              {/* Total row */}
-              <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-muted">
-                <span className="text-sm text-muted-foreground font-medium">
-                  {tr.splitTotal}
-                </span>
-                <span className="text-lg font-bold text-foreground font-mono">
-                  {total}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    DEN
-                  </span>
-                </span>
-              </div>
-
-              {/* People picker */}
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  {tr.splitPeople}
-                </p>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setPeople((p) => Math.max(2, p - 1))}
-                    className="h-11 w-11 rounded-2xl bg-muted flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30"
-                    disabled={people <= 2}
-                  >
-                    <Minus className="h-4 w-4 text-foreground" />
-                  </button>
-
-                  {/* People avatars */}
-                  <div className="flex-1 flex items-center justify-center gap-2 flex-wrap">
-                    {Array.from({ length: Math.min(people, 8) }).map((_, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 24,
-                          delay: i * 0.03,
-                        }}
-                        className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center text-sm"
-                      >
-                        👤
-                      </motion.div>
-                    ))}
-                    {people > 8 && (
-                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-[11px] font-bold text-muted-foreground">
-                        +{people - 8}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => setPeople((p) => Math.min(20, p + 1))}
-                    className="h-11 w-11 rounded-2xl bg-muted flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30"
-                    disabled={people >= 20}
-                  >
-                    <Plus className="h-4 w-4 text-foreground" />
-                  </button>
+            {/* People selector */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border flex-shrink-0">
+              <p className="text-sm font-semibold text-foreground">{tr.splitPeople}</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setPeople((p) => Math.max(2, p - 1))}
+                  disabled={people <= 2}
+                  className="h-8 w-8 rounded-xl bg-muted flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: people }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 24 }}
+                      className={`h-6 w-6 rounded-full ${PERSON_COLORS[i]?.dot ?? "bg-stone-400"} flex items-center justify-center text-white text-[10px] font-bold`}
+                    >
+                      {i + 1}
+                    </motion.div>
+                  ))}
                 </div>
-
-                {/* People count label */}
-                <p className="text-center text-sm font-semibold text-foreground">
-                  {people} {tr.splitPeople.toLowerCase()}
-                </p>
+                <button
+                  onClick={() => setPeople((p) => Math.min(8, p + 1))}
+                  disabled={people >= 8}
+                  className="h-8 w-8 rounded-xl bg-muted flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
               </div>
+            </div>
 
-              {/* Per person amount — big hero number */}
-              <motion.div
-                key={perPerson}
-                initial={{ scale: 0.88, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 22 }}
-                className="rounded-3xl bg-primary p-6 flex flex-col items-center gap-1 shadow-lg"
-              >
-                <p className="text-sm font-semibold text-primary-foreground/70">
-                  {tr.splitEach}
-                </p>
-                <p className="text-5xl font-black text-primary-foreground font-mono tracking-tight">
-                  {perPerson}
-                </p>
-                <p className="text-sm font-bold text-primary-foreground/70">
-                  DEN
-                </p>
-              </motion.div>
+            {/* Item list — tap a person number to claim each dish */}
+            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+              {units.length === 0 ? (
+                <p className="text-center text-muted-foreground text-sm py-10">{tr.emptyCart}</p>
+              ) : (
+                units.map((unit) => {
+                  const assigned = assignments[unit.key];
+                  const color = assigned != null ? PERSON_COLORS[assigned] : null;
+                  return (
+                    <div
+                      key={unit.key}
+                      className={`flex items-center gap-3 px-3.5 py-3 rounded-2xl border transition-colors ${
+                        color ? color.soft : "border-border bg-muted/20"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{unit.name}</p>
+                        <p className={`text-xs font-mono font-bold mt-0.5 ${color ? color.label : "text-muted-foreground"}`}>
+                          {unit.price} DEN
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        {Array.from({ length: people }, (_, i) => {
+                          const c = PERSON_COLORS[i];
+                          const isMe = assigned === i;
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => assign(unit.key, i)}
+                              className={`h-8 w-8 rounded-full text-[11px] font-bold transition-all ${
+                                isMe
+                                  ? `${c.dot} text-white ring-2 ring-offset-1 ${c.ring} scale-110`
+                                  : "bg-muted text-muted-foreground active:scale-95"
+                              }`}
+                            >
+                              {i + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Per-person breakdown */}
+            <div className="px-5 pt-4 pb-5 border-t border-border space-y-2.5 flex-shrink-0">
+              {Array.from({ length: people }, (_, i) => {
+                const c = PERSON_COLORS[i];
+                return (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`h-6 w-6 rounded-full ${c.dot} flex items-center justify-center text-white text-[10px] font-bold`}>
+                        {i + 1}
+                      </div>
+                      <span className="text-sm font-medium text-foreground">{tr.splitPerson(i + 1)}</span>
+                    </div>
+                    <span className={`text-sm font-black font-mono ${c.label}`}>
+                      {personTotals[i]} <span className="text-xs font-normal text-muted-foreground">DEN</span>
+                    </span>
+                  </div>
+                );
+              })}
+              {unassignedTotal > 0 && (
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <span className="text-xs text-muted-foreground">{tr.splitUnassigned}</span>
+                  <span className="text-xs font-mono font-semibold text-muted-foreground">{unassignedTotal} DEN</span>
+                </div>
+              )}
             </div>
           </motion.div>
         </>
@@ -1309,7 +1379,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         );
         setDessertToast(true);
       },
-      (18 + foodItems.length * 2) * 60 * 1000,
+      40 * 60 * 1000,
     );
     return () => {
       if (dessertTimerRef.current) clearTimeout(dessertTimerRef.current);
@@ -1399,7 +1469,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       <BillSplitDrawer
         open={splitOpen}
         onClose={() => setSplitOpen(false)}
-        total={total}
+        cart={cart}
         lang={lang}
       />
 
