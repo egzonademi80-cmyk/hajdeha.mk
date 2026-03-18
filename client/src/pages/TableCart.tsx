@@ -21,6 +21,8 @@ import {
   VolumeX,
   Bell,
   Divide,
+  Loader2,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
