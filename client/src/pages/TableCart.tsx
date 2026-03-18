@@ -1176,20 +1176,23 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     });
     channel.bind("pusher:subscription_succeeded", () => setConnected(true));
 
-    // Session isolation: each new browser session (new customer) starts fresh
-    const sessionKey = `hajde-session-${channelName}`;
-    const isNewSession = !sessionStorage.getItem(sessionKey);
-    sessionStorage.setItem(sessionKey, "1");
+    // Time-based table isolation:
+    // - Friends scanning together (within 3 hours) → share the same cart
+    // - New customers (cart older than 3 hours) → start fresh automatically
+    const tsKey = `hajde-ts-${channelName}`;
+    const THREE_HOURS = 3 * 60 * 60 * 1000;
+    const lastActive = parseInt(localStorage.getItem(tsKey) || "0", 10);
+    const isStale = !lastActive || Date.now() - lastActive > THREE_HOURS;
 
-    if (isNewSession) {
-      // New customer — clear whatever the previous customer left behind
+    if (isStale) {
+      // Table has turned over — wipe old cart so new customers start fresh
       fetch("/api/table/cart-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel: channelName, cart: [] }),
       }).catch(() => {});
     } else {
-      // Same customer refreshed — restore their in-progress cart
+      // Active table — load shared cart (works for friends scanning together too)
       fetch(`/api/table/${channelName}/cart`)
         .then((r) => r.json())
         .then((d) => { if (d.cart) setCart(d.cart); })
@@ -1205,9 +1208,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const syncCart = useCallback(
     async (newCart: CartItem[]) => {
       isLocal.current = true;
-      setTimeout(() => {
-        isLocal.current = false;
-      }, 200);
+      setTimeout(() => { isLocal.current = false; }, 200);
+      // Keep the timestamp fresh so friends joining the same table can share the cart
+      if (newCart.length > 0) {
+        localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
+      }
       try {
         await fetch("/api/table/cart-update", {
           method: "POST",
@@ -1228,8 +1233,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       setWaiterCalledFromCart(false);
       setOrderConfirmedDone(false);
       setOrderConfirming(false);
-      // Remove session key so the next fresh open is treated as a new customer
-      sessionStorage.removeItem(`hajde-session-${channelName}`);
+      // Clear the timestamp so the next customers are detected as a fresh table session
+      localStorage.removeItem(`hajde-ts-${channelName}`);
     }, 4000);
     return () => clearTimeout(timer);
   }, [orderConfirmedDone, syncCart, channelName]);
