@@ -83,7 +83,7 @@ const t = {
     viewCart: "Shiko shportën",
     cart: "Shporta",
     cartItems: (n: number) => `${n} artikuj`,
-    yourOrder: (t: number | string) => `Porosia juaj · Tavolina ${t}`,
+    yourOrder: (t: number) => `Porosia juaj · Tavolina ${t}`,
     emptyCart: "Shporta është bosh",
     addItems: "Shto artikuj",
     listening: "Duke dëgjuar...",
@@ -163,7 +163,7 @@ const t = {
     viewCart: "Кошничка",
     cart: "Кошничка",
     cartItems: (n: number) => `${n} артикли`,
-    yourOrder: (t: number | string) => `Вашата нарачка · Маса ${t}`,
+    yourOrder: (t: number) => `Вашата нарачка · Маса ${t}`,
     emptyCart: "Кошничката е празна",
     addItems: "Додај артикли",
     listening: "Слушам...",
@@ -242,7 +242,7 @@ const t = {
     viewCart: "View Cart",
     cart: "Cart",
     cartItems: (n: number) => `${n} items`,
-    yourOrder: (t: number | string) => `Your order · Table ${t}`,
+    yourOrder: (t: number) => `Your order · Table ${t}`,
     emptyCart: "Your cart is empty",
     addItems: "Add items",
     listening: "Listening...",
@@ -565,7 +565,7 @@ function WaiterSheet({
   open: boolean;
   onClose: () => void;
   phoneNumber?: string | null;
-  tableNumber: number | string;
+  tableNumber: number;
   lang: Lang;
 }) {
   const tr = t[lang];
@@ -791,7 +791,7 @@ function AIWaiterPanel({
   restaurantName: string;
   menuItems: MenuItem[];
   cart: CartItem[];
-  tableNumber: number | string;
+  tableNumber: number;
   onAddItem: (item: MenuItem) => void;
   lang: Lang;
 }) {
@@ -1308,10 +1308,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     },
   });
 
-  const displayTable = restaurant?.tablePrefix
-    ? `${restaurant.tablePrefix}${tableNumber}`
-    : String(tableNumber);
-
   const menuItems: MenuItem[] = useMemo(
     () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
     [restaurant],
@@ -1641,7 +1637,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         open={waiterSheetOpen}
         onClose={() => setWaiterSheetOpen(false)}
         phoneNumber={restaurant.phoneNumber}
-        tableNumber={displayTable}
+        tableNumber={tableNumber}
         lang={lang}
       />
       <AIWaiterPanel
@@ -1650,7 +1646,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         restaurantName={restaurant.name}
         menuItems={menuItems}
         cart={cart}
-        tableNumber={displayTable}
+        tableNumber={tableNumber}
         onAddItem={addItem}
         lang={lang}
       />
@@ -1715,7 +1711,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               {restaurant.name}
             </p>
             <p className="text-[11px] text-muted-foreground font-mono mt-0.5 uppercase tracking-widest">
-              {tr.table} {displayTable}
+              {tr.table} {tableNumber}
             </p>
           </div>
         </div>

@@ -30,7 +30,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, userId: num
   const {
     name, slug, description, descriptionAl, descriptionMk, photoUrl,
     website, phoneNumber, location, openingTime, closingTime,
-    active, latitude, longitude, tableCount, tablePrefix,
+    active, latitude, longitude, tableCount,
   } = req.body || {};
 
   if (!name || !slug)
@@ -47,7 +47,6 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, userId: num
       website, phoneNumber, location, openingTime, closingTime,
       active: active ?? true, latitude, longitude,
       tableCount: tableCount ?? 0,
-      tablePrefix: tablePrefix || null,
       userId,
     })
     .returning();
@@ -70,7 +69,7 @@ async function handleUpdate(req: VercelRequest, res: VercelResponse, userId: num
   const allowed = [
     "name", "description", "descriptionAl", "descriptionMk", "slug",
     "photoUrl", "website", "phoneNumber", "location",
-    "openingTime", "closingTime", "active", "latitude", "longitude", "tableCount", "tablePrefix",
+    "openingTime", "closingTime", "active", "latitude", "longitude", "tableCount",
   ];
 
   const updateData: Record<string, unknown> = {};

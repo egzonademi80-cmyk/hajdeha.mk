@@ -1004,8 +1004,6 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
     restaurant.tableCount || 0,
   );
   const [inputVal, setInputVal] = useState(String(restaurant.tableCount || 0));
-  const [prefix, setPrefix] = useState<string>(restaurant.tablePrefix || "");
-  const [prefixInput, setPrefixInput] = useState<string>(restaurant.tablePrefix || "");
   const [saving, setSaving] = useState(false);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
@@ -1031,13 +1029,15 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
         const ctx = canvas.getContext("2d");
         if (!ctx) continue;
         const url = `${baseUrl}/table/${restaurant.slug}/${i + 1}`;
-        drawQR(canvas, url, i + 1, prefix);
+        // Draw QR using qrcode-svg approach via data URL
+        drawQR(canvas, url, i + 1);
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [tableCount, restaurant.slug, baseUrl, prefix]);
+  }, [tableCount, restaurant.slug, baseUrl]);
 
-  const drawQR = (canvas: HTMLCanvasElement, url: string, tableNum: number, pfx: string) => {
+  const drawQR = (canvas: HTMLCanvasElement, url: string, tableNum: number) => {
+    // Use a simple QR via Google Charts API rendered to canvas
     const size = 200;
     canvas.width = size;
     canvas.height = size + 40;
@@ -1050,18 +1050,18 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
     img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}&bgcolor=FFFFFF&color=000000&margin=10`;
     img.onload = () => {
       ctx.drawImage(img, 10, 10, 180, 180);
+      // Table label
       ctx.fillStyle = "#000000";
       ctx.font = "bold 14px DM Sans, sans-serif";
       ctx.textAlign = "center";
-      const label = pfx ? `${pfx}${tableNum}` : `Table ${tableNum}`;
-      ctx.fillText(label, size / 2, size + 20);
+      ctx.fillText(`Table ${tableNum}`, size / 2, size + 20);
       ctx.font = "10px DM Sans, sans-serif";
       ctx.fillStyle = "#888888";
       ctx.fillText(restaurant.name, size / 2, size + 35);
     };
   };
 
-  const saveTableSettings = () => {
+  const saveTableCount = () => {
     const count = parseInt(inputVal);
     if (isNaN(count) || count < 0 || count > 100) {
       toast({
@@ -1071,19 +1071,14 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
       });
       return;
     }
-    const cleanPrefix = prefixInput.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 3);
     setSaving(true);
     update(
-      { id: restaurant.id, tableCount: count, tablePrefix: cleanPrefix || null },
+      { id: restaurant.id, tableCount: count },
       {
         onSuccess: () => {
           setTableCount(count);
-          setPrefix(cleanPrefix);
           setSaving(false);
-          const label = cleanPrefix
-            ? `${count} tavolina · ${cleanPrefix}1–${cleanPrefix}${count}`
-            : `${count} tavolina`;
-          toast({ title: "✓ Ruajtur", description: label });
+          toast({ title: "✓ Ruajtur", description: `${count} tavolina` });
         },
         onError: () => setSaving(false),
       },
@@ -1125,15 +1120,18 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
         )}
       </div>
 
-      {/* Table settings input */}
-      <div className="bg-background rounded-xl border border-border p-4 space-y-4">
-        {/* Count row */}
-        <div className="flex items-center gap-3">
-          <Table2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">Numri i tavolinave</p>
-            <p className="text-xs text-muted-foreground">Gjeneron QR kod unik për çdo tavolinë</p>
-          </div>
+      {/* Table count input */}
+      <div className="bg-background rounded-xl border border-border p-4 flex items-center gap-3">
+        <Table2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-foreground">
+            Numri i tavolinave
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Gjeneron QR kod unik për çdo tavolinë
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           <input
             type="number"
             min={0}
@@ -1142,40 +1140,14 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
             onChange={(e) => setInputVal(e.target.value)}
             className="w-16 h-9 rounded-lg border border-border bg-muted text-center text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
+          <button
+            onClick={saveTableCount}
+            disabled={saving}
+            className="h-9 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ruaj"}
+          </button>
         </div>
-
-        {/* Prefix row */}
-        <div className="flex items-center gap-3 pt-1 border-t border-border">
-          <div className="h-5 w-5 flex-shrink-0 flex items-center justify-center text-muted-foreground font-bold text-xs">A#</div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-foreground">
-              Prefix i tavolinës{" "}
-              <span className="text-[11px] font-normal text-muted-foreground ml-1">opsionale</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {prefixInput.trim()
-                ? `Tavolinat do të quhen: ${prefixInput.trim().toUpperCase().slice(0,3)}1, ${prefixInput.trim().toUpperCase().slice(0,3)}2…`
-                : "P.sh. D → D1, D2…  ose T → T1, T2…"}
-            </p>
-          </div>
-          <input
-            type="text"
-            maxLength={3}
-            placeholder="D"
-            value={prefixInput}
-            onChange={(e) => setPrefixInput(e.target.value.toUpperCase().replace(/[^A-Za-z]/g, ""))}
-            className="w-16 h-9 rounded-lg border border-border bg-muted text-center text-sm font-bold text-foreground uppercase placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-
-        {/* Save button */}
-        <button
-          onClick={saveTableSettings}
-          disabled={saving}
-          className="w-full h-9 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-1.5"
-        >
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ruaj konfigurimet"}
-        </button>
       </div>
 
       {/* QR Grid */}
@@ -1196,7 +1168,7 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
                 />
                 <div className="w-full flex items-center justify-between">
                   <span className="text-xs font-bold text-foreground">
-                    {prefix ? `${prefix}${tableNum}` : `T${tableNum}`}
+                    T{tableNum}
                   </span>
                   <button
                     onClick={() => downloadQR(tableNum)}
