@@ -23,6 +23,8 @@ import {
   Divide,
   Loader2,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -116,6 +118,11 @@ const t = {
     splitPerson: (n: number) => `Personi ${n}`,
     splitUnassigned: "Pa caktuar",
     splitYou: "Ti",
+    billPayHow: "Si do të paguani?",
+    cash: "Kesh",
+    card: "Kartë",
+    billTextCash: (table: number) => `Përshëndetje! Tavolina ${table} dëshiron faturën — me KESH, ju lutem.`,
+    billTextCard: (table: number) => `Përshëndetje! Tavolina ${table} dëshiron faturën — me KARTË, ju lutem.`,
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -191,6 +198,11 @@ const t = {
     splitPerson: (n: number) => `Лице ${n}`,
     splitUnassigned: "Недоделено",
     splitYou: "Ти",
+    billPayHow: "Како ќе платите?",
+    cash: "Готово",
+    card: "Картичка",
+    billTextCash: (table: number) => `Здраво! Маса ${table} би сакала сметката — ГОТОВО, ве молам.`,
+    billTextCard: (table: number) => `Здраво! Маса ${table} би сакала сметката — КАРТИЧКА, ве молам.`,
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -265,6 +277,11 @@ const t = {
     splitPerson: (n: number) => `Person ${n}`,
     splitUnassigned: "Unassigned",
     splitYou: "You",
+    billPayHow: "How will you pay?",
+    cash: "Cash",
+    card: "Card",
+    billTextCash: (table: number) => `Hi! Table ${table} would like the bill — CASH, please.`,
+    billTextCard: (table: number) => `Hi! Table ${table} would like the bill — CARD, please.`,
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -550,6 +567,13 @@ function WaiterSheet({
   lang: Lang;
 }) {
   const tr = t[lang];
+  const [billPicker, setBillPicker] = useState(false);
+
+  // Reset sub-step when sheet closes
+  useEffect(() => {
+    if (!open) setBillPicker(false);
+  }, [open]);
+
   const openWhatsApp = (message: string) => {
     const phone = (phoneNumber || "").replace(/\D/g, "");
     const url = phone
@@ -558,6 +582,14 @@ function WaiterSheet({
     window.open(url, "_blank");
     onClose();
   };
+
+  const WaIcon = () => (
+    <svg className="h-4 w-4 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.554 4.122 1.527 5.855L.057 23.04a.75.75 0 00.903.903l5.185-1.47A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.698-.513-5.238-1.406l-.374-.222-3.878 1.1 1.1-3.878-.222-.374A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
+    </svg>
+  );
+
   return (
     <AnimatePresence>
       {open && (
@@ -581,14 +613,25 @@ function WaiterSheet({
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 rounded-full bg-stone-200 dark:bg-stone-700" />
             </div>
+
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                  <Bell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
+                {billPicker ? (
+                  <button
+                    onClick={() => setBillPicker(false)}
+                    className="h-8 w-8 rounded-full bg-muted flex items-center justify-center active:bg-muted/70"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                    <Bell className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-bold text-foreground leading-tight">
-                    {tr.waiterSheetTitle}
+                    {billPicker ? tr.billPayHow : tr.waiterSheetTitle}
                   </p>
                   <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
                     {tr.table} {tableNumber}
@@ -602,34 +645,91 @@ function WaiterSheet({
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
-            <div className="p-4 space-y-2.5 pb-6">
-              {tr.waiterMessages(tableNumber).map((msg) => (
-                <motion.button
-                  key={msg.label}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => openWhatsApp(msg.text)}
-                  className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
+
+            <AnimatePresence mode="wait">
+              {billPicker ? (
+                /* ── Cash / Card picker ── */
+                <motion.div
+                  key="bill-picker"
+                  initial={{ opacity: 0, x: 40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -40 }}
+                  transition={{ duration: 0.18 }}
+                  className="p-4 pb-8 space-y-3"
                 >
-                  <span className="text-2xl flex-shrink-0">{msg.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-snug">
-                      {msg.label}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                      {msg.text}
-                    </p>
+                  <p className="text-[11px] text-muted-foreground text-center pb-1">🧾 {tr.billPayHow}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Cash */}
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => openWhatsApp(tr.billTextCash(tableNumber))}
+                      className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 active:border-emerald-400 transition-colors"
+                    >
+                      <span className="text-4xl">💵</span>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{tr.cash}</p>
+                        <WaIcon />
+                      </div>
+                    </motion.button>
+                    {/* Card */}
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => openWhatsApp(tr.billTextCard(tableNumber))}
+                      className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 active:border-blue-400 transition-colors"
+                    >
+                      <span className="text-4xl">💳</span>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-blue-700 dark:text-blue-300">{tr.card}</p>
+                        <WaIcon />
+                      </div>
+                    </motion.button>
                   </div>
-                  <svg
-                    className="h-4 w-4 text-green-500 flex-shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.554 4.122 1.527 5.855L.057 23.04a.75.75 0 00.903.903l5.185-1.47A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.698-.513-5.238-1.406l-.374-.222-3.878 1.1 1.1-3.878-.222-.374A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
-                  </svg>
-                </motion.button>
-              ))}
-            </div>
+                </motion.div>
+              ) : (
+                /* ── Normal message list ── */
+                <motion.div
+                  key="msg-list"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -40 }}
+                  transition={{ duration: 0.18 }}
+                  className="p-4 space-y-2.5 pb-6"
+                >
+                  {tr.waiterMessages(tableNumber).map((msg) => {
+                    const isBill = msg.icon === "🧾";
+                    return (
+                      <motion.button
+                        key={msg.label}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => isBill ? setBillPicker(true) : openWhatsApp(msg.text)}
+                        className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
+                      >
+                        <span className="text-2xl flex-shrink-0">{msg.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground leading-snug">
+                            {msg.label}
+                          </p>
+                          {isBill ? (
+                            <p className="text-[11px] text-primary font-medium mt-0.5">
+                              {tr.cash} · {tr.card}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                              {msg.text}
+                            </p>
+                          )}
+                        </div>
+                        {isBill ? (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <WaIcon />
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </>
       )}
