@@ -25,6 +25,8 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Banknote,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -655,35 +657,64 @@ function WaiterSheet({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -40 }}
                   transition={{ duration: 0.18 }}
-                  className="p-4 pb-8 space-y-3"
+                  className="px-4 pt-5 pb-8 space-y-3"
                 >
-                  <p className="text-[11px] text-muted-foreground text-center pb-1">🧾 {tr.billPayHow}</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Cash */}
-                    <motion.button
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => openWhatsApp(tr.billTextCash(tableNumber))}
-                      className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-800 active:border-emerald-400 transition-colors"
-                    >
-                      <span className="text-4xl">💵</span>
-                      <div className="text-center">
-                        <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{tr.cash}</p>
-                        <WaIcon />
-                      </div>
-                    </motion.button>
-                    {/* Card */}
-                    <motion.button
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => openWhatsApp(tr.billTextCard(tableNumber))}
-                      className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 active:border-blue-400 transition-colors"
-                    >
-                      <span className="text-4xl">💳</span>
-                      <div className="text-center">
-                        <p className="text-sm font-bold text-blue-700 dark:text-blue-300">{tr.card}</p>
-                        <WaIcon />
-                      </div>
-                    </motion.button>
+                  {/* Section label */}
+                  <div className="flex items-center gap-2 px-1 mb-4">
+                    <div className="h-px flex-1 bg-border" />
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+                      {tr.billPayHow}
+                    </p>
+                    <div className="h-px flex-1 bg-border" />
                   </div>
+
+                  {/* Cash button */}
+                  <motion.button
+                    whileTap={{ scale: 0.985 }}
+                    onClick={() => openWhatsApp(tr.billTextCash(tableNumber))}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
+                  >
+                    {/* Icon */}
+                    <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-200 dark:shadow-emerald-900/40">
+                      <Banknote className="h-6 w-6 text-white" strokeWidth={1.75} />
+                    </div>
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-semibold text-foreground leading-tight">{tr.cash}</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">{tr.billTextCash(tableNumber)}</p>
+                    </div>
+                    {/* WhatsApp send indicator */}
+                    <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
+                      <WaIcon />
+                    </div>
+                  </motion.button>
+
+                  {/* Card button */}
+                  <motion.button
+                    whileTap={{ scale: 0.985 }}
+                    onClick={() => openWhatsApp(tr.billTextCard(tableNumber))}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
+                  >
+                    {/* Icon */}
+                    <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200 dark:shadow-blue-900/40">
+                      <CreditCard className="h-6 w-6 text-white" strokeWidth={1.75} />
+                    </div>
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-semibold text-foreground leading-tight">{tr.card}</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">{tr.billTextCard(tableNumber)}</p>
+                    </div>
+                    {/* WhatsApp send indicator */}
+                    <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
+                      <WaIcon />
+                    </div>
+                  </motion.button>
+
+                  {/* Footer hint */}
+                  <p className="text-center text-[11px] text-muted-foreground pt-2 flex items-center justify-center gap-1.5">
+                    <WaIcon />
+                    <span>Sends via WhatsApp</span>
+                  </p>
                 </motion.div>
               ) : (
                 /* ── Normal message list ── */
