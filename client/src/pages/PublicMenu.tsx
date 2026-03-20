@@ -2921,12 +2921,18 @@ export default function PublicMenu() {
   );
 
   const pageTopRef = useRef<HTMLDivElement>(null);
+  const categoryChangedRef = useRef(false);
 
-  const scrollToTop = useCallback(() => {
-    setTimeout(() => {
-      pageTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  }, []);
+  useEffect(() => {
+    if (!categoryChangedRef.current) return;
+    categoryChangedRef.current = false;
+    const raf1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    });
+    return () => cancelAnimationFrame(raf1);
+  }, [selectedCategory]);
 
   const scrollToMap = useCallback(() => {
     document
@@ -3317,8 +3323,8 @@ export default function PublicMenu() {
               <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
                 <DropdownMenuItem
                   onClick={() => {
+                    categoryChangedRef.current = true;
                     setSelectedCategory("All");
-                    scrollToTop();
                   }}
                   className="cursor-pointer py-2.5 px-4 font-semibold rounded-lg m-1"
                 >
@@ -3328,8 +3334,8 @@ export default function PublicMenu() {
                   <DropdownMenuItem
                     key={cat}
                     onClick={() => {
+                      categoryChangedRef.current = true;
                       setSelectedCategory(cat);
-                      scrollToTop();
                     }}
                     className="cursor-pointer py-2.5 px-4 rounded-lg m-1"
                   >
