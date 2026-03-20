@@ -1710,19 +1710,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             <p className="text-sm font-bold text-foreground leading-tight truncate max-w-[120px] sm:max-w-none">
               {restaurant.name}
             </p>
-            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-widest">
-                {tr.table} {tableNumber}
-              </p>
-              {restaurant.wifiPassword && (
-                <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">
-                  <Wifi className="h-2.5 w-2.5 text-blue-500" />
-                  <span className="text-[10px] font-mono font-semibold text-blue-600 dark:text-blue-300">
-                    {restaurant.wifiPassword}
-                  </span>
-                </div>
-              )}
-            </div>
+            <p className="text-[11px] text-muted-foreground font-mono mt-0.5 uppercase tracking-widest">
+              {tr.table} {tableNumber}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">

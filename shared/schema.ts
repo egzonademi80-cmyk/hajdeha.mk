@@ -17,8 +17,6 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").default("owner").notNull(),
-  email: text("email"),
 });
 
 export const restaurants = pgTable(
@@ -43,8 +41,6 @@ export const restaurants = pgTable(
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
     tableCount: integer("table_count").default(0).notNull(),
-    wifiPassword: text("wifi_password"),
-    paymentStatus: text("payment_status").default("pending").notNull(),
   },
   (table) => ({ slugIdx: index("slug_idx").on(table.slug) }),
 );

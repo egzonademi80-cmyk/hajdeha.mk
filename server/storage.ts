@@ -12,27 +12,22 @@ import {
   type InsertMenuItem,
 } from "../shared/schema.js";
 
-export type RestaurantWithOwner = Restaurant & { ownerUsername: string };
-
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getUsersByRole(role: string): Promise<User[]>;
 
   // Restaurant operations
   getRestaurant(id: number): Promise<Restaurant | undefined>;
   getRestaurantBySlug(slug: string): Promise<Restaurant | undefined>;
   getRestaurantsByUserId(userId: number): Promise<Restaurant[]>;
   getAllRestaurants(): Promise<Restaurant[]>;
-  getAllRestaurantsWithOwners(): Promise<RestaurantWithOwner[]>;
   createRestaurant(restaurant: InsertRestaurant): Promise<Restaurant>;
   updateRestaurant(
     id: number,
     updates: Partial<InsertRestaurant>,
   ): Promise<Restaurant>;
-  setRestaurantPaymentStatus(id: number, paymentStatus: string): Promise<Restaurant>;
   deleteRestaurant(id: number): Promise<void>;
 
   // Menu Item operations

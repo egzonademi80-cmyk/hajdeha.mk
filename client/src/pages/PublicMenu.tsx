@@ -2920,34 +2920,6 @@ export default function PublicMenu() {
     [cart],
   );
 
-  const [showFloatingFilter, setShowFloatingFilter] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => setShowFloatingFilter(window.scrollY > 220);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const pageTopRef = useRef<HTMLDivElement>(null);
-  const categoryChangedRef = useRef(false);
-
-  useEffect(() => {
-    if (!categoryChangedRef.current) return;
-    categoryChangedRef.current = false;
-    const raf1 = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const sectionId =
-          selectedCategory === "All"
-            ? "menu-main"
-            : `category-${selectedCategory.toLowerCase().replace(/\s+/g, "-")}`;
-        document
-          .getElementById(sectionId)
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    });
-    return () => cancelAnimationFrame(raf1);
-  }, [selectedCategory]);
-
   const scrollToMap = useCallback(() => {
     document
       .getElementById("map-section")
@@ -3126,7 +3098,6 @@ export default function PublicMenu() {
         />
       )}
       <div
-        ref={pageTopRef}
         className={`min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 transition-colors duration-300 ${cartCount > 0 ? "pb-48" : "pb-36"}`}
       >
         <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
@@ -3255,8 +3226,8 @@ export default function PublicMenu() {
           </div>
         </header>
 
-        {/* Search + Filter Bar */}
-        <div className="bg-white/95 dark:bg-stone-900/95 border-b border-stone-100 dark:border-stone-800 py-3 shadow-sm">
+        {/* Sticky Search + Filter Bar */}
+        <div className="sticky top-0 z-40 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-b border-stone-100 dark:border-stone-800 py-3 shadow-sm">
           <div className="max-w-4xl mx-auto px-3 sm:px-4 space-y-2.5">
             <div className="relative">
               <div className="relative w-full">
@@ -3336,9 +3307,7 @@ export default function PublicMenu() {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
                 <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedCategory("All");
-                  }}
+                  onClick={() => setSelectedCategory("All")}
                   className="cursor-pointer py-2.5 px-4 font-semibold rounded-lg m-1"
                 >
                   {t.allCategories}
@@ -3346,10 +3315,7 @@ export default function PublicMenu() {
                 {categories.map((cat: any) => (
                   <DropdownMenuItem
                     key={cat}
-                    onClick={() => {
-                      categoryChangedRef.current = true;
-                      setSelectedCategory(cat);
-                    }}
+                    onClick={() => setSelectedCategory(cat)}
                     className="cursor-pointer py-2.5 px-4 rounded-lg m-1"
                   >
                     {cat}
@@ -3361,7 +3327,7 @@ export default function PublicMenu() {
         </div>
 
         {/* Menu */}
-        <main id="menu-main" className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
+        <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
           <SurpriseMe
             menuItems={restaurant.menuItems || []}
             onAddToCart={updateCart}
@@ -3398,7 +3364,6 @@ export default function PublicMenu() {
             ([category, items]: [string, MenuItem[]], idx: number) => (
               <motion.section
                 key={category}
-                id={`category-${category.toLowerCase().replace(/\s+/g, "-")}`}
                 // ✅ Improved: spring + slide from left
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -3591,57 +3556,6 @@ export default function PublicMenu() {
             </div>
           </motion.section>
         </main>
-
-        {/* Floating Category Filter */}
-        <AnimatePresence>
-          {showFloatingFilter && (
-            <motion.div
-              initial={{ y: 60, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 60, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              className={`fixed left-0 right-0 z-[45] bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t border-stone-200 dark:border-stone-700 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-3 py-2 ${cartCount > 0 ? "bottom-[84px]" : "bottom-0"}`}
-              style={{
-                paddingBottom:
-                  cartCount === 0
-                    ? "max(8px, env(safe-area-inset-bottom, 8px))"
-                    : "8px",
-              }}
-            >
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-4xl mx-auto">
-                <button
-                  onClick={() => {
-                    categoryChangedRef.current = true;
-                    setSelectedCategory("All");
-                  }}
-                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    selectedCategory === "All"
-                      ? "bg-primary text-white shadow-md"
-                      : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
-                  }`}
-                >
-                  {t.allCategories}
-                </button>
-                {categories.map((cat: any) => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      categoryChangedRef.current = true;
-                      setSelectedCategory(cat);
-                    }}
-                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                      selectedCategory === cat
-                        ? "bg-primary text-white shadow-md"
-                        : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Cart Bar */}
         <AnimatePresence>

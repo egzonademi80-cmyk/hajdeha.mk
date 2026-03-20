@@ -51,7 +51,6 @@ import {
   QrCode,
   Download,
   Table2,
-  Wifi,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -654,7 +653,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
     latitude: restaurant.latitude || "",
     longitude: restaurant.longitude || "",
     tableCount: restaurant.tableCount || 0,
-    wifiPassword: restaurant.wifiPassword || "",
   });
 
   useEffect(() => {
@@ -674,7 +672,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
       latitude: restaurant.latitude || "",
       longitude: restaurant.longitude || "",
       tableCount: restaurant.tableCount || 0,
-      wifiPassword: restaurant.wifiPassword || "",
     });
   }, [restaurant]);
 
@@ -783,17 +780,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
             value={formData.phoneNumber}
             onChange={(e) =>
               setFormData((p) => ({ ...p, phoneNumber: e.target.value }))
-            }
-            className="h-9 bg-background text-foreground border-border"
-          />
-        </div>
-        <div>
-          <Label className="text-sm text-foreground">WiFi Password</Label>
-          <Input
-            value={formData.wifiPassword}
-            placeholder="e.g. pass1234"
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, wifiPassword: e.target.value }))
             }
             className="h-9 bg-background text-foreground border-border"
           />
@@ -1192,14 +1178,6 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
                     PNG
                   </button>
                 </div>
-                {restaurant.wifiPassword && (
-                  <div className="flex items-center gap-1 w-full bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2 py-1">
-                    <Wifi className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                    <span className="text-[10px] font-mono font-semibold text-blue-700 dark:text-blue-300 truncate">
-                      {restaurant.wifiPassword}
-                    </span>
-                  </div>
-                )}
                 <p className="text-[10px] text-muted-foreground text-center truncate w-full">
                   /table/{restaurant.slug}/{tableNum}
                 </p>

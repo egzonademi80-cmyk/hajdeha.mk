@@ -34,7 +34,6 @@ import {
   BarChart2,
   ChevronDown,
   ChevronUp,
-  Wifi,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -897,21 +896,13 @@ export default function AdminDashboard() {
                                     className="w-64 h-64"
                                   />
                                 </div>
-                                <div className="text-center space-y-2">
+                                <div className="text-center space-y-1">
                                   <p className="font-medium text-foreground">
                                     {restaurant.name}
                                   </p>
                                   <p className="text-sm text-muted-foreground font-mono">
                                     /{restaurant.slug}
                                   </p>
-                                  {restaurant.wifiPassword && (
-                                    <div className="flex items-center justify-center gap-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-4 py-2 mx-auto">
-                                      <Wifi className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                      <span className="text-sm font-mono font-semibold text-blue-700 dark:text-blue-300">
-                                        {restaurant.wifiPassword}
-                                      </span>
-                                    </div>
-                                  )}
                                 </div>
                                 <Button
                                   className="w-full h-11"
