@@ -2920,6 +2920,14 @@ export default function PublicMenu() {
     [cart],
   );
 
+  const [showFloatingFilter, setShowFloatingFilter] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setShowFloatingFilter(window.scrollY > 220);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const pageTopRef = useRef<HTMLDivElement>(null);
   const categoryChangedRef = useRef(false);
 
@@ -3576,6 +3584,54 @@ export default function PublicMenu() {
             </div>
           </motion.section>
         </main>
+
+        {/* Floating Category Filter */}
+        <AnimatePresence>
+          {showFloatingFilter && (
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              className={`fixed left-0 right-0 z-[45] bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-t border-stone-200 dark:border-stone-700 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-3 py-2 ${cartCount > 0 ? "bottom-[84px]" : "bottom-0"}`}
+              style={{
+                paddingBottom:
+                  cartCount === 0
+                    ? "max(8px, env(safe-area-inset-bottom, 8px))"
+                    : "8px",
+              }}
+            >
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-4xl mx-auto">
+                <button
+                  onClick={() => setSelectedCategory("All")}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    selectedCategory === "All"
+                      ? "bg-primary text-white shadow-md"
+                      : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
+                  }`}
+                >
+                  {t.allCategories}
+                </button>
+                {categories.map((cat: any) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      categoryChangedRef.current = true;
+                      setSelectedCategory(cat);
+                    }}
+                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      selectedCategory === cat
+                        ? "bg-primary text-white shadow-md"
+                        : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Cart Bar */}
         <AnimatePresence>
