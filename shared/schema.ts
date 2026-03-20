@@ -41,6 +41,7 @@ export const restaurants = pgTable(
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
     tableCount: integer("table_count").default(0).notNull(),
+    wifiPassword: text("wifi_password"),
   },
   (table) => ({ slugIdx: index("slug_idx").on(table.slug) }),
 );
