@@ -3323,7 +3323,6 @@ export default function PublicMenu() {
               <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
                 <DropdownMenuItem
                   onClick={() => {
-                    categoryChangedRef.current = true;
                     setSelectedCategory("All");
                   }}
                   className="cursor-pointer py-2.5 px-4 font-semibold rounded-lg m-1"
