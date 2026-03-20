@@ -3610,7 +3610,10 @@ export default function PublicMenu() {
             >
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-4xl mx-auto">
                 <button
-                  onClick={() => setSelectedCategory("All")}
+                  onClick={() => {
+                    categoryChangedRef.current = true;
+                    setSelectedCategory("All");
+                  }}
                   className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
                     selectedCategory === "All"
                       ? "bg-primary text-white shadow-md"
