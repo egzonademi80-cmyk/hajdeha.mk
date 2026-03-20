@@ -2920,6 +2920,14 @@ export default function PublicMenu() {
     [cart],
   );
 
+  const pageTopRef = useRef<HTMLDivElement>(null);
+
+  const scrollToTop = useCallback(() => {
+    setTimeout(() => {
+      pageTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }, []);
+
   const scrollToMap = useCallback(() => {
     document
       .getElementById("map-section")
@@ -3098,6 +3106,7 @@ export default function PublicMenu() {
         />
       )}
       <div
+        ref={pageTopRef}
         className={`min-h-screen bg-gradient-to-b from-[#FDFBF7] via-white to-[#FDFBF7] dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 transition-colors duration-300 ${cartCount > 0 ? "pb-48" : "pb-36"}`}
       >
         <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
@@ -3309,7 +3318,7 @@ export default function PublicMenu() {
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedCategory("All");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    scrollToTop();
                   }}
                   className="cursor-pointer py-2.5 px-4 font-semibold rounded-lg m-1"
                 >
@@ -3320,7 +3329,7 @@ export default function PublicMenu() {
                     key={cat}
                     onClick={() => {
                       setSelectedCategory(cat);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
+                      scrollToTop();
                     }}
                     className="cursor-pointer py-2.5 px-4 rounded-lg m-1"
                   >
