@@ -3249,8 +3249,8 @@ export default function PublicMenu() {
           </div>
         </header>
 
-        {/* Sticky Search + Filter Bar */}
-        <div className="sticky top-0 z-40 bg-white/95 dark:bg-stone-900/95 backdrop-blur-lg border-b border-stone-100 dark:border-stone-800 py-3 shadow-sm">
+        {/* Search + Filter Bar */}
+        <div className="bg-white/95 dark:bg-stone-900/95 border-b border-stone-100 dark:border-stone-800 py-3 shadow-sm">
           <div className="max-w-4xl mx-auto px-3 sm:px-4 space-y-2.5">
             <div className="relative">
               <div className="relative w-full">
