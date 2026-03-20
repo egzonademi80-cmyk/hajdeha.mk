@@ -2936,7 +2936,13 @@ export default function PublicMenu() {
     categoryChangedRef.current = false;
     const raf1 = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        const sectionId =
+          selectedCategory === "All"
+            ? "menu-main"
+            : `category-${selectedCategory.toLowerCase().replace(/\s+/g, "-")}`;
+        document
+          .getElementById(sectionId)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     });
     return () => cancelAnimationFrame(raf1);
@@ -3355,7 +3361,7 @@ export default function PublicMenu() {
         </div>
 
         {/* Menu */}
-        <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
+        <main id="menu-main" className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
           <SurpriseMe
             menuItems={restaurant.menuItems || []}
             onAddToCart={updateCart}
@@ -3392,6 +3398,7 @@ export default function PublicMenu() {
             ([category, items]: [string, MenuItem[]], idx: number) => (
               <motion.section
                 key={category}
+                id={`category-${category.toLowerCase().replace(/\s+/g, "-")}`}
                 // ✅ Improved: spring + slide from left
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
