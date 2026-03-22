@@ -1394,31 +1394,82 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     [channelName],
   );
 
-  // After order is confirmed: clear cart & reset so the table is ready for the next customer
-  // Also start the dessert reminder timer (18 min after order placed)
+  // Listen for SHOW_DESSERTS message from service worker (notification tap)
   useEffect(() => {
-    if (!orderConfirmedDone) return;
-
-    // Start dessert timer once per session
-    if (!dessertTimerStarted.current && menuItems.length) {
-      dessertTimerStarted.current = true;
-      dessertTimerRef.current = setTimeout(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "SHOW_DESSERTS") {
         const dessertCats = [
           "dessert", "ëmbëlsirë", "desserts",
           "десерт", "десерти", "sweet", "sweets",
         ];
-        const pool = menuItems.filter((m) =>
-          dessertCats.includes((m.category || "").toLowerCase()),
+        const dessertCat = categories.find((c) =>
+          dessertCats.includes(c.toLowerCase()),
         );
-        const src = pool.length >= 2 ? pool : menuItems;
-        setDessertItems(
-          [...src]
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 2)
-            .map((m) => getItemName(m, lang)),
-        );
-        setDessertToast(true);
-      }, 18 * 60 * 1000);
+        if (dessertCat) setActiveCategory(dessertCat);
+        setView("menu");
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => navigator.serviceWorker.removeEventListener("message", handler);
+  }, [categories]);
+
+  // After order is confirmed: clear cart & reset so the table is ready for the next customer
+  // Also start the dessert reminder timer (20 min after order placed)
+  useEffect(() => {
+    if (!orderConfirmedDone) return;
+
+    // Start dessert notification once per session (20 min after order)
+    if (!dessertTimerStarted.current && menuItems.length) {
+      dessertTimerStarted.current = true;
+
+      const DESSERT_DELAY = 20 * 60 * 1000;
+      const dessertCats = [
+        "dessert", "ëmbëlsirë", "desserts",
+        "десерт", "десерти", "sweet", "sweets",
+      ];
+      const pool = menuItems.filter((m) =>
+        dessertCats.includes((m.category || "").toLowerCase()),
+      );
+      const hasDesserts = pool.length >= 2;
+      const src = hasDesserts ? pool : menuItems;
+      const pickedItems = [...src]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 2)
+        .map((m) => getItemName(m, lang));
+
+      // Try web push via service worker first
+      const tryPushNotification = async () => {
+        if (!("serviceWorker" in navigator) || !("Notification" in window)) return false;
+        let perm = Notification.permission;
+        if (perm === "default") {
+          perm = await Notification.requestPermission();
+        }
+        if (perm !== "granted") return false;
+        const reg = await navigator.serviceWorker.ready;
+        reg.active?.postMessage({
+          type: "SCHEDULE_DESSERT",
+          payload: {
+            delay: DESSERT_DELAY,
+            restaurantName: restaurant?.name ?? "Hajde HA",
+            tableUrl: window.location.href,
+            items: pickedItems,
+            hasDesserts,
+            lang,
+          },
+        });
+        return true;
+      };
+
+      tryPushNotification().then((scheduled) => {
+        if (!scheduled) {
+          // Fallback: in-app toast
+          dessertTimerRef.current = setTimeout(() => {
+            setDessertItems(pickedItems);
+            setDessertToast(true);
+          }, DESSERT_DELAY);
+        }
+      });
     }
 
     const timer = setTimeout(() => {
