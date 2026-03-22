@@ -1791,6 +1791,19 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                   className="p-3 sm:p-4 space-y-3 max-w-2xl mx-auto w-full"
                   style={{ paddingBottom: 104 }}
                 >
+                  {restaurant.wifiPassword && (
+                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl px-4 py-3">
+                      <div className="h-8 w-8 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0">
+                        <Wifi className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-widest">WiFi Password</p>
+                        <p className="text-sm font-bold font-mono text-blue-700 dark:text-blue-300 truncate">
+                          {restaurant.wifiPassword}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {filtered.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
                       <UtensilsCrossed className="h-10 w-10 text-muted-foreground/30" />
