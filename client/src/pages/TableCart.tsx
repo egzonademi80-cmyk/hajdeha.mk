@@ -112,6 +112,7 @@ const t = {
     dessertMsg: (items: string[]) =>
       `A mund t'ju ofrojmë diçka të ëmbël si përfundim?\nSot rekomandojmë: ${items.join(" dhe ")}.`,
     dessertDismiss: "Jo, faleminderit",
+    dessertYes: "Shiko ëmbëlsirat",
     splitBill: "Ndaj faturën",
     splitPeople: "Persona",
     splitEach: "Secili paguan",
@@ -192,6 +193,7 @@ const t = {
     dessertMsg: (items: string[]) =>
       `Може ли да ви предложиме нешто слатко за крај?\nДенес препорачуваме: ${items.join(" и ")}.`,
     dessertDismiss: "Не, фала",
+    dessertYes: "Прикажи десерти",
     splitBill: "Подели сметка",
     splitPeople: "Луѓе",
     splitEach: "Секој плаќа",
@@ -271,6 +273,7 @@ const t = {
     dessertMsg: (items: string[]) =>
       `May we tempt you with a dessert to finish?\nToday we recommend: ${items.join(" and ")}.`,
     dessertDismiss: "No, thank you",
+    dessertYes: "Show Desserts",
     splitBill: "Split Bill",
     splitPeople: "People",
     splitEach: "Each person pays",
@@ -1274,6 +1277,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [dessertToast, setDessertToast] = useState(false);
   const [dessertItems, setDessertItems] = useState<string[]>([]);
   const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dessertTimerStarted = useRef(false);
   const isLocal = useRef(false);
 
   // Stable per-device identity — stored in localStorage so it survives refreshes
@@ -1391,15 +1395,38 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   );
 
   // After order is confirmed: clear cart & reset so the table is ready for the next customer
+  // Also start the dessert reminder timer (18 min after order placed)
   useEffect(() => {
     if (!orderConfirmedDone) return;
+
+    // Start dessert timer once per session
+    if (!dessertTimerStarted.current && menuItems.length) {
+      dessertTimerStarted.current = true;
+      dessertTimerRef.current = setTimeout(() => {
+        const dessertCats = [
+          "dessert", "ëmbëlsirë", "desserts",
+          "десерт", "десерти", "sweet", "sweets",
+        ];
+        const pool = menuItems.filter((m) =>
+          dessertCats.includes((m.category || "").toLowerCase()),
+        );
+        const src = pool.length >= 2 ? pool : menuItems;
+        setDessertItems(
+          [...src]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 2)
+            .map((m) => getItemName(m, lang)),
+        );
+        setDessertToast(true);
+      }, 18 * 60 * 1000);
+    }
+
     const timer = setTimeout(() => {
       setCart([]);
       syncCart([]);
       setWaiterCalledFromCart(false);
       setOrderConfirmedDone(false);
       setOrderConfirming(false);
-      // Clear the timestamp so the next customers are detected as a fresh table session
       localStorage.removeItem(`hajde-ts-${channelName}`);
     }, 4000);
     return () => clearTimeout(timer);
@@ -1446,47 +1473,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const itemCount = cart.reduce((s, i) => s + i.qty, 0);
 
-  useEffect(() => {
-    if (!restaurant || !menuItems.length) return;
-    if (dessertTimerRef.current) clearTimeout(dessertTimerRef.current);
-    const foodItems = cart.filter((c) => {
-      const mi = menuItems.find((m) => m.id === c.id);
-      return (
-        mi &&
-        !["drinks", "pije", "пијалоци", "beverages"].includes(
-          (mi.category || "").toLowerCase(),
-        )
-      );
-    });
-    dessertTimerRef.current = setTimeout(
-      () => {
-        const dessertCats = [
-          "dessert",
-          "ëmbëlsirë",
-          "desserts",
-          "десерт",
-          "десерти",
-          "sweet",
-          "sweets",
-        ];
-        const pool = menuItems.filter((m) =>
-          dessertCats.includes((m.category || "").toLowerCase()),
-        );
-        const src = pool.length >= 2 ? pool : menuItems;
-        setDessertItems(
-          [...src]
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 2)
-            .map((m) => getItemName(m, lang)),
-        );
-        setDessertToast(true);
-      },
-      40 * 60 * 1000,
-    );
-    return () => {
-      if (dessertTimerRef.current) clearTimeout(dessertTimerRef.current);
-    };
-  }, [restaurant, menuItems.length, cart.length]);
 
   // ── Loading skeleton
   if (isLoading) {
@@ -1610,14 +1596,22 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               <div className="flex border-t border-border">
                 <button
                   onClick={() => {
-                    setWaiterSheetOpen(true);
+                    const dessertCats = [
+                      "dessert", "ëmbëlsirë", "desserts",
+                      "десерт", "десерти", "sweet", "sweets",
+                    ];
+                    const dessertCat = categories.find((c) =>
+                      dessertCats.includes(c.toLowerCase()),
+                    );
+                    if (dessertCat) setActiveCategory(dessertCat);
+                    setView("menu");
                     setDessertToast(false);
                   }}
-                  className="flex-1 py-3 text-xs font-bold text-emerald-600 dark:text-emerald-400 active:bg-muted/50 transition-colors"
+                  className="flex-1 py-3 text-xs font-bold text-amber-600 dark:text-amber-400 active:bg-muted/50 transition-colors"
                 >
                   <span className="flex items-center justify-center gap-1.5">
-                    <Bell className="h-3.5 w-3.5" />
-                    {tr.callWaiter}
+                    <span>🍰</span>
+                    {tr.dessertYes}
                   </span>
                 </button>
                 <div className="w-px bg-border" />
