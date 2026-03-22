@@ -27,6 +27,15 @@
       }
     },
     {
+      "src": "^/sw\\.js$",
+      "dest": "/sw.js",
+      "headers": {
+        "Content-Type": "application/javascript",
+        "Service-Worker-Allowed": "/",
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
       "src": "^/service-worker\\.js$",
       "dest": "/service-worker.js",
       "headers": {
