@@ -1418,7 +1418,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             .map((m) => getItemName(m, lang)),
         );
         setDessertToast(true);
-      }, 1 * 60 * 1000);
+      }, 18 * 60 * 1000);
     }
 
     const timer = setTimeout(() => {
