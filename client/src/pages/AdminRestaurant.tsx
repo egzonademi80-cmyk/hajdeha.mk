@@ -749,6 +749,19 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
                 {restaurant.phoneNumber || "—"}
               </p>
             </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">WiFi Password</p>
+              {restaurant.wifiPassword ? (
+                <div className="flex items-center gap-1.5">
+                  <Wifi className="h-3.5 w-3.5 text-blue-500" />
+                  <p className="text-sm font-mono font-semibold text-foreground">
+                    {restaurant.wifiPassword}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">—</p>
+              )}
+            </div>
           </div>
           {restaurant.photoUrl && (
             <img
@@ -1048,16 +1061,17 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [tableCount, restaurant.slug, baseUrl]);
+  }, [tableCount, restaurant.slug, baseUrl, restaurant.wifiPassword]);
 
   const drawQR = (canvas: HTMLCanvasElement, url: string, tableNum: number) => {
-    // Use a simple QR via Google Charts API rendered to canvas
     const size = 200;
+    const hasWifi = !!restaurant.wifiPassword;
+    const totalHeight = size + (hasWifi ? 58 : 42);
     canvas.width = size;
-    canvas.height = size + 40;
+    canvas.height = totalHeight;
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, size, size + 40);
+    ctx.fillRect(0, 0, size, totalHeight);
 
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -1068,10 +1082,17 @@ function TableQRSection({ restaurant }: { restaurant: any }) {
       ctx.fillStyle = "#000000";
       ctx.font = "bold 14px DM Sans, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(`Table ${tableNum}`, size / 2, size + 20);
+      ctx.fillText(`Table ${tableNum}`, size / 2, size + 18);
+      // Restaurant name
       ctx.font = "10px DM Sans, sans-serif";
       ctx.fillStyle = "#888888";
-      ctx.fillText(restaurant.name, size / 2, size + 35);
+      ctx.fillText(restaurant.name, size / 2, size + 32);
+      // WiFi password
+      if (hasWifi) {
+        ctx.font = "bold 10px DM Sans, sans-serif";
+        ctx.fillStyle = "#3B82F6";
+        ctx.fillText(`WiFi: ${restaurant.wifiPassword}`, size / 2, size + 50);
+      }
     };
   };
 
