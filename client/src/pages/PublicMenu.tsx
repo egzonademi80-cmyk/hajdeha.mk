@@ -14,7 +14,6 @@ import {
   Minus,
   ShoppingBag,
   X,
-  ChevronDown,
   Leaf,
   WheatOff,
   Clock,
@@ -36,12 +35,6 @@ import { type MenuItem } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -3288,47 +3281,29 @@ export default function PublicMenu() {
               </div>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between bg-white dark:bg-stone-800 rounded-xl h-11 border-stone-200 dark:border-stone-700 text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <UtensilsCrossed className="h-4 w-4 text-primary" />
-                    <span className="font-semibold text-stone-900 dark:text-stone-100">
-                      {selectedCategory === "All"
-                        ? t.allCategories
-                        : selectedCategory}
-                    </span>
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-stone-400" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] rounded-xl bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 shadow-2xl z-[60]">
-                <DropdownMenuItem
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
+              <button
+                onClick={() => {
+                  setSelectedCategory("All");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === "All" ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
+              >
+                {t.allCategories}
+              </button>
+              {categories.map((cat: any) => (
+                <button
+                  key={cat}
                   onClick={() => {
-                    setSelectedCategory("All");
+                    setSelectedCategory(cat);
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
-                  className="cursor-pointer py-2.5 px-4 font-semibold rounded-lg m-1"
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
                 >
-                  {t.allCategories}
-                </DropdownMenuItem>
-                {categories.map((cat: any) => (
-                  <DropdownMenuItem
-                    key={cat}
-                    onClick={() => {
-                      setSelectedCategory(cat);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="cursor-pointer py-2.5 px-4 rounded-lg m-1"
-                  >
-                    {cat}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
