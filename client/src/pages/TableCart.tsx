@@ -1278,6 +1278,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [dessertItems, setDessertItems] = useState<string[]>([]);
   const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dessertTimerStarted = useRef(false);
+  const menuScrollRef = useRef<HTMLDivElement>(null);
   const isLocal = useRef(false);
 
   // Stable per-device identity — stored in localStorage so it survives refreshes
@@ -1408,6 +1409,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         );
         if (dessertCat) setActiveCategory(dessertCat);
         setView("menu");
+        requestAnimationFrame(() =>
+          menuScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }),
+        );
       }
     };
     navigator.serviceWorker.addEventListener("message", handler);
@@ -1657,6 +1661,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     if (dessertCat) setActiveCategory(dessertCat);
                     setView("menu");
                     setDessertToast(false);
+                    requestAnimationFrame(() =>
+                      menuScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }),
+                    );
                   }}
                   className="flex-1 py-3 text-xs font-bold text-amber-600 dark:text-amber-400 active:bg-muted/50 transition-colors"
                 >
@@ -1821,7 +1828,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 {categories.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setActiveCategory(cat)}
+                    onClick={() => {
+                      setActiveCategory(cat);
+                      menuScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
                     className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${activeCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                   >
                     {cat}
@@ -1829,6 +1839,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 ))}
               </div>
               <div
+                ref={menuScrollRef}
                 className="flex-1 overflow-y-auto min-h-0"
                 style={{ WebkitOverflowScrolling: "touch" }}
               >
