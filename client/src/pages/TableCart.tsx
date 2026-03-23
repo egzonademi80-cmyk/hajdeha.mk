@@ -805,6 +805,7 @@ function AIWaiterPanel({
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [aiJustAdded, setAiJustAdded] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialized = useRef(false);
@@ -1140,11 +1141,16 @@ function AIWaiterPanel({
                                 <button
                                   onClick={() => {
                                     onAddItem(item);
-                                    onClose();
+                                    setAiJustAdded(item.id);
+                                    setTimeout(() => setAiJustAdded(null), 1000);
                                   }}
-                                  className="flex-shrink-0 h-7 w-7 rounded-lg bg-primary flex items-center justify-center active:scale-95 transition-transform shadow-sm"
+                                  className={`flex-shrink-0 h-7 w-7 rounded-lg flex items-center justify-center active:scale-95 transition-all shadow-sm ${aiJustAdded === item.id ? "bg-emerald-500" : "bg-primary"}`}
                                 >
-                                  <Plus className="h-3.5 w-3.5 text-primary-foreground" />
+                                  {aiJustAdded === item.id ? (
+                                    <Check className="h-3.5 w-3.5 text-white" />
+                                  ) : (
+                                    <Plus className="h-3.5 w-3.5 text-primary-foreground" />
+                                  )}
                                 </button>
                               </div>
                             ))}
