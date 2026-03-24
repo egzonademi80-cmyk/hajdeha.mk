@@ -840,12 +840,16 @@ function WaiterSheet({
   phoneNumber,
   tableNumber,
   lang,
+  receiptItems,
+  restaurantName,
 }: {
   open: boolean;
   onClose: () => void;
   phoneNumber?: string | null;
   tableNumber: number;
   lang: Lang;
+  receiptItems: CartItem[];
+  restaurantName: string;
 }) {
   const tr = t[lang];
   const [billPicker, setBillPicker] = useState(false);
@@ -948,12 +952,12 @@ function WaiterSheet({
                   </div>
 
                   {/* Receipt preview */}
-                  {cart.length > 0 && (() => {
-                    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
-                    const totalPrice = cart.reduce((s, i) => s + i.price * i.qty, 0);
+                  {receiptItems.length > 0 && (() => {
+                    const totalItems = receiptItems.reduce((s, i) => s + i.qty, 0);
+                    const totalPrice = receiptItems.reduce((s, i) => s + i.price * i.qty, 0);
                     return (
                       <div className="bg-stone-50 dark:bg-stone-800/80 rounded-2xl px-4 py-3 border border-stone-200 dark:border-orange-800/40 font-mono text-[11px] text-muted-foreground space-y-1 mb-1">
-                        {cart.map((item) => (
+                        {receiptItems.map((item) => (
                           <div key={item.id} className="flex justify-between gap-2">
                             <span className="truncate">{item.qty}x {item.name}</span>
                             <span className="flex-shrink-0">{(item.price * item.qty).toLocaleString()} DEN</span>
@@ -971,8 +975,8 @@ function WaiterSheet({
                   <motion.button
                     whileTap={{ scale: 0.985 }}
                     onClick={() => openWhatsApp(
-                      restaurant
-                        ? buildReceipt(lang, restaurant.name, tableNumber, cart, "cash")
+                      receiptItems.length > 0
+                        ? buildReceipt(lang, restaurantName, tableNumber, receiptItems, "cash")
                         : tr.billTextCash(tableNumber)
                     )}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
@@ -995,8 +999,8 @@ function WaiterSheet({
                   <motion.button
                     whileTap={{ scale: 0.985 }}
                     onClick={() => openWhatsApp(
-                      restaurant
-                        ? buildReceipt(lang, restaurant.name, tableNumber, cart, "card")
+                      receiptItems.length > 0
+                        ? buildReceipt(lang, restaurantName, tableNumber, receiptItems, "card")
                         : tr.billTextCard(tableNumber)
                     )}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
@@ -1583,6 +1587,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dessertTimerStarted = useRef(false);
   const menuScrollRef = useRef<HTMLDivElement>(null);
+  const [sessionOrder, setSessionOrder] = useState<CartItem[]>([]);
   const [showLangPicker, setShowLangPicker] = useState(
     () => localStorage.getItem("hajdeha_lang_chosen") !== "1"
   );
@@ -1785,6 +1790,17 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         }
       });
     }
+
+    // Snapshot the cart into sessionOrder before clearing
+    setSessionOrder((prev) => {
+      const merged = [...prev];
+      cart.forEach((item) => {
+        const existing = merged.find((i) => i.id === item.id);
+        if (existing) existing.qty += item.qty;
+        else merged.push({ ...item });
+      });
+      return merged;
+    });
 
     const timer = setTimeout(() => {
       setCart([]);
@@ -2001,6 +2017,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         phoneNumber={restaurant.phoneNumber}
         tableNumber={tableNumber}
         lang={lang}
+        receiptItems={sessionOrder.length > 0 ? sessionOrder : cart}
+        restaurantName={restaurant.name}
       />
       <AIWaiterPanel
         open={aiOpen}
