@@ -549,7 +549,7 @@ function BillSplitDrawer({
 // ─── ✨ Skeleton Card ─────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl border border-border bg-white dark:bg-stone-800/60 overflow-hidden">
+    <div className="flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl border border-stone-200 dark:border-orange-800/50 bg-white dark:bg-stone-800/60 overflow-hidden">
       <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
         <div className="shimmer absolute inset-0" />
       </div>
@@ -1940,7 +1940,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       <motion.div
                         key={item.id}
                         layout
-                        className={`relative flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 ${isJust ? "border-primary ring-2 ring-primary/25 bg-primary/5 dark:bg-primary/10" : inCart ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30" : "bg-white dark:bg-stone-800/60 border-border"}`}
+                        className={`relative flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 ${isJust ? "border-primary ring-2 ring-primary/25 bg-primary/5 dark:bg-primary/10" : inCart ? "bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30" : "bg-white dark:bg-stone-800/60 border-stone-200 dark:border-orange-800/50"}`}
                       >
                         {item.imageUrl ? (
                           <img
@@ -2126,7 +2126,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                               initial={{ opacity: 0, y: 8 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -8 }}
-                              className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-border"
+                              className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-stone-200 dark:border-orange-800/50"
                             >
                               {/* Person color dot */}
                               {color && (
