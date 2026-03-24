@@ -57,55 +57,55 @@ function getItemDesc(item: MenuItem, lang: Lang): string | null | undefined {
 }
 
 const CATEGORY_NAMES: Record<string, { al: string; mk: string }> = {
-  food:        { al: "Ushqim",           mk: "Храна" },
-  foods:       { al: "Ushqime",          mk: "Храна" },
-  drinks:      { al: "Pije",             mk: "Пијалоци" },
-  beverages:   { al: "Pije",             mk: "Пијалоци" },
-  coffee:      { al: "Kafe",             mk: "Кафе" },
-  coffees:     { al: "Kafeja",           mk: "Кафиња" },
-  dessert:     { al: "Ëmbëlsirë",        mk: "Десерт" },
-  desserts:    { al: "Ëmbëlsirat",       mk: "Десерти" },
-  sweet:       { al: "Të ëmbla",         mk: "Слатко" },
-  sweets:      { al: "Ëmbëlsirat",       mk: "Слатки" },
-  mains:       { al: "Pjata kryesore",   mk: "Главни јадења" },
-  main:        { al: "Pjata kryesore",   mk: "Главно јадење" },
-  starters:    { al: "Antipastet",       mk: "Предјадења" },
-  starter:     { al: "Antipaste",        mk: "Предјадење" },
-  salads:      { al: "Sallata",          mk: "Салати" },
-  salad:       { al: "Sallatë",          mk: "Салата" },
-  soups:       { al: "Supa",             mk: "Супи" },
-  soup:        { al: "Supë",             mk: "Супа" },
-  pizza:       { al: "Picë",             mk: "Пица" },
-  pizzas:      { al: "Pica",             mk: "Пици" },
-  burgers:     { al: "Hamburgerë",       mk: "Бургери" },
-  burger:      { al: "Hamburger",        mk: "Бургер" },
-  grill:       { al: "Skarë",            mk: "Скара" },
-  grills:      { al: "Skarë",            mk: "Скара" },
-  sandwiches:  { al: "Sanduiçe",         mk: "Сендвичи" },
-  sandwich:    { al: "Sanduiç",          mk: "Сендвич" },
-  pasta:       { al: "Paste",            mk: "Тестенини" },
-  seafood:     { al: "Fruta deti",       mk: "Морска храна" },
-  meat:        { al: "Mish",             mk: "Месо" },
-  chicken:     { al: "Pule",             mk: "Пилешко" },
-  snacks:      { al: "Snacks",           mk: "Грицки" },
-  breakfast:   { al: "Mëngjes",          mk: "Појадок" },
-  lunch:       { al: "Drekë",            mk: "Ручек" },
-  dinner:      { al: "Darkë",            mk: "Вечера" },
-  specials:    { al: "Specialitete",     mk: "Специјалитети" },
-  special:     { al: "Specialitet",      mk: "Специјалитет" },
-  vegetarian:  { al: "Vegjetarian",      mk: "Вегетаријанско" },
-  vegan:       { al: "Vegan",            mk: "Веганско" },
-  sides:       { al: "Anëse",            mk: "Прилози" },
-  side:        { al: "Anëse",            mk: "Прилог" },
-  sauces:      { al: "Salca",            mk: "Сосови" },
-  alcohol:     { al: "Alkool",           mk: "Алкохол" },
-  wine:        { al: "Verë",             mk: "Вино" },
-  beer:        { al: "Birrë",            mk: "Пиво" },
-  cocktails:   { al: "Kokteje",          mk: "Коктели" },
-  juices:      { al: "Lëngje",           mk: "Сокови" },
-  juice:       { al: "Lëng",             mk: "Сок" },
-  tea:         { al: "Çaj",              mk: "Чај" },
-  water:       { al: "Ujë",              mk: "Вода" },
+  food: { al: "Ushqim", mk: "Храна" },
+  foods: { al: "Ushqime", mk: "Храна" },
+  drinks: { al: "Pije", mk: "Пијалоци" },
+  beverages: { al: "Pije", mk: "Пијалоци" },
+  coffee: { al: "Kafe", mk: "Кафе" },
+  coffees: { al: "Kafeja", mk: "Кафиња" },
+  dessert: { al: "Ëmbëlsirë", mk: "Десерт" },
+  desserts: { al: "Ëmbëlsirat", mk: "Десерти" },
+  sweet: { al: "Të ëmbla", mk: "Слатко" },
+  sweets: { al: "Ëmbëlsirat", mk: "Слатки" },
+  mains: { al: "Pjata kryesore", mk: "Главни јадења" },
+  main: { al: "Pjata kryesore", mk: "Главно јадење" },
+  starters: { al: "Antipastet", mk: "Предјадења" },
+  starter: { al: "Antipaste", mk: "Предјадење" },
+  salads: { al: "Sallata", mk: "Салати" },
+  salad: { al: "Sallatë", mk: "Салата" },
+  soups: { al: "Supa", mk: "Супи" },
+  soup: { al: "Supë", mk: "Супа" },
+  pizza: { al: "Picë", mk: "Пица" },
+  pizzas: { al: "Pica", mk: "Пици" },
+  burgers: { al: "Hamburgerë", mk: "Бургери" },
+  burger: { al: "Hamburger", mk: "Бургер" },
+  grill: { al: "Skarë", mk: "Скара" },
+  grills: { al: "Skarë", mk: "Скара" },
+  sandwiches: { al: "Sanduiçe", mk: "Сендвичи" },
+  sandwich: { al: "Sanduiç", mk: "Сендвич" },
+  pasta: { al: "Paste", mk: "Тестенини" },
+  seafood: { al: "Fruta deti", mk: "Морска храна" },
+  meat: { al: "Mish", mk: "Месо" },
+  chicken: { al: "Pule", mk: "Пилешко" },
+  snacks: { al: "Snacks", mk: "Грицки" },
+  breakfast: { al: "Mëngjes", mk: "Појадок" },
+  lunch: { al: "Drekë", mk: "Ручек" },
+  dinner: { al: "Darkë", mk: "Вечера" },
+  specials: { al: "Specialitete", mk: "Специјалитети" },
+  special: { al: "Specialitet", mk: "Специјалитет" },
+  vegetarian: { al: "Vegjetarian", mk: "Вегетаријанско" },
+  vegan: { al: "Vegan", mk: "Веганско" },
+  sides: { al: "Anëse", mk: "Прилози" },
+  side: { al: "Anëse", mk: "Прилог" },
+  sauces: { al: "Salca", mk: "Сосови" },
+  alcohol: { al: "Alkool", mk: "Алкохол" },
+  wine: { al: "Verë", mk: "Вино" },
+  beer: { al: "Birrë", mk: "Пиво" },
+  cocktails: { al: "Kokteje", mk: "Коктели" },
+  juices: { al: "Lëngje", mk: "Сокови" },
+  juice: { al: "Lëng", mk: "Сок" },
+  tea: { al: "Çaj", mk: "Чај" },
+  water: { al: "Ujë", mk: "Вода" },
 };
 
 function getCategoryDisplay(cat: string, lang: Lang): string {
@@ -138,7 +138,7 @@ function buildReceipt(
   restaurantName: string,
   tableNumber: number,
   cart: CartItem[],
-  payMethod: "cash" | "card"
+  payMethod: "cash" | "card",
 ): string {
   const L = {
     al: {
@@ -174,7 +174,8 @@ function buildReceipt(
   const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
 
   const itemLines = cart.map(
-    (i) => `• ${i.qty}x ${i.name}${"  "}${(i.price * i.qty).toLocaleString()} DEN`
+    (i) =>
+      `• ${i.qty}x ${i.name}${"  "}${(i.price * i.qty).toLocaleString()} DEN`,
   );
 
   return [
@@ -243,8 +244,10 @@ const t = {
     billPayHow: "Si do të paguani?",
     cash: "Kesh",
     card: "Kartë",
-    billTextCash: (table: number) => `Përshëndetje! Tavolina ${table} dëshiron faturën — me KESH, ju lutem.`,
-    billTextCard: (table: number) => `Përshëndetje! Tavolina ${table} dëshiron faturën — me KARTË, ju lutem.`,
+    billTextCash: (table: number) =>
+      `Përshëndetje! Tavolina ${table} dëshiron faturën — me KESH, ju lutem.`,
+    billTextCard: (table: number) =>
+      `Përshëndetje! Tavolina ${table} dëshiron faturën — me KARTË, ju lutem.`,
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -276,11 +279,31 @@ const t = {
     tutorialNext: "Tjetër",
     tutorialDone: "Kuptova!",
     tutorialSteps: [
-      { icon: "👋", title: "Mirë se vini!", desc: "Kjo është menuja digjitale e restorantit. Lëvizni poshtë për të parë të gjitha pjatat." },
-      { icon: "🗂️", title: "Filtroni sipas kategorisë", desc: "Klikoni butonat e kategorive në krye për të parë vetëm pjatat që dëshironi." },
-      { icon: "➕", title: "Shtoni në shportë", desc: "Klikoni butonin + pranë çdo artikulli për ta shtuar në porosinë tuaj." },
-      { icon: "🤖", title: "Kamarieri AI", desc: "Klikoni ikonën e botit për të marrë rekomandime dhe për të pyetur për menunë." },
-      { icon: "🛒", title: "Vendosni porosinë", desc: "Kur jeni gati, klikoni 'Shiko shportën' dhe konfirmoni porosinë tuaj me një klikim." },
+      {
+        icon: "👋",
+        title: "Mirë se vini!",
+        desc: "Kjo është menuja digjitale e restorantit. Lëvizni poshtë për të parë të gjitha pjatat.",
+      },
+      {
+        icon: "🗂️",
+        title: "Filtroni sipas kategorisë",
+        desc: "Klikoni butonat e kategorive në krye për të parë vetëm pjatat që dëshironi.",
+      },
+      {
+        icon: "➕",
+        title: "Shtoni në shportë",
+        desc: "Klikoni butonin + pranë çdo artikulli për ta shtuar në porosinë tuaj.",
+      },
+      {
+        icon: "🤖",
+        title: "Kamarieri AI",
+        desc: "Klikoni ikonën e botit për të marrë rekomandime dhe për të pyetur për menunë.",
+      },
+      {
+        icon: "🛒",
+        title: "Vendosni porosinë",
+        desc: "Kur jeni gati, klikoni 'Shiko shportën' dhe konfirmoni porosinë tuaj me një klikim.",
+      },
     ],
   },
   mk: {
@@ -334,8 +357,10 @@ const t = {
     billPayHow: "Како ќе платите?",
     cash: "Готово",
     card: "Картичка",
-    billTextCash: (table: number) => `Здраво! Маса ${table} би сакала сметката — ГОТОВО, ве молам.`,
-    billTextCard: (table: number) => `Здраво! Маса ${table} би сакала сметката — КАРТИЧКА, ве молам.`,
+    billTextCash: (table: number) =>
+      `Здраво! Маса ${table} би сакала сметката — ГОТОВО, ве молам.`,
+    billTextCard: (table: number) =>
+      `Здраво! Маса ${table} би сакала сметката — КАРТИЧКА, ве молам.`,
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -367,11 +392,31 @@ const t = {
     tutorialNext: "Следно",
     tutorialDone: "Разбрав!",
     tutorialSteps: [
-      { icon: "👋", title: "Добредојдовте!", desc: "Ова е дигиталното мени на ресторанот. Лизгајте надолу за да ги видите сите јадења." },
-      { icon: "🗂️", title: "Филтрирај по категорија", desc: "Притиснете ги копчињата за категории на врвот за да видите само она што го сакате." },
-      { icon: "➕", title: "Додај во кошничка", desc: "Притиснете го копчето + до секој артикл за да го додадете во вашата нарачка." },
-      { icon: "🤖", title: "AI Келнер", desc: "Притиснете ја иконата за бот за препораки и прашања за менито." },
-      { icon: "🛒", title: "Нарачај", desc: "Кога сте подготвени, притиснете 'Кошничка' и потврдете ја вашата нарачка." },
+      {
+        icon: "👋",
+        title: "Добредојдовте!",
+        desc: "Ова е дигиталното мени на ресторанот. Лизгајте надолу за да ги видите сите јадења.",
+      },
+      {
+        icon: "🗂️",
+        title: "Филтрирај по категорија",
+        desc: "Притиснете ги копчињата за категории на врвот за да видите само она што го сакате.",
+      },
+      {
+        icon: "➕",
+        title: "Додај во кошничка",
+        desc: "Притиснете го копчето + до секој артикл за да го додадете во вашата нарачка.",
+      },
+      {
+        icon: "🤖",
+        title: "AI Келнер",
+        desc: "Притиснете ја иконата за бот за препораки и прашања за менито.",
+      },
+      {
+        icon: "🛒",
+        title: "Нарачај",
+        desc: "Кога сте подготвени, притиснете 'Кошничка' и потврдете ја вашата нарачка.",
+      },
     ],
   },
   en: {
@@ -424,8 +469,10 @@ const t = {
     billPayHow: "How will you pay?",
     cash: "Cash",
     card: "Card",
-    billTextCash: (table: number) => `Hi! Table ${table} would like the bill — CASH, please.`,
-    billTextCard: (table: number) => `Hi! Table ${table} would like the bill — CARD, please.`,
+    billTextCash: (table: number) =>
+      `Hi! Table ${table} would like the bill — CASH, please.`,
+    billTextCard: (table: number) =>
+      `Hi! Table ${table} would like the bill — CARD, please.`,
     waiterMessages: (table: number) => [
       {
         icon: "🙋",
@@ -457,25 +504,85 @@ const t = {
     tutorialNext: "Next",
     tutorialDone: "Got it!",
     tutorialSteps: [
-      { icon: "👋", title: "Welcome!", desc: "This is the restaurant's digital menu. Scroll down to explore all available dishes." },
-      { icon: "🗂️", title: "Filter by category", desc: "Tap the category buttons at the top to show only what you're looking for." },
-      { icon: "➕", title: "Add to cart", desc: "Tap the + button next to any item to add it to your order." },
-      { icon: "🤖", title: "AI Waiter", desc: "Tap the bot icon to get personalized recommendations and ask anything about the menu." },
-      { icon: "🛒", title: "Place your order", desc: "When you're ready, tap 'View Cart' and confirm your order with one tap." },
+      {
+        icon: "👋",
+        title: "Welcome!",
+        desc: "This is the restaurant's digital menu. Scroll down to explore all available dishes.",
+      },
+      {
+        icon: "🗂️",
+        title: "Filter by category",
+        desc: "Tap the category buttons at the top to show only what you're looking for.",
+      },
+      {
+        icon: "➕",
+        title: "Add to cart",
+        desc: "Tap the + button next to any item to add it to your order.",
+      },
+      {
+        icon: "🤖",
+        title: "AI Waiter",
+        desc: "Tap the bot icon to get personalized recommendations and ask anything about the menu.",
+      },
+      {
+        icon: "🛒",
+        title: "Place your order",
+        desc: "When you're ready, tap 'View Cart' and confirm your order with one tap.",
+      },
     ],
   },
 } as const;
 
 // ─── Bill Split Drawer ────────────────────────────────────────────────────────
 const PERSON_COLORS = [
-  { dot: "bg-blue-500", ring: "ring-blue-400", label: "text-blue-600 dark:text-blue-400", soft: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" },
-  { dot: "bg-rose-500", ring: "ring-rose-400", label: "text-rose-600 dark:text-rose-400", soft: "bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800" },
-  { dot: "bg-amber-500", ring: "ring-amber-400", label: "text-amber-600 dark:text-amber-400", soft: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800" },
-  { dot: "bg-emerald-500", ring: "ring-emerald-400", label: "text-emerald-600 dark:text-emerald-400", soft: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800" },
-  { dot: "bg-violet-500", ring: "ring-violet-400", label: "text-violet-600 dark:text-violet-400", soft: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800" },
-  { dot: "bg-orange-500", ring: "ring-orange-400", label: "text-orange-600 dark:text-orange-400", soft: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800" },
-  { dot: "bg-pink-500", ring: "ring-pink-400", label: "text-pink-600 dark:text-pink-400", soft: "bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800" },
-  { dot: "bg-teal-500", ring: "ring-teal-400", label: "text-teal-600 dark:text-teal-400", soft: "bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800" },
+  {
+    dot: "bg-blue-500",
+    ring: "ring-blue-400",
+    label: "text-blue-600 dark:text-blue-400",
+    soft: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
+  },
+  {
+    dot: "bg-rose-500",
+    ring: "ring-rose-400",
+    label: "text-rose-600 dark:text-rose-400",
+    soft: "bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800",
+  },
+  {
+    dot: "bg-amber-500",
+    ring: "ring-amber-400",
+    label: "text-amber-600 dark:text-amber-400",
+    soft: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800",
+  },
+  {
+    dot: "bg-emerald-500",
+    ring: "ring-emerald-400",
+    label: "text-emerald-600 dark:text-emerald-400",
+    soft: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800",
+  },
+  {
+    dot: "bg-violet-500",
+    ring: "ring-violet-400",
+    label: "text-violet-600 dark:text-violet-400",
+    soft: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800",
+  },
+  {
+    dot: "bg-orange-500",
+    ring: "ring-orange-400",
+    label: "text-orange-600 dark:text-orange-400",
+    soft: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800",
+  },
+  {
+    dot: "bg-pink-500",
+    ring: "ring-pink-400",
+    label: "text-pink-600 dark:text-pink-400",
+    soft: "bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800",
+  },
+  {
+    dot: "bg-teal-500",
+    ring: "ring-teal-400",
+    label: "text-teal-600 dark:text-teal-400",
+    soft: "bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800",
+  },
 ];
 
 function BillSplitDrawer({
@@ -494,11 +601,15 @@ function BillSplitDrawer({
   const tr = t[lang];
 
   // Group cart items by who added them, preserving insertion order
-  const uniqueIds = Array.from(new Set(cart.map((i) => i.addedBy).filter(Boolean))) as string[];
+  const uniqueIds = Array.from(
+    new Set(cart.map((i) => i.addedBy).filter(Boolean)),
+  ) as string[];
   const unassigned = cart.filter((i) => !i.addedBy);
 
   const groupTotal = (id: string) =>
-    cart.filter((i) => i.addedBy === id).reduce((s, i) => s + i.price * i.qty, 0);
+    cart
+      .filter((i) => i.addedBy === id)
+      .reduce((s, i) => s + i.price * i.qty, 0);
   const unassignedTotal = unassigned.reduce((s, i) => s + i.price * i.qty, 0);
   const grandTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
@@ -522,7 +633,10 @@ function BillSplitDrawer({
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 360, damping: 34 }}
             className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-stone-900 rounded-t-3xl shadow-2xl flex flex-col"
-            style={{ maxHeight: "85dvh", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+            style={{
+              maxHeight: "85dvh",
+              paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            }}
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
@@ -536,10 +650,14 @@ function BillSplitDrawer({
                   <Divide className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-base font-bold text-foreground">{tr.splitBill}</p>
+                  <p className="text-base font-bold text-foreground">
+                    {tr.splitBill}
+                  </p>
                   {!isEmpty && (
                     <p className="text-[11px] text-muted-foreground font-mono">
-                      {grandTotal} DEN · {uniqueIds.length + (unassigned.length > 0 ? 1 : 0)} {tr.splitPeople.toLowerCase()}
+                      {grandTotal} DEN ·{" "}
+                      {uniqueIds.length + (unassigned.length > 0 ? 1 : 0)}{" "}
+                      {tr.splitPeople.toLowerCase()}
                     </p>
                   )}
                 </div>
@@ -555,7 +673,9 @@ function BillSplitDrawer({
             {/* Person groups */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               {isEmpty ? (
-                <p className="text-center text-muted-foreground text-sm py-10">{tr.emptyCart}</p>
+                <p className="text-center text-muted-foreground text-sm py-10">
+                  {tr.emptyCart}
+                </p>
               ) : (
                 <>
                   {uniqueIds.map((id, idx) => {
@@ -568,31 +688,48 @@ function BillSplitDrawer({
                         {/* Person header */}
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <div className={`h-7 w-7 rounded-full ${color.dot} flex items-center justify-center text-white text-[11px] font-bold`}>
+                            <div
+                              className={`h-7 w-7 rounded-full ${color.dot} flex items-center justify-center text-white text-[11px] font-bold`}
+                            >
                               {idx + 1}
                             </div>
                             <span className="text-sm font-bold text-foreground">
                               {isMe ? tr.splitYou : tr.splitPerson(idx + 1)}
                             </span>
                           </div>
-                          <span className={`text-sm font-black font-mono ${color.label}`}>
-                            {subtotal} <span className="text-xs font-normal text-muted-foreground">DEN</span>
+                          <span
+                            className={`text-sm font-black font-mono ${color.label}`}
+                          >
+                            {subtotal}{" "}
+                            <span className="text-xs font-normal text-muted-foreground">
+                              DEN
+                            </span>
                           </span>
                         </div>
                         {/* Items */}
-                        <div className={`rounded-2xl border overflow-hidden ${color.soft}`}>
+                        <div
+                          className={`rounded-2xl border overflow-hidden ${color.soft}`}
+                        >
                           {items.map((item, i) => (
                             <div
                               key={`${item.id}-${i}`}
                               className={`flex items-center justify-between px-3.5 py-2.5 ${i > 0 ? "border-t border-border/50" : ""}`}
                             >
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {item.name}
+                                </p>
                                 {item.qty > 1 && (
-                                  <p className={`text-[11px] font-mono mt-0.5 ${color.label}`}>×{item.qty}</p>
+                                  <p
+                                    className={`text-[11px] font-mono mt-0.5 ${color.label}`}
+                                  >
+                                    ×{item.qty}
+                                  </p>
                                 )}
                               </div>
-                              <span className={`text-sm font-bold font-mono ml-3 flex-shrink-0 ${color.label}`}>
+                              <span
+                                className={`text-sm font-bold font-mono ml-3 flex-shrink-0 ${color.label}`}
+                              >
                                 {item.price * item.qty} DEN
                               </span>
                             </div>
@@ -606,7 +743,9 @@ function BillSplitDrawer({
                   {unassigned.length > 0 && (
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-bold text-muted-foreground">{tr.splitUnassigned}</span>
+                        <span className="text-sm font-bold text-muted-foreground">
+                          {tr.splitUnassigned}
+                        </span>
                         <span className="text-sm font-bold font-mono text-muted-foreground">
                           {unassignedTotal} DEN
                         </span>
@@ -617,8 +756,12 @@ function BillSplitDrawer({
                             key={`u-${item.id}-${i}`}
                             className={`flex items-center justify-between px-3.5 py-2.5 ${i > 0 ? "border-t border-border/50" : ""}`}
                           >
-                            <p className="text-sm font-medium text-foreground truncate flex-1">{item.name}</p>
-                            <span className="text-sm font-bold font-mono text-muted-foreground ml-3">{item.price * item.qty} DEN</span>
+                            <p className="text-sm font-medium text-foreground truncate flex-1">
+                              {item.name}
+                            </p>
+                            <span className="text-sm font-bold font-mono text-muted-foreground ml-3">
+                              {item.price * item.qty} DEN
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -668,9 +811,9 @@ function LangPickerScreen({
   onPick: (lang: Lang) => void;
 }) {
   const options: { lang: Lang; flag: string; label: string; sub: string }[] = [
-    { lang: "al", flag: "🇦🇱", label: "Shqip",        sub: "Gjuha Shqipe" },
-    { lang: "mk", flag: "🇲🇰", label: "Македонски",   sub: "Македонски јазик" },
-    { lang: "en", flag: "🇬🇧", label: "English",       sub: "English language" },
+    { lang: "al", flag: "🇦🇱", label: "Shqip", sub: "Gjuha Shqipe" },
+    { lang: "mk", flag: "🇲🇰", label: "Македонски", sub: "Македонски јазик" },
+    { lang: "en", flag: "🇬🇧", label: "English", sub: "English language" },
   ];
 
   return (
@@ -683,8 +826,12 @@ function LangPickerScreen({
       >
         <div className="text-center">
           <div className="text-4xl mb-3">🍽️</div>
-          <h1 className="text-2xl font-bold text-foreground">{restaurantName}</h1>
-          <p className="text-sm text-muted-foreground mt-1">Select your language · Zgjidhni gjuhën · Изберете јазик</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {restaurantName}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Select your language · Zgjidhni gjuhën · Изберете јазик
+          </p>
         </div>
 
         <div className="w-full flex flex-col gap-3">
@@ -697,7 +844,9 @@ function LangPickerScreen({
             >
               <span className="text-3xl leading-none">{flag}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-base font-bold text-foreground group-hover:text-primary transition-colors">{label}</p>
+                <p className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
+                  {label}
+                </p>
                 <p className="text-xs text-muted-foreground">{sub}</p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
@@ -710,15 +859,13 @@ function LangPickerScreen({
 }
 
 // ─── 🎓 Tutorial Overlay ──────────────────────────────────────────────────────
-function TutorialOverlay({
-  lang,
-  onDone,
-}: {
-  lang: Lang;
-  onDone: () => void;
-}) {
+function TutorialOverlay({ lang, onDone }: { lang: Lang; onDone: () => void }) {
   const tr = t[lang];
-  const steps = tr.tutorialSteps as readonly { icon: string; title: string; desc: string }[];
+  const steps = tr.tutorialSteps as readonly {
+    icon: string;
+    title: string;
+    desc: string;
+  }[];
   const [step, setStep] = useState(0);
   const total = steps.length;
   const current = steps[step];
@@ -743,10 +890,16 @@ function TutorialOverlay({
             </button>
 
             <div className="flex flex-col items-center text-center gap-4">
-              <div className="text-6xl leading-none select-none">{current.icon}</div>
+              <div className="text-6xl leading-none select-none">
+                {current.icon}
+              </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground mb-2">{current.title}</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">{current.desc}</p>
+                <h2 className="text-xl font-bold text-foreground mb-2">
+                  {current.title}
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {current.desc}
+                </p>
               </div>
             </div>
 
@@ -869,7 +1022,11 @@ function WaiterSheet({
   };
 
   const WaIcon = () => (
-    <svg className="h-4 w-4 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+    <svg
+      className="h-4 w-4 text-green-500 flex-shrink-0"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+    >
       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
       <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.554 4.122 1.527 5.855L.057 23.04a.75.75 0 00.903.903l5.185-1.47A11.944 11.944 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.698-.513-5.238-1.406l-.374-.222-3.878 1.1 1.1-3.878-.222-.374A9.944 9.944 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
     </svg>
@@ -952,42 +1109,80 @@ function WaiterSheet({
                   </div>
 
                   {/* Receipt preview */}
-                  {receiptItems.length > 0 && (() => {
-                    const totalItems = receiptItems.reduce((s, i) => s + i.qty, 0);
-                    const totalPrice = receiptItems.reduce((s, i) => s + i.price * i.qty, 0);
-                    return (
-                      <div className="bg-stone-50 dark:bg-stone-800/80 rounded-2xl px-4 py-3 border border-stone-200 dark:border-orange-800/40 font-mono text-[11px] text-muted-foreground space-y-1 mb-1">
-                        {receiptItems.map((item) => (
-                          <div key={item.id} className="flex justify-between gap-2">
-                            <span className="truncate">{item.qty}x {item.name}</span>
-                            <span className="flex-shrink-0">{(item.price * item.qty).toLocaleString()} DEN</span>
+                  {receiptItems.length > 0 &&
+                    (() => {
+                      const totalItems = receiptItems.reduce(
+                        (s, i) => s + i.qty,
+                        0,
+                      );
+                      const totalPrice = receiptItems.reduce(
+                        (s, i) => s + i.price * i.qty,
+                        0,
+                      );
+                      return (
+                        <div className="bg-stone-50 dark:bg-stone-800/80 rounded-2xl px-4 py-3 border border-stone-200 dark:border-orange-800/40 font-mono text-[11px] text-muted-foreground space-y-1 mb-1">
+                          {receiptItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex justify-between gap-2"
+                            >
+                              <span className="truncate">
+                                {item.qty}x {item.name}
+                              </span>
+                              <span className="flex-shrink-0">
+                                {(item.price * item.qty).toLocaleString()} DEN
+                              </span>
+                            </div>
+                          ))}
+                          <div className="border-t border-border pt-1 mt-1 flex justify-between font-bold text-foreground">
+                            <span>
+                              {totalItems}{" "}
+                              {lang === "al"
+                                ? "artikuj"
+                                : lang === "mk"
+                                  ? "артикли"
+                                  : "items"}
+                            </span>
+                            <span>{totalPrice.toLocaleString()} DEN</span>
                           </div>
-                        ))}
-                        <div className="border-t border-border pt-1 mt-1 flex justify-between font-bold text-foreground">
-                          <span>{totalItems} {lang === "al" ? "artikuj" : lang === "mk" ? "артикли" : "items"}</span>
-                          <span>{totalPrice.toLocaleString()} DEN</span>
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
 
                   {/* Cash button */}
                   <motion.button
                     whileTap={{ scale: 0.985 }}
-                    onClick={() => openWhatsApp(
-                      receiptItems.length > 0
-                        ? buildReceipt(lang, restaurantName, tableNumber, receiptItems, "cash")
-                        : tr.billTextCash(tableNumber)
-                    )}
+                    onClick={() =>
+                      openWhatsApp(
+                        receiptItems.length > 0
+                          ? buildReceipt(
+                              lang,
+                              restaurantName,
+                              tableNumber,
+                              receiptItems,
+                              "cash",
+                            )
+                          : tr.billTextCash(tableNumber),
+                      )
+                    }
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
                   >
                     <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-200 dark:shadow-emerald-900/40">
-                      <Banknote className="h-6 w-6 text-white" strokeWidth={1.75} />
+                      <Banknote
+                        className="h-6 w-6 text-white"
+                        strokeWidth={1.75}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-semibold text-foreground leading-tight">{tr.cash}</p>
+                      <p className="text-[15px] font-semibold text-foreground leading-tight">
+                        {tr.cash}
+                      </p>
                       <p className="text-[12px] text-muted-foreground mt-0.5">
-                        {lang === "al" ? "Dërgon faturën e plotë me WhatsApp" : lang === "mk" ? "Испраќа целосна сметка на WhatsApp" : "Sends full itemized receipt via WhatsApp"}
+                        {lang === "al"
+                          ? "Dërgon faturën e plotë me WhatsApp"
+                          : lang === "mk"
+                            ? "Испраќа целосна сметка на WhatsApp"
+                            : "Sends full itemized receipt via WhatsApp"}
                       </p>
                     </div>
                     <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
@@ -998,20 +1193,37 @@ function WaiterSheet({
                   {/* Card button */}
                   <motion.button
                     whileTap={{ scale: 0.985 }}
-                    onClick={() => openWhatsApp(
-                      receiptItems.length > 0
-                        ? buildReceipt(lang, restaurantName, tableNumber, receiptItems, "card")
-                        : tr.billTextCard(tableNumber)
-                    )}
+                    onClick={() =>
+                      openWhatsApp(
+                        receiptItems.length > 0
+                          ? buildReceipt(
+                              lang,
+                              restaurantName,
+                              tableNumber,
+                              receiptItems,
+                              "card",
+                            )
+                          : tr.billTextCard(tableNumber),
+                      )
+                    }
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
                   >
                     <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200 dark:shadow-blue-900/40">
-                      <CreditCard className="h-6 w-6 text-white" strokeWidth={1.75} />
+                      <CreditCard
+                        className="h-6 w-6 text-white"
+                        strokeWidth={1.75}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-semibold text-foreground leading-tight">{tr.card}</p>
+                      <p className="text-[15px] font-semibold text-foreground leading-tight">
+                        {tr.card}
+                      </p>
                       <p className="text-[12px] text-muted-foreground mt-0.5">
-                        {lang === "al" ? "Dërgon faturën e plotë me WhatsApp" : lang === "mk" ? "Испраќа целосна сметка на WhatsApp" : "Sends full itemized receipt via WhatsApp"}
+                        {lang === "al"
+                          ? "Dërgon faturën e plotë me WhatsApp"
+                          : lang === "mk"
+                            ? "Испраќа целосна сметка на WhatsApp"
+                            : "Sends full itemized receipt via WhatsApp"}
                       </p>
                     </div>
                     <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
@@ -1041,10 +1253,14 @@ function WaiterSheet({
                       <motion.button
                         key={msg.label}
                         whileTap={{ scale: 0.97 }}
-                        onClick={() => isBill ? setBillPicker(true) : openWhatsApp(msg.text)}
+                        onClick={() =>
+                          isBill ? setBillPicker(true) : openWhatsApp(msg.text)
+                        }
                         className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
                       >
-                        <span className="text-2xl flex-shrink-0">{msg.icon}</span>
+                        <span className="text-2xl flex-shrink-0">
+                          {msg.icon}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-foreground leading-snug">
                             {msg.label}
@@ -1589,10 +1805,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const menuScrollRef = useRef<HTMLDivElement>(null);
   const [sessionOrder, setSessionOrder] = useState<CartItem[]>([]);
   const [showLangPicker, setShowLangPicker] = useState(
-    () => localStorage.getItem("hajdeha_lang_chosen") !== "1"
+    () => localStorage.getItem("hajdeha_lang_chosen") !== "1",
   );
   const [showTutorial, setShowTutorial] = useState(
-    () => localStorage.getItem("hajdeha_tutorial_seen") !== "1"
+    () => localStorage.getItem("hajdeha_tutorial_seen") !== "1",
   );
   const isLocal = useRef(false);
 
@@ -1684,12 +1900,16 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       // Active table — load shared cart (works for friends scanning together too)
       fetch(`/api/table/${channelName}/cart`)
         .then((r) => r.json())
-        .then((d) => { if (d.cart) setCart(d.cart); })
+        .then((d) => {
+          if (d.cart) setCart(d.cart);
+        })
         .catch(() => {});
       // Also restore the shared session order (bill history for the whole table)
       fetch(`/api/table/${channelName}/order-snapshot`)
         .then((r) => r.json())
-        .then((d) => { if (d.sessionOrder?.length) setSessionOrder(d.sessionOrder); })
+        .then((d) => {
+          if (d.sessionOrder?.length) setSessionOrder(d.sessionOrder);
+        })
         .catch(() => {});
     }
     return () => {
@@ -1702,7 +1922,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const syncCart = useCallback(
     async (newCart: CartItem[]) => {
       isLocal.current = true;
-      setTimeout(() => { isLocal.current = false; }, 200);
+      setTimeout(() => {
+        isLocal.current = false;
+      }, 200);
       // Keep the timestamp fresh so friends joining the same table can share the cart
       if (newCart.length > 0) {
         localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
@@ -1724,8 +1946,13 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === "SHOW_DESSERTS") {
         const dessertCats = [
-          "dessert", "ëmbëlsirë", "desserts",
-          "десерт", "десерти", "sweet", "sweets",
+          "dessert",
+          "ëmbëlsirë",
+          "desserts",
+          "десерт",
+          "десерти",
+          "sweet",
+          "sweets",
         ];
         const dessertCat = categories.find((c) =>
           dessertCats.includes(c.toLowerCase()),
@@ -1738,7 +1965,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       }
     };
     navigator.serviceWorker.addEventListener("message", handler);
-    return () => navigator.serviceWorker.removeEventListener("message", handler);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", handler);
   }, [categories]);
 
   // After order is confirmed: clear cart & reset so the table is ready for the next customer
@@ -1752,8 +1980,13 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
       const DESSERT_DELAY = 20 * 60 * 1000;
       const dessertCats = [
-        "dessert", "ëmbëlsirë", "desserts",
-        "десерт", "десерти", "sweet", "sweets",
+        "dessert",
+        "ëmbëlsirë",
+        "desserts",
+        "десерт",
+        "десерти",
+        "sweet",
+        "sweets",
       ];
       const pool = menuItems.filter((m) =>
         dessertCats.includes((m.category || "").toLowerCase()),
@@ -1767,7 +2000,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
       // Try web push via service worker first
       const tryPushNotification = async () => {
-        if (!("serviceWorker" in navigator) || !("Notification" in window)) return false;
+        if (!("serviceWorker" in navigator) || !("Notification" in window))
+          return false;
         let perm = Notification.permission;
         if (perm === "default") {
           perm = await Notification.requestPermission();
@@ -1800,15 +2034,22 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     }
 
     // Snapshot the cart into sessionOrder before clearing
-    setSessionOrder((prev) => {
-      const merged = [...prev];
-      cart.forEach((item) => {
-        const existing = merged.find((i) => i.id === item.id);
-        if (existing) existing.qty += item.qty;
-        else merged.push({ ...item });
-      });
-      return merged;
+    // Snapshot the cart into sessionOrder before clearing
+    // Snapshot the cart into sessionOrder before clearing AND sync to server
+    const merged = [...sessionOrder];
+    cart.forEach((item) => {
+      const existing = merged.find((i) => i.id === item.id);
+      if (existing) existing.qty += item.qty;
+      else merged.push({ ...item });
     });
+    setSessionOrder(merged);
+
+    // Broadcast the updated sessionOrder to all devices at this table
+    fetch("/api/table/place-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: channelName, items: cart }),
+    }).catch(() => {});
 
     const timer = setTimeout(() => {
       setCart([]);
@@ -1819,7 +2060,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       localStorage.removeItem(`hajde-ts-${channelName}`);
     }, 4000);
     return () => clearTimeout(timer);
-  }, [orderConfirmedDone, syncCart, channelName]);
+  }, [orderConfirmedDone, syncCart, channelName, cart, sessionOrder]);
 
   const addItem = (item: MenuItem) => {
     setCart((prev) => {
@@ -1850,7 +2091,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     setCart((prev) => {
       const next = prev
         .map((i) => {
-          const match = i.id === id && (addedBy === undefined || i.addedBy === addedBy);
+          const match =
+            i.id === id && (addedBy === undefined || i.addedBy === addedBy);
           return match ? { ...i, qty: i.qty + delta } : i;
         })
         .filter((i) => i.qty > 0);
@@ -1861,7 +2103,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const itemCount = cart.reduce((s, i) => s + i.qty, 0);
-
 
   // ── Loading skeleton
   if (isLoading) {
@@ -1986,8 +2227,13 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 <button
                   onClick={() => {
                     const dessertCats = [
-                      "dessert", "ëmbëlsirë", "desserts",
-                      "десерт", "десерти", "sweet", "sweets",
+                      "dessert",
+                      "ëmbëlsirë",
+                      "desserts",
+                      "десерт",
+                      "десерти",
+                      "sweet",
+                      "sweets",
                     ];
                     const dessertCat = categories.find((c) =>
                       dessertCats.includes(c.toLowerCase()),
@@ -1996,7 +2242,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     setView("menu");
                     setDessertToast(false);
                     requestAnimationFrame(() =>
-                      menuScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }),
+                      menuScrollRef.current?.scrollTo({
+                        top: 0,
+                        behavior: "smooth",
+                      }),
                     );
                   }}
                   className="flex-1 py-3 text-xs font-bold text-amber-600 dark:text-amber-400 active:bg-muted/50 transition-colors"
@@ -2166,11 +2415,16 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     key={cat}
                     onClick={() => {
                       setActiveCategory(cat);
-                      menuScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                      menuScrollRef.current?.scrollTo({
+                        top: 0,
+                        behavior: "smooth",
+                      });
                     }}
                     className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${activeCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                   >
-                    {cat === tr.allCategories ? cat : getCategoryDisplay(cat, lang)}
+                    {cat === tr.allCategories
+                      ? cat
+                      : getCategoryDisplay(cat, lang)}
                   </button>
                 ))}
               </div>
@@ -2189,7 +2443,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         <Wifi className="h-4 w-4 text-white" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-widest">WiFi Password</p>
+                        <p className="text-[10px] font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-widest">
+                          WiFi Password
+                        </p>
                         <p className="text-sm font-bold font-mono text-blue-700 dark:text-blue-300 truncate">
                           {restaurant.wifiPassword}
                         </p>
@@ -2207,7 +2463,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                   {filtered.map((item) => {
                     const allForItem = cart.filter((c) => c.id === item.id);
                     const totalQty = allForItem.reduce((s, c) => s + c.qty, 0);
-                    const myQty = allForItem.find((c) => c.addedBy === myId)?.qty ?? 0;
+                    const myQty =
+                      allForItem.find((c) => c.addedBy === myId)?.qty ?? 0;
                     const inCart = totalQty > 0;
                     const qty = totalQty;
                     const isJust = justAdded === item.id;
@@ -2387,12 +2644,22 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       </p>
                       {(() => {
                         // Assign a stable color to each unique person in the cart
-                        const uniqueIds = Array.from(new Set(cart.map((i) => i.addedBy).filter(Boolean)));
+                        const uniqueIds = Array.from(
+                          new Set(cart.map((i) => i.addedBy).filter(Boolean)),
+                        );
                         const personColor = (id?: string) =>
-                          id != null ? PERSON_COLORS[uniqueIds.indexOf(id) % PERSON_COLORS.length] : null;
+                          id != null
+                            ? PERSON_COLORS[
+                                uniqueIds.indexOf(id) % PERSON_COLORS.length
+                              ]
+                            : null;
                         return cart.map((item) => {
-                          const menuItem = menuItems.find((m) => m.id === item.id);
-                          const displayName = menuItem ? getItemName(menuItem, lang) : item.name;
+                          const menuItem = menuItems.find(
+                            (m) => m.id === item.id,
+                          );
+                          const displayName = menuItem
+                            ? getItemName(menuItem, lang)
+                            : item.name;
                           const color = personColor(item.addedBy);
                           const isMe = item.addedBy === myId;
                           return (
@@ -2405,7 +2672,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             >
                               {/* Person color dot */}
                               {color && (
-                                <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${color.dot}`} />
+                                <div
+                                  className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${color.dot}`}
+                                />
                               )}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -2413,20 +2682,27 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                                     {displayName}
                                   </p>
                                   {isMe && (
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-muted text-muted-foreground`}>
+                                    <span
+                                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-muted text-muted-foreground`}
+                                    >
                                       {tr.splitYou}
                                     </span>
                                   )}
                                 </div>
                                 <p className="text-xs text-primary font-mono mt-0.5">
                                   {item.price} × {item.qty} ={" "}
-                                  <span className="font-bold">{item.price * item.qty}</span> DEN
+                                  <span className="font-bold">
+                                    {item.price * item.qty}
+                                  </span>{" "}
+                                  DEN
                                 </p>
                               </div>
                               <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
                                 <button
                                   data-testid={`button-cart-decrease-${item.id}`}
-                                  onClick={() => updateQty(item.id, -1, item.addedBy)}
+                                  onClick={() =>
+                                    updateQty(item.id, -1, item.addedBy)
+                                  }
                                   className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
                                 >
                                   <Minus className="h-3 w-3 text-muted-foreground" />
@@ -2436,7 +2712,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                                 </span>
                                 <button
                                   data-testid={`button-cart-increase-${item.id}`}
-                                  onClick={() => updateQty(item.id, 1, item.addedBy)}
+                                  onClick={() =>
+                                    updateQty(item.id, 1, item.addedBy)
+                                  }
                                   className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
                                 >
                                   <Plus className="h-3 w-3 text-muted-foreground" />
@@ -2513,7 +2791,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 12 }}
-                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 380,
+                          damping: 30,
+                        }}
                       >
                         <AnimatePresence mode="wait">
                           {orderConfirmedDone ? (
