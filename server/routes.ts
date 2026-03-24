@@ -22,6 +22,7 @@ interface CartItem {
 }
 interface TableRoom {
   cart: CartItem[];
+  sessionOrder: CartItem[];
 }
 
 const tableRooms = new Map<string, TableRoom>();
@@ -146,7 +147,8 @@ export async function registerRoutes(
       const { channel, cart } = req.body;
       if (!channel || !Array.isArray(cart))
         return res.status(400).json({ message: "Missing fields" });
-      tableRooms.set(channel, { cart });
+      const existing = tableRooms.get(channel);
+      tableRooms.set(channel, { cart, sessionOrder: existing?.sessionOrder || [] });
       await pusherServer.trigger(channel, "cart-update", { cart });
       res.json({ ok: true });
     } catch (err: any) {
@@ -164,13 +166,29 @@ export async function registerRoutes(
     try {
       const { channel, cart, tableNumber } = req.body;
       await pusherServer.trigger(channel, "order-placed", { cart, tableNumber });
-      tableRooms.set(channel, { cart: [] });
+
+      // Accumulate ordered items into a shared session order for the whole table
+      const room = tableRooms.get(channel) || { cart: [], sessionOrder: [] };
+      const merged = [...room.sessionOrder];
+      (cart as CartItem[]).forEach((item) => {
+        const existing = merged.find((i) => i.id === item.id);
+        if (existing) existing.qty += item.qty;
+        else merged.push({ ...item });
+      });
+      tableRooms.set(channel, { cart: [], sessionOrder: merged });
+
       await pusherServer.trigger(channel, "cart-update", { cart: [] });
+      await pusherServer.trigger(channel, "order-snapshot", { sessionOrder: merged });
       res.json({ ok: true });
     } catch (err: any) {
       console.error("place-order error:", err);
       res.status(500).json({ message: err.message });
     }
+  });
+
+  app.get("/api/table/:pin/order-snapshot", (req, res) => {
+    const room = tableRooms.get(req.params.pin);
+    res.json({ sessionOrder: room?.sessionOrder || [] });
   });
 
   app.post("/api/table/call-waiter", async (req, res) => {

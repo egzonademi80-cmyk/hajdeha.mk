@@ -1660,6 +1660,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     channel.bind("cart-update", (data: { cart: CartItem[] }) => {
       if (!isLocal.current) setCart(data.cart);
     });
+    channel.bind("order-snapshot", (data: { sessionOrder: CartItem[] }) => {
+      setSessionOrder(data.sessionOrder);
+    });
     channel.bind("pusher:subscription_succeeded", () => setConnected(true));
 
     // Time-based table isolation:
@@ -1682,6 +1685,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       fetch(`/api/table/${channelName}/cart`)
         .then((r) => r.json())
         .then((d) => { if (d.cart) setCart(d.cart); })
+        .catch(() => {});
+      // Also restore the shared session order (bill history for the whole table)
+      fetch(`/api/table/${channelName}/order-snapshot`)
+        .then((r) => r.json())
+        .then((d) => { if (d.sessionOrder?.length) setSessionOrder(d.sessionOrder); })
         .catch(() => {});
     }
     return () => {
