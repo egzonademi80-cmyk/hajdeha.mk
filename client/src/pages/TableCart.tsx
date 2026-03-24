@@ -23,6 +23,7 @@ import {
   Divide,
   Loader2,
   CheckCircle,
+  Check,
   ChevronLeft,
   ChevronRight,
   Banknote,
@@ -53,6 +54,66 @@ function getItemDesc(item: MenuItem, lang: Lang): string | null | undefined {
   if (lang === "al" && item.descriptionAl) return item.descriptionAl;
   if (lang === "mk" && item.descriptionMk) return item.descriptionMk;
   return item.description;
+}
+
+const CATEGORY_NAMES: Record<string, { al: string; mk: string }> = {
+  food:        { al: "Ushqim",           mk: "Храна" },
+  foods:       { al: "Ushqime",          mk: "Храна" },
+  drinks:      { al: "Pije",             mk: "Пијалоци" },
+  beverages:   { al: "Pije",             mk: "Пијалоци" },
+  coffee:      { al: "Kafe",             mk: "Кафе" },
+  coffees:     { al: "Kafeja",           mk: "Кафиња" },
+  dessert:     { al: "Ëmbëlsirë",        mk: "Десерт" },
+  desserts:    { al: "Ëmbëlsirat",       mk: "Десерти" },
+  sweet:       { al: "Të ëmbla",         mk: "Слатко" },
+  sweets:      { al: "Ëmbëlsirat",       mk: "Слатки" },
+  mains:       { al: "Pjata kryesore",   mk: "Главни јадења" },
+  main:        { al: "Pjata kryesore",   mk: "Главно јадење" },
+  starters:    { al: "Antipastet",       mk: "Предјадења" },
+  starter:     { al: "Antipaste",        mk: "Предјадење" },
+  salads:      { al: "Sallata",          mk: "Салати" },
+  salad:       { al: "Sallatë",          mk: "Салата" },
+  soups:       { al: "Supa",             mk: "Супи" },
+  soup:        { al: "Supë",             mk: "Супа" },
+  pizza:       { al: "Picë",             mk: "Пица" },
+  pizzas:      { al: "Pica",             mk: "Пици" },
+  burgers:     { al: "Hamburgerë",       mk: "Бургери" },
+  burger:      { al: "Hamburger",        mk: "Бургер" },
+  grill:       { al: "Skarë",            mk: "Скара" },
+  grills:      { al: "Skarë",            mk: "Скара" },
+  sandwiches:  { al: "Sanduiçe",         mk: "Сендвичи" },
+  sandwich:    { al: "Sanduiç",          mk: "Сендвич" },
+  pasta:       { al: "Paste",            mk: "Тестенини" },
+  seafood:     { al: "Fruta deti",       mk: "Морска храна" },
+  meat:        { al: "Mish",             mk: "Месо" },
+  chicken:     { al: "Pule",             mk: "Пилешко" },
+  snacks:      { al: "Snacks",           mk: "Грицки" },
+  breakfast:   { al: "Mëngjes",          mk: "Појадок" },
+  lunch:       { al: "Drekë",            mk: "Ручек" },
+  dinner:      { al: "Darkë",            mk: "Вечера" },
+  specials:    { al: "Specialitete",     mk: "Специјалитети" },
+  special:     { al: "Specialitet",      mk: "Специјалитет" },
+  vegetarian:  { al: "Vegjetarian",      mk: "Вегетаријанско" },
+  vegan:       { al: "Vegan",            mk: "Веганско" },
+  sides:       { al: "Anëse",            mk: "Прилози" },
+  side:        { al: "Anëse",            mk: "Прилог" },
+  sauces:      { al: "Salca",            mk: "Сосови" },
+  alcohol:     { al: "Alkool",           mk: "Алкохол" },
+  wine:        { al: "Verë",             mk: "Вино" },
+  beer:        { al: "Birrë",            mk: "Пиво" },
+  cocktails:   { al: "Kokteje",          mk: "Коктели" },
+  juices:      { al: "Lëngje",           mk: "Сокови" },
+  juice:       { al: "Lëng",             mk: "Сок" },
+  tea:         { al: "Çaj",              mk: "Чај" },
+  water:       { al: "Ujë",              mk: "Вода" },
+};
+
+function getCategoryDisplay(cat: string, lang: Lang): string {
+  if (lang === "en") return cat;
+  const key = cat.toLowerCase().trim();
+  const entry = CATEGORY_NAMES[key];
+  if (entry) return entry[lang];
+  return cat;
 }
 interface CartItem {
   id: number;
@@ -1834,7 +1895,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     }}
                     className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${activeCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                   >
-                    {cat}
+                    {cat === tr.allCategories ? cat : getCategoryDisplay(cat, lang)}
                   </button>
                 ))}
               </div>
