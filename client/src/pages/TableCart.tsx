@@ -214,6 +214,16 @@ const t = {
         text: `Përshëndetje! Tavolina ${table} ka një pyetje.`,
       },
     ],
+    tutorialSkip: "Kalo",
+    tutorialNext: "Tjetër",
+    tutorialDone: "Kuptova!",
+    tutorialSteps: [
+      { icon: "👋", title: "Mirë se vini!", desc: "Kjo është menuja digjitale e restorantit. Lëvizni poshtë për të parë të gjitha pjatat." },
+      { icon: "🗂️", title: "Filtroni sipas kategorisë", desc: "Klikoni butonat e kategorive në krye për të parë vetëm pjatat që dëshironi." },
+      { icon: "➕", title: "Shtoni në shportë", desc: "Klikoni butonin + pranë çdo artikulli për ta shtuar në porosinë tuaj." },
+      { icon: "🤖", title: "Kamarieri AI", desc: "Klikoni ikonën e botit për të marrë rekomandime dhe për të pyetur për menunë." },
+      { icon: "🛒", title: "Vendosni porosinë", desc: "Kur jeni gati, klikoni 'Shiko shportën' dhe konfirmoni porosinë tuaj me një klikim." },
+    ],
   },
   mk: {
     table: "Маса",
@@ -295,6 +305,16 @@ const t = {
         text: `Здраво! Маса ${table} има прашање.`,
       },
     ],
+    tutorialSkip: "Прескокни",
+    tutorialNext: "Следно",
+    tutorialDone: "Разбрав!",
+    tutorialSteps: [
+      { icon: "👋", title: "Добредојдовте!", desc: "Ова е дигиталното мени на ресторанот. Лизгајте надолу за да ги видите сите јадења." },
+      { icon: "🗂️", title: "Филтрирај по категорија", desc: "Притиснете ги копчињата за категории на врвот за да видите само она што го сакате." },
+      { icon: "➕", title: "Додај во кошничка", desc: "Притиснете го копчето + до секој артикл за да го додадете во вашата нарачка." },
+      { icon: "🤖", title: "AI Келнер", desc: "Притиснете ја иконата за бот за препораки и прашања за менито." },
+      { icon: "🛒", title: "Нарачај", desc: "Кога сте подготвени, притиснете 'Кошничка' и потврдете ја вашата нарачка." },
+    ],
   },
   en: {
     table: "Table",
@@ -374,6 +394,16 @@ const t = {
         label: "I have a question",
         text: `Hi! Table ${table} has a question.`,
       },
+    ],
+    tutorialSkip: "Skip",
+    tutorialNext: "Next",
+    tutorialDone: "Got it!",
+    tutorialSteps: [
+      { icon: "👋", title: "Welcome!", desc: "This is the restaurant's digital menu. Scroll down to explore all available dishes." },
+      { icon: "🗂️", title: "Filter by category", desc: "Tap the category buttons at the top to show only what you're looking for." },
+      { icon: "➕", title: "Add to cart", desc: "Tap the + button next to any item to add it to your order." },
+      { icon: "🤖", title: "AI Waiter", desc: "Tap the bot icon to get personalized recommendations and ask anything about the menu." },
+      { icon: "🛒", title: "Place your order", desc: "When you're ready, tap 'View Cart' and confirm your order with one tap." },
     ],
   },
 } as const;
@@ -567,6 +597,83 @@ function SkeletonCard() {
       <div className="relative h-9 w-9 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
         <div className="shimmer absolute inset-0" />
       </div>
+    </div>
+  );
+}
+
+// ─── 🎓 Tutorial Overlay ──────────────────────────────────────────────────────
+function TutorialOverlay({
+  lang,
+  onDone,
+}: {
+  lang: Lang;
+  onDone: () => void;
+}) {
+  const tr = t[lang];
+  const steps = tr.tutorialSteps as readonly { icon: string; title: string; desc: string }[];
+  const [step, setStep] = useState(0);
+  const total = steps.length;
+  const current = steps[step];
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={step}
+          initial={{ opacity: 0, y: 24, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -16, scale: 0.97 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="w-full max-w-sm bg-white dark:bg-stone-900 rounded-3xl shadow-2xl overflow-hidden"
+        >
+          <div className="relative px-6 pt-8 pb-6">
+            <button
+              onClick={onDone}
+              className="absolute top-4 right-4 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted"
+            >
+              {tr.tutorialSkip}
+            </button>
+
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="text-6xl leading-none select-none">{current.icon}</div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground mb-2">{current.title}</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">{current.desc}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 mt-6 mb-5">
+              {Array.from({ length: total }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setStep(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${i === step ? "w-6 bg-primary" : "w-1.5 bg-muted-foreground/30"}`}
+                />
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              {step > 0 && (
+                <button
+                  onClick={() => setStep((s) => s - 1)}
+                  className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  ←
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (step < total - 1) setStep((s) => s + 1);
+                  else onDone();
+                }}
+                className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-95 transition-transform"
+              >
+                {step < total - 1 ? tr.tutorialNext : tr.tutorialDone}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -1340,6 +1447,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dessertTimerStarted = useRef(false);
   const menuScrollRef = useRef<HTMLDivElement>(null);
+  const [showTutorial, setShowTutorial] = useState(
+    () => localStorage.getItem("hajdeha_tutorial_seen") !== "1"
+  );
   const isLocal = useRef(false);
 
   // Stable per-device identity — stored in localStorage so it survives refreshes
@@ -2294,6 +2404,16 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
           )}
         </AnimatePresence>
       </div>
+
+      {showTutorial && (
+        <TutorialOverlay
+          lang={lang}
+          onDone={() => {
+            localStorage.setItem("hajdeha_tutorial_seen", "1");
+            setShowTutorial(false);
+          }}
+        />
+      )}
     </div>
   );
 }
