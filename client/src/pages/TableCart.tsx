@@ -133,6 +133,64 @@ function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
 }
 
+function buildReceipt(
+  lang: Lang,
+  restaurantName: string,
+  tableNumber: number,
+  cart: CartItem[],
+  payMethod: "cash" | "card"
+): string {
+  const L = {
+    al: {
+      title: "Fatura",
+      table: "Tavolina",
+      total: "Totali",
+      cash: "KESH",
+      card: "KARTË",
+      pay: (m: string) => `💳 Pagesa: ${m}`,
+      thanks: `Ju faleminderit që zgjodhët`,
+    },
+    mk: {
+      title: "Сметка",
+      table: "Маса",
+      total: "Вкупно",
+      cash: "ГОТОВО",
+      card: "КАРТИЧКА",
+      pay: (m: string) => `💳 Плаќање: ${m}`,
+      thanks: `Ви благодариме што го избравте`,
+    },
+    en: {
+      title: "Bill",
+      table: "Table",
+      total: "Total",
+      cash: "CASH",
+      card: "CARD",
+      pay: (m: string) => `💳 Payment: ${m}`,
+      thanks: `Thank you for choosing`,
+    },
+  }[lang];
+
+  const method = payMethod === "cash" ? L.cash : L.card;
+  const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+
+  const itemLines = cart.map(
+    (i) => `• ${i.qty}x ${i.name}${"  "}${(i.price * i.qty).toLocaleString()} DEN`
+  );
+
+  return [
+    `🧾 *${L.title} — ${restaurantName}*`,
+    `📍 ${L.table} ${tableNumber}`,
+    ``,
+    ...itemLines,
+    `─────────────────────`,
+    `💰 *${L.total}: ${total.toLocaleString()} DEN*`,
+    ``,
+    L.pay(method),
+    ``,
+    `${L.thanks} *${restaurantName}* 🙏`,
+  ].join("\n");
+}
+
 // ─── Translations ─────────────────────────────────────────────────────────────
 const t = {
   al: {
@@ -889,22 +947,45 @@ function WaiterSheet({
                     <div className="h-px flex-1 bg-border" />
                   </div>
 
+                  {/* Receipt preview */}
+                  {cart.length > 0 && (() => {
+                    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
+                    const totalPrice = cart.reduce((s, i) => s + i.price * i.qty, 0);
+                    return (
+                      <div className="bg-stone-50 dark:bg-stone-800/80 rounded-2xl px-4 py-3 border border-stone-200 dark:border-orange-800/40 font-mono text-[11px] text-muted-foreground space-y-1 mb-1">
+                        {cart.map((item) => (
+                          <div key={item.id} className="flex justify-between gap-2">
+                            <span className="truncate">{item.qty}x {item.name}</span>
+                            <span className="flex-shrink-0">{(item.price * item.qty).toLocaleString()} DEN</span>
+                          </div>
+                        ))}
+                        <div className="border-t border-border pt-1 mt-1 flex justify-between font-bold text-foreground">
+                          <span>{totalItems} {lang === "al" ? "artikuj" : lang === "mk" ? "артикли" : "items"}</span>
+                          <span>{totalPrice.toLocaleString()} DEN</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Cash button */}
                   <motion.button
                     whileTap={{ scale: 0.985 }}
-                    onClick={() => openWhatsApp(tr.billTextCash(tableNumber))}
+                    onClick={() => openWhatsApp(
+                      restaurant
+                        ? buildReceipt(lang, restaurant.name, tableNumber, cart, "cash")
+                        : tr.billTextCash(tableNumber)
+                    )}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
                   >
-                    {/* Icon */}
                     <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-200 dark:shadow-emerald-900/40">
                       <Banknote className="h-6 w-6 text-white" strokeWidth={1.75} />
                     </div>
-                    {/* Text */}
                     <div className="flex-1 min-w-0">
                       <p className="text-[15px] font-semibold text-foreground leading-tight">{tr.cash}</p>
-                      <p className="text-[12px] text-muted-foreground mt-0.5">{tr.billTextCash(tableNumber)}</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">
+                        {lang === "al" ? "Dërgon faturën e plotë me WhatsApp" : lang === "mk" ? "Испраќа целосна сметка на WhatsApp" : "Sends full itemized receipt via WhatsApp"}
+                      </p>
                     </div>
-                    {/* WhatsApp send indicator */}
                     <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
                       <WaIcon />
                     </div>
@@ -913,19 +994,22 @@ function WaiterSheet({
                   {/* Card button */}
                   <motion.button
                     whileTap={{ scale: 0.985 }}
-                    onClick={() => openWhatsApp(tr.billTextCard(tableNumber))}
+                    onClick={() => openWhatsApp(
+                      restaurant
+                        ? buildReceipt(lang, restaurant.name, tableNumber, cart, "card")
+                        : tr.billTextCard(tableNumber)
+                    )}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
                   >
-                    {/* Icon */}
                     <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200 dark:shadow-blue-900/40">
                       <CreditCard className="h-6 w-6 text-white" strokeWidth={1.75} />
                     </div>
-                    {/* Text */}
                     <div className="flex-1 min-w-0">
                       <p className="text-[15px] font-semibold text-foreground leading-tight">{tr.card}</p>
-                      <p className="text-[12px] text-muted-foreground mt-0.5">{tr.billTextCard(tableNumber)}</p>
+                      <p className="text-[12px] text-muted-foreground mt-0.5">
+                        {lang === "al" ? "Dërgon faturën e plotë me WhatsApp" : lang === "mk" ? "Испраќа целосна сметка на WhatsApp" : "Sends full itemized receipt via WhatsApp"}
+                      </p>
                     </div>
-                    {/* WhatsApp send indicator */}
                     <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
                       <WaIcon />
                     </div>
