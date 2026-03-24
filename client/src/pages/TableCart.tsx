@@ -601,6 +601,56 @@ function SkeletonCard() {
   );
 }
 
+// ─── 🌍 Language Picker Screen ────────────────────────────────────────────────
+function LangPickerScreen({
+  restaurantName,
+  onPick,
+}: {
+  restaurantName: string;
+  onPick: (lang: Lang) => void;
+}) {
+  const options: { lang: Lang; flag: string; label: string; sub: string }[] = [
+    { lang: "al", flag: "🇦🇱", label: "Shqip",        sub: "Gjuha Shqipe" },
+    { lang: "mk", flag: "🇲🇰", label: "Македонски",   sub: "Македонски јазик" },
+    { lang: "en", flag: "🇬🇧", label: "English",       sub: "English language" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-background px-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="w-full max-w-sm flex flex-col items-center gap-8"
+      >
+        <div className="text-center">
+          <div className="text-4xl mb-3">🍽️</div>
+          <h1 className="text-2xl font-bold text-foreground">{restaurantName}</h1>
+          <p className="text-sm text-muted-foreground mt-1">Select your language · Zgjidhni gjuhën · Изберете јазик</p>
+        </div>
+
+        <div className="w-full flex flex-col gap-3">
+          {options.map(({ lang, flag, label, sub }) => (
+            <motion.button
+              key={lang}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onPick(lang)}
+              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl border border-stone-200 dark:border-orange-800/50 bg-white dark:bg-stone-800/60 hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 transition-all group text-left"
+            >
+              <span className="text-3xl leading-none">{flag}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold text-foreground group-hover:text-primary transition-colors">{label}</p>
+                <p className="text-xs text-muted-foreground">{sub}</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── 🎓 Tutorial Overlay ──────────────────────────────────────────────────────
 function TutorialOverlay({
   lang,
@@ -1420,6 +1470,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const channelName = `table-${restaurantSlug}-${tableNumber}`;
 
   const getDefaultLang = (): Lang => {
+    const saved = localStorage.getItem("hajdeha_lang") as Lang | null;
+    if (saved && ["al", "mk", "en"].includes(saved)) return saved;
     const bl = navigator.language.toLowerCase();
     if (bl.startsWith("sq")) return "al";
     if (bl.startsWith("mk")) return "mk";
@@ -1447,6 +1499,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dessertTimerStarted = useRef(false);
   const menuScrollRef = useRef<HTMLDivElement>(null);
+  const [showLangPicker, setShowLangPicker] = useState(
+    () => localStorage.getItem("hajdeha_lang_chosen") !== "1"
+  );
   const [showTutorial, setShowTutorial] = useState(
     () => localStorage.getItem("hajdeha_tutorial_seen") !== "1"
   );
@@ -2405,7 +2460,19 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         </AnimatePresence>
       </div>
 
-      {showTutorial && (
+      {showLangPicker && restaurant && (
+        <LangPickerScreen
+          restaurantName={restaurant.name}
+          onPick={(picked) => {
+            setLang(picked);
+            localStorage.setItem("hajdeha_lang", picked);
+            localStorage.setItem("hajdeha_lang_chosen", "1");
+            setShowLangPicker(false);
+          }}
+        />
+      )}
+
+      {!showLangPicker && showTutorial && (
         <TutorialOverlay
           lang={lang}
           onDone={() => {
