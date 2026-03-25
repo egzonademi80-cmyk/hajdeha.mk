@@ -783,6 +783,7 @@ function RestaurantMap({
   const { slug } = useParams<{ slug: string }>();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
+  const menuSectionRef = useRef<HTMLElement>(null);
   const initedRef = useRef(false); // ← prevents double-init in StrictMode
   const watchIdRef = useRef<number | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -3285,7 +3286,7 @@ export default function PublicMenu() {
               <button
                 onClick={() => {
                   setSelectedCategory("All");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  menuSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === "All" ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
               >
@@ -3296,7 +3297,7 @@ export default function PublicMenu() {
                   key={cat}
                   onClick={() => {
                     setSelectedCategory(cat);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    menuSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
                 >
@@ -3308,7 +3309,7 @@ export default function PublicMenu() {
         </div>
 
         {/* Menu */}
-        <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
+        <main ref={menuSectionRef} className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
           <SurpriseMe
             menuItems={restaurant.menuItems || []}
             onAddToCart={updateCart}
