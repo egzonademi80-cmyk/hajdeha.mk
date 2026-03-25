@@ -10,7 +10,6 @@ import {
   restaurants as restaurantsTable,
   menuItems as menuItemsTable,
   pageViews,
-  users as usersTable,
 } from "../shared/schema.js";
 import { eq, sql, gte, and } from "drizzle-orm";
 
@@ -51,7 +50,7 @@ export async function registerRoutes(
   const { hashPassword } = setupAuth(app);
 
   // === AUTH — /api/auth?action=login|logout|me ===
-  app.all("/api/auth", async (req, res, next) => {
+  app.all("/api/auth", (req, res, next) => {
     const action = req.query.action as string;
 
     if (action === "login") {
@@ -84,53 +83,6 @@ export async function registerRoutes(
       if (!requireAuth(req, res)) return;
       const { password: _pw, ...safeUser } = req.user as any;
       return res.json({ user: safeUser });
-    }
-
-    if (action === "register") {
-      const { username, password, fullName, restaurantName } = req.body;
-      if (!username || !password || !restaurantName)
-        return res.status(400).json({ message: "Username, password and restaurant name are required" });
-
-      const existing = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
-      if (existing.length > 0)
-        return res.status(409).json({ message: "Username already taken" });
-
-      const hashed = await hashPassword(password);
-      const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-      const [newUser] = await db.insert(usersTable).values({
-        username,
-        password: hashed,
-        fullName: fullName || null,
-        plan: "trial",
-        trialEndsAt,
-      }).returning();
-
-      // Build a unique slug from restaurant name
-      const slugBase = restaurantName.toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 60) || "restaurant";
-      let finalSlug = slugBase;
-      let attempt = 0;
-      while (true) {
-        const taken = await db.select().from(restaurantsTable).where(eq(restaurantsTable.slug, finalSlug)).limit(1);
-        if (taken.length === 0) break;
-        attempt++;
-        finalSlug = `${slugBase}-${attempt}`;
-      }
-
-      await db.insert(restaurantsTable).values({
-        name: restaurantName,
-        slug: finalSlug,
-        userId: newUser.id,
-        active: true,
-        tableCount: 0,
-      });
-
-      return req.logIn(newUser, (err) => {
-        if (err) return next(err);
-        const { password: _pw, ...safeUser } = newUser;
-        return res.json({ user: safeUser });
-      });
     }
 
     if (action === "list") {
@@ -468,40 +420,6 @@ export async function registerRoutes(
       console.error("Admin menu error:", err);
       res.status(500).json({ message: err.message || "Internal server error" });
     }
-  });
-
-  // === SUPER ADMIN ROUTES ===
-  const SUPERADMIN = process.env.SUPERADMIN_USERNAME || "superadmin";
-
-  app.get("/api/superadmin/dashboard", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user as any).username !== SUPERADMIN)
-      return res.status(403).json({ message: "Forbidden" });
-    const rows = await db
-      .select({
-        restaurantId: restaurantsTable.id,
-        restaurantName: restaurantsTable.name,
-        slug: restaurantsTable.slug,
-        active: restaurantsTable.active,
-        userId: usersTable.id,
-        username: usersTable.username,
-        fullName: usersTable.fullName,
-        plan: usersTable.plan,
-        trialEndsAt: usersTable.trialEndsAt,
-      })
-      .from(restaurantsTable)
-      .leftJoin(usersTable, eq(restaurantsTable.userId, usersTable.id));
-    res.json(rows);
-  });
-
-  app.patch("/api/superadmin/users/:id/plan", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user as any).username !== SUPERADMIN)
-      return res.status(403).json({ message: "Forbidden" });
-    const userId = parseInt(req.params.id);
-    const { plan } = req.body;
-    if (!["trial", "active", "expired"].includes(plan))
-      return res.status(400).json({ message: "Invalid plan" });
-    await db.update(usersTable).set({ plan }).where(eq(usersTable.id, userId));
-    res.json({ ok: true });
   });
 
   // === SEED DATA ===

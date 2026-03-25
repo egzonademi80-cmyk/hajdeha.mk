@@ -6,9 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 // Pages
-import Landing from "@/pages/Landing";
-import Register from "@/pages/Register";
-import SuperAdmin from "@/pages/SuperAdmin";
+import Home from "@/pages/Home";
 import PublicMenu from "@/pages/PublicMenu";
 import AuthLogin from "@/pages/AuthLogin";
 import POS from "@/pages/POS";
@@ -27,11 +25,9 @@ function Router() {
       <DarkModeToggle isDark={isDark} toggleDarkMode={toggleDarkMode} />
       <Switch>
         {/* Public Routes */}
-        <Route path="/" component={Landing} />
-        <Route path="/register" component={Register} />
+        <Route path="/">{() => <Home />}</Route>
         <Route path="/restaurant/:slug" component={PublicMenu} />
         <Route path="/auth/login" component={AuthLogin} />
-        <Route path="/superadmin" component={SuperAdmin} />
 
         {/* Protected Routes */}
         <Route path="/admin/dashboard">
