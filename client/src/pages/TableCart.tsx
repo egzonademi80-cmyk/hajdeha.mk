@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Banknote,
   CreditCard,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -1684,6 +1685,15 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         .then((d) => { if (d.cart) setCart(d.cart); })
         .catch(() => {});
     }
+
+    // Always fetch the shared bill snapshot regardless of stale status —
+    // every device at the table must see the same receipt whether they joined
+    // before or after the order was placed.
+    fetch(`/api/table/${channelName}/order-snapshot`)
+      .then((r) => r.json())
+      .then((d) => { if (d.sessionOrder?.length) setSessionOrder(d.sessionOrder); })
+      .catch(() => {});
+
     return () => {
       channel.unbind_all();
       pusher.unsubscribe(channelName);
@@ -2415,25 +2425,34 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                                   <span className="font-bold">{item.price * item.qty}</span> DEN
                                 </p>
                               </div>
-                              <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
-                                <button
-                                  data-testid={`button-cart-decrease-${item.id}`}
-                                  onClick={() => updateQty(item.id, -1, item.addedBy)}
-                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                                >
-                                  <Minus className="h-3 w-3 text-muted-foreground" />
-                                </button>
-                                <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
-                                  {item.qty}
-                                </span>
-                                <button
-                                  data-testid={`button-cart-increase-${item.id}`}
-                                  onClick={() => updateQty(item.id, 1, item.addedBy)}
-                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                                >
-                                  <Plus className="h-3 w-3 text-muted-foreground" />
-                                </button>
-                              </div>
+                              {orderConfirming || orderConfirmedDone ? (
+                                <div className="flex items-center gap-1 bg-primary/10 rounded-xl px-2.5 py-1.5 flex-shrink-0">
+                                  <Lock className="h-3.5 w-3.5 text-primary opacity-70" />
+                                  <span className="text-sm font-bold text-primary font-mono w-5 text-center">
+                                    {item.qty}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
+                                  <button
+                                    data-testid={`button-cart-decrease-${item.id}`}
+                                    onClick={() => updateQty(item.id, -1, item.addedBy)}
+                                    className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                                  >
+                                    <Minus className="h-3 w-3 text-muted-foreground" />
+                                  </button>
+                                  <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
+                                    {item.qty}
+                                  </span>
+                                  <button
+                                    data-testid={`button-cart-increase-${item.id}`}
+                                    onClick={() => updateQty(item.id, 1, item.addedBy)}
+                                    className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                                  >
+                                    <Plus className="h-3 w-3 text-muted-foreground" />
+                                  </button>
+                                </div>
+                              )}
                             </motion.div>
                           );
                         });
