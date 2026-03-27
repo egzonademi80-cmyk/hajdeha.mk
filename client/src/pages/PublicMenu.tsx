@@ -3285,7 +3285,18 @@ export default function PublicMenu() {
               <button
                 onClick={() => {
                   setSelectedCategory("All");
-                  window.scrollTo({ top: 0, behavior: "smooth" });
+                  setTimeout(() => {
+                    const first = document.querySelector(
+                      "[id^='category-']",
+                    ) as HTMLElement;
+                    if (!first) return;
+                    const stickyBarHeight = 120;
+                    const top =
+                      first.getBoundingClientRect().top +
+                      window.scrollY -
+                      stickyBarHeight;
+                    window.scrollTo({ top, behavior: "smooth" });
+                  }, 50);
                 }}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === "All" ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
               >
@@ -3296,7 +3307,16 @@ export default function PublicMenu() {
                   key={cat}
                   onClick={() => {
                     setSelectedCategory(cat);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    setTimeout(() => {
+                      const el = document.getElementById(`category-${cat}`);
+                      if (!el) return;
+                      const stickyBarHeight = 120; // adjust if your bar is taller/shorter
+                      const top =
+                        el.getBoundingClientRect().top +
+                        window.scrollY -
+                        stickyBarHeight;
+                      window.scrollTo({ top, behavior: "smooth" });
+                    }, 50);
                   }}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
                 >
@@ -3345,6 +3365,7 @@ export default function PublicMenu() {
             ([category, items]: [string, MenuItem[]], idx: number) => (
               <motion.section
                 key={category}
+                id={`category-${category}`}
                 // ✅ Improved: spring + slide from left
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}

@@ -97,7 +97,7 @@ const translations: Record<string, any> = {
       "Visit the restaurant or call them directly to place your order with confidence.",
   },
   al: {
-    hero: "Platforma e Menusë Dixhitale e Tetovës.",
+    hero: "Platforma e Menusë Digjitale e Tetovës.",
     subHero:
       "Shfletoni menutë dhe llogaritni faturën tuaj para se të porosisni.",
     searchPlaceholder: "Kërko për restorante ose pjata (p.sh. Pica, Burger)...",
@@ -111,7 +111,7 @@ const translations: Record<string, any> = {
     whyUs: "Pse të zgjidhni HAJDE HA?",
     whyUsSub:
       "Mënyra moderne për të përjetuar ngrënien në Tetovë. E thjeshtë, efikase dhe pa kontakt.",
-    digitalMenus: "Menu Dixhitale",
+    digitalMenus: "Menu Digjitale",
     digitalMenusDesc:
       "Qasuni menjëherë në menu cilësore nga çdo smartphone. Nuk ka nevojë për menu fizike.",
     billCalc: "Llogaritësi i Faturës",
@@ -119,16 +119,16 @@ const translations: Record<string, any> = {
       "Dini saktësisht se sa do të kushtojë vakti juaj para se të porosisni. Llogaritni shumat në Denarë menjëherë.",
     eco: "Ekologjike",
     ecoDesc:
-      "Reduktoni mbetjet e letrës duke kaluar në menu dixhitale. Përditësoni menunë tuaj në çdo kohë pa riprintim.",
+      "Reduktoni mbetjet e letrës duke kaluar në menu digjitale. Përditësoni menunë tuaj në çdo kohë pa riprintim.",
     listRestaurant: "Dëshironi të listoni restorantin tuaj?",
     noRestaurantsOpen: "Asnjë restorant nuk është i hapur tani.",
     joinPlatform:
-      "Bashkohuni me platformën e menusë dixhitale me rritjen më të shpejtë në Tetovë.",
+      "Bashkohuni me platformën e menusë digjitale me rritjen më të shpejtë në Tetovë.",
     emailUs: "Na dërgoni email",
     callSupport: "Telefoni Mbështetjen",
     contactTitle: "Vendosni Restorantin tuaj Online",
     contactSubtitle:
-      "Bashkohuni me revolucionin e menusë dixhitale në Tetovë. Plotësoni formularin dhe ne do t'ju kontaktojmë brenda 24 orëve.",
+      "Bashkohuni me revolucionin e menusë digjitale në Tetovë. Plotësoni formularin dhe ne do t'ju kontaktojmë brenda 24 orëve.",
     fullName: "Emri i plotë",
     emailAddr: "Adresa e Email-it",
     restaurantName: "Emri i Restorantit",

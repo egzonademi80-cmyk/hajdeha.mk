@@ -58,16 +58,21 @@ export async function registerRoutes(
       const validation = api.auth.login.input.safeParse(req.body);
       if (!validation.success)
         return res.status(400).json({ message: "Invalid input" });
-      return passport.authenticate("local", (err: any, user: any, info: any) => {
-        if (err) return next(err);
-        if (!user)
-          return res.status(401).json({ message: info?.message || "Authentication failed" });
-        req.logIn(user, (err) => {
+      return passport.authenticate(
+        "local",
+        (err: any, user: any, info: any) => {
           if (err) return next(err);
-          const { password: _pw, ...safeUser } = user;
-          return res.json({ user: safeUser });
-        });
-      })(req, res, next);
+          if (!user)
+            return res
+              .status(401)
+              .json({ message: info?.message || "Authentication failed" });
+          req.logIn(user, (err) => {
+            if (err) return next(err);
+            const { password: _pw, ...safeUser } = user;
+            return res.json({ user: safeUser });
+          });
+        },
+      )(req, res, next);
     }
 
     if (action === "logout") {
@@ -148,7 +153,10 @@ export async function registerRoutes(
       if (!channel || !Array.isArray(cart))
         return res.status(400).json({ message: "Missing fields" });
       const existing = tableRooms.get(channel);
-      tableRooms.set(channel, { cart, sessionOrder: existing?.sessionOrder || [] });
+      tableRooms.set(channel, {
+        cart,
+        sessionOrder: existing?.sessionOrder || [],
+      });
       await pusherServer.trigger(channel, "cart-update", { cart });
       res.json({ ok: true });
     } catch (err: any) {
@@ -165,7 +173,10 @@ export async function registerRoutes(
   app.post("/api/table/place-order", async (req, res) => {
     try {
       const { channel, cart, tableNumber } = req.body;
-      await pusherServer.trigger(channel, "order-placed", { cart, tableNumber });
+      await pusherServer.trigger(channel, "order-placed", {
+        cart,
+        tableNumber,
+      });
 
       // Accumulate ordered items into a shared session order for the whole table
       const room = tableRooms.get(channel) || { cart: [], sessionOrder: [] };
@@ -178,7 +189,9 @@ export async function registerRoutes(
       tableRooms.set(channel, { cart: [], sessionOrder: merged });
 
       await pusherServer.trigger(channel, "cart-update", { cart: [] });
-      await pusherServer.trigger(channel, "order-snapshot", { sessionOrder: merged });
+      await pusherServer.trigger(channel, "order-snapshot", {
+        sessionOrder: merged,
+      });
       res.json({ ok: true });
     } catch (err: any) {
       console.error("place-order error:", err);
@@ -195,7 +208,10 @@ export async function registerRoutes(
     try {
       const { channel, tableNumber } = req.body;
       if (!channel) return res.status(400).json({ message: "Missing channel" });
-      await pusherServer.trigger(channel, "waiter-called", { tableNumber, timestamp: Date.now() });
+      await pusherServer.trigger(channel, "waiter-called", {
+        tableNumber,
+        timestamp: Date.now(),
+      });
       res.json({ ok: true });
     } catch (err: any) {
       console.error("call-waiter error:", err);
@@ -236,19 +252,34 @@ export async function registerRoutes(
       const todayResult = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(pageViews)
-        .where(and(eq(pageViews.restaurantId, restaurantId), eq(pageViews.dateStr, today)));
+        .where(
+          and(
+            eq(pageViews.restaurantId, restaurantId),
+            eq(pageViews.dateStr, today),
+          ),
+        );
       const todayCount = todayResult[0]?.count ?? 0;
 
       const last30Result = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(pageViews)
-        .where(and(eq(pageViews.restaurantId, restaurantId), gte(pageViews.dateStr, date30)));
+        .where(
+          and(
+            eq(pageViews.restaurantId, restaurantId),
+            gte(pageViews.dateStr, date30),
+          ),
+        );
       const last30Days = last30Result[0]?.count ?? 0;
 
       const last7Result = await db
         .select({ date: pageViews.dateStr, count: sql<number>`count(*)::int` })
         .from(pageViews)
-        .where(and(eq(pageViews.restaurantId, restaurantId), gte(pageViews.dateStr, date7)))
+        .where(
+          and(
+            eq(pageViews.restaurantId, restaurantId),
+            gte(pageViews.dateStr, date7),
+          ),
+        )
         .groupBy(pageViews.dateStr);
 
       const last7Map = new Map(last7Result.map((r) => [r.date, r.count]));
@@ -323,7 +354,11 @@ export async function registerRoutes(
       if (action === "create") {
         const result = api.restaurants.create.input.safeParse(req.body);
         if (!result.success)
-          return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+          return res
+            .status(400)
+            .json({
+              message: result.error.errors[0]?.message || "Invalid input",
+            });
         const restaurant = await storage.createRestaurant({
           ...result.data,
           userId: user.id,
@@ -342,7 +377,11 @@ export async function registerRoutes(
           return res.status(403).json({ message: "Forbidden" });
         const result = api.restaurants.update.input.safeParse(req.body);
         if (!result.success)
-          return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+          return res
+            .status(400)
+            .json({
+              message: result.error.errors[0]?.message || "Invalid input",
+            });
         const updated = await storage.updateRestaurant(id, result.data);
         return res.json(updated);
       }
@@ -377,7 +416,8 @@ export async function registerRoutes(
         if (isNaN(restaurantId))
           return res.status(400).json({ message: "restaurantId is required" });
         const restaurant = await storage.getRestaurant(restaurantId);
-        if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
+        if (!restaurant)
+          return res.status(404).json({ message: "Restaurant not found" });
         if (restaurant.userId !== user.id)
           return res.status(403).json({ message: "Forbidden" });
         const items = await storage.getMenuItems(restaurantId);
@@ -395,9 +435,16 @@ export async function registerRoutes(
       if (action === "create") {
         const result = api.menuItems.create.input.safeParse(req.body);
         if (!result.success)
-          return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
-        const restaurant = await storage.getRestaurant(result.data.restaurantId);
-        if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
+          return res
+            .status(400)
+            .json({
+              message: result.error.errors[0]?.message || "Invalid input",
+            });
+        const restaurant = await storage.getRestaurant(
+          result.data.restaurantId,
+        );
+        if (!restaurant)
+          return res.status(404).json({ message: "Restaurant not found" });
         const item = await storage.createMenuItem(result.data);
         return res.status(201).json(item);
       }
@@ -409,7 +456,11 @@ export async function registerRoutes(
         if (!item) return res.status(404).json({ message: "Item not found" });
         const result = api.menuItems.update.input.safeParse(req.body);
         if (!result.success)
-          return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+          return res
+            .status(400)
+            .json({
+              message: result.error.errors[0]?.message || "Invalid input",
+            });
         const updated = await storage.updateMenuItem(id, result.data);
         return res.json(updated);
       }
@@ -427,7 +478,10 @@ export async function registerRoutes(
         const { items } = api.menuItems.reorder.input.parse(req.body);
         await Promise.all(
           items.map(({ id, sortOrder }) =>
-            db.update(menuItemsTable).set({ sortOrder }).where(eq(menuItemsTable.id, id)),
+            db
+              .update(menuItemsTable)
+              .set({ sortOrder })
+              .where(eq(menuItemsTable.id, id)),
           ),
         );
         return res.json({ ok: true });
@@ -453,11 +507,17 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
   if (admin) return;
   console.log("Seeding database...");
   const pwd = await hashPassword("DesiigneR.123");
-  const user1 = await storage.createUser({ username: "hajdeha", password: pwd });
+  const user1 = await storage.createUser({
+    username: "hajdeha",
+    password: pwd,
+  });
   const seedUser = async (username: string, passwordPlain: string) => {
     const existing = await storage.getUserByUsername(username);
     if (existing) return existing;
-    return storage.createUser({ username, password: await hashPassword(passwordPlain) });
+    return storage.createUser({
+      username,
+      password: await hashPassword(passwordPlain),
+    });
   };
   const user2 = await seedUser("admin2", "password123");
   const user3 = await seedUser("admin3", "password123");
@@ -466,47 +526,107 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
     name: "Test Restaurant Tetovë",
     slug: "test-restaurant-tetove",
     description: "Authentic local cuisine in the heart of Tetovo.",
-    photoUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+    photoUrl:
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
     website: "https://test-restaurant.mk",
     phoneNumber: "+389 44 123 456",
     location: "Rruga e Marshit, Tetovë 1200",
     latitude: 42.01,
     longitude: 20.97,
+      wifi_password: "12345678", // ✅ add this
   });
   const r2 = await storage.createRestaurant({
     userId: user2.id,
     name: "Hajde Grill",
     slug: "hajde-grill",
     description: "Best grilled meats and traditional qebapa.",
-    photoUrl: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+    photoUrl:
+      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
     website: "https://hajdegrill.mk",
     phoneNumber: "+389 44 234 567",
     location: "Bulevardi Iliria, Tetovë 1200",
     latitude: 42.008,
     longitude: 20.965,
+    wifi_password: "12345678", // ✅ add this
   });
   const r3 = await storage.createRestaurant({
     userId: user3.id,
     name: "Cafe Hajde",
     slug: "cafe-hajde",
     description: "Premium coffee and delightful desserts.",
-    photoUrl: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80",
+    photoUrl:
+      "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80",
     website: "https://cafehajde.mk",
     phoneNumber: "+389 44 345 678",
     location: "Sheshi Iliria, Tetovë 1200",
     latitude: 42.012,
     longitude: 20.972,
+    wifi_password: "12345678", // ✅ add this
   });
   const items = [
-    { restaurantId: r1.id, name: "Pizza Margherita", price: "500 DEN", category: "Food", description: "Tomato sauce, mozzarella, basil" },
-    { restaurantId: r1.id, name: "Classic Burger", price: "350 DEN", category: "Food", description: "Beef patty, lettuce, tomato, house sauce" },
-    { restaurantId: r1.id, name: "Coca-Cola", price: "100 DEN", category: "Drinks", description: "330ml can" },
-    { restaurantId: r2.id, name: "Grilled Chicken", price: "450 DEN", category: "Mains", description: "Served with fries and salad" },
-    { restaurantId: r2.id, name: "Qebapa (10 pcs)", price: "300 DEN", category: "Mains", description: "Traditional minced meat rolls with bread" },
-    { restaurantId: r2.id, name: "Ayran", price: "60 DEN", category: "Drinks", description: "Refreshing yogurt drink" },
-    { restaurantId: r3.id, name: "Espresso", price: "80 DEN", category: "Coffee", description: "Strong and rich" },
-    { restaurantId: r3.id, name: "Cappuccino", price: "120 DEN", category: "Coffee", description: "Espresso with steamed milk foam" },
-    { restaurantId: r3.id, name: "Cheesecake", price: "250 DEN", category: "Dessert", description: "New York style with berry topping" },
+    {
+      restaurantId: r1.id,
+      name: "Pizza Margherita",
+      price: "500 DEN",
+      category: "Food",
+      description: "Tomato sauce, mozzarella, basil",
+    },
+    {
+      restaurantId: r1.id,
+      name: "Classic Burger",
+      price: "350 DEN",
+      category: "Food",
+      description: "Beef patty, lettuce, tomato, house sauce",
+    },
+    {
+      restaurantId: r1.id,
+      name: "Coca-Cola",
+      price: "100 DEN",
+      category: "Drinks",
+      description: "330ml can",
+    },
+    {
+      restaurantId: r2.id,
+      name: "Grilled Chicken",
+      price: "450 DEN",
+      category: "Mains",
+      description: "Served with fries and salad",
+    },
+    {
+      restaurantId: r2.id,
+      name: "Qebapa (10 pcs)",
+      price: "300 DEN",
+      category: "Mains",
+      description: "Traditional minced meat rolls with bread",
+    },
+    {
+      restaurantId: r2.id,
+      name: "Ayran",
+      price: "60 DEN",
+      category: "Drinks",
+      description: "Refreshing yogurt drink",
+    },
+    {
+      restaurantId: r3.id,
+      name: "Espresso",
+      price: "80 DEN",
+      category: "Coffee",
+      description: "Strong and rich",
+    },
+    {
+      restaurantId: r3.id,
+      name: "Cappuccino",
+      price: "120 DEN",
+      category: "Coffee",
+      description: "Espresso with steamed milk foam",
+    },
+    {
+      restaurantId: r3.id,
+      name: "Cheesecake",
+      price: "250 DEN",
+      category: "Dessert",
+      description: "New York style with berry topping",
+    },
   ];
   for (let i = 0; i < items.length; i++) {
     await storage.createMenuItem({ ...items[i], sortOrder: i });
