@@ -369,7 +369,7 @@ const t = {
       },
       {
         icon: "🧾",
-        label: "Можам ли да ја добијам сметката?",
+        label: "Можам ли да ја доб��јам сметката?",
         text: `Здраво! Маса ${table} би сакала сметката, ве молам.`,
       },
       {
@@ -777,7 +777,7 @@ function BillSplitDrawer({
   );
 }
 
-// ─── ✨ Skeleton Card ─────────────────────────────────────────────────────────
+// ─── ✨ Skeleton Card ────────────────────���────────────────────────────────────
 function SkeletonCard() {
   return (
     <div className="flex items-center gap-3 p-3 sm:p-3.5 rounded-2xl border border-stone-200 dark:border-orange-800/50 bg-white dark:bg-stone-800/60 overflow-hidden">
@@ -1350,8 +1350,11 @@ function AIWaiterPanel({
     };
     loadVoices();
     window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
-    return () =>
+    return () => {
       window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+      // Stop any ongoing speech on unmount
+      synthRef.current?.cancel();
+    };
   }, []);
 
   useEffect(() => {
@@ -1803,6 +1806,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const dessertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dessertTimerStarted = useRef(false);
   const menuScrollRef = useRef<HTMLDivElement>(null);
+  const orderProcessedRef = useRef(false);
   const [sessionOrder, setSessionOrder] = useState<CartItem[]>([]);
   const [showLangPicker, setShowLangPicker] = useState(
     () => localStorage.getItem("hajdeha_lang_chosen") !== "1",
@@ -1833,6 +1837,15 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     apply();
     const interval = setInterval(apply, 60_000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Cleanup dessert timer on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (dessertTimerRef.current) {
+        clearTimeout(dessertTimerRef.current);
+      }
+    };
   }, []);
 
   const { data: restaurant, isLoading } = useQuery({
@@ -1868,6 +1881,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     const pusherKey = import.meta.env.VITE_PUSHER_KEY;
     const pusherCluster = import.meta.env.VITE_PUSHER_CLUSTER;
     if (!pusherKey || !pusherCluster) return;
+
+    const abortController = new AbortController();
+    const { signal } = abortController;
+
     const pusher = new Pusher(pusherKey, { cluster: pusherCluster });
     const channel = pusher.subscribe(channelName);
     pusher.connection.bind("connected", () => setConnected(true));
@@ -1895,24 +1912,27 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel: channelName, cart: [] }),
+        signal,
       }).catch(() => {});
     } else {
       // Active table — load shared cart (works for friends scanning together too)
-      fetch(`/api/table/${channelName}/cart`)
+      fetch(`/api/table/${channelName}/cart`, { signal })
         .then((r) => r.json())
         .then((d) => {
-          if (d.cart) setCart(d.cart);
+          if (!signal.aborted && d.cart) setCart(d.cart);
         })
         .catch(() => {});
       // Also restore the shared session order (bill history for the whole table)
-      fetch(`/api/table/${channelName}/order-snapshot`)
+      fetch(`/api/table/${channelName}/order-snapshot`, { signal })
         .then((r) => r.json())
         .then((d) => {
-          if (d.sessionOrder?.length) setSessionOrder(d.sessionOrder);
+          if (!signal.aborted && d.sessionOrder?.length)
+            setSessionOrder(d.sessionOrder);
         })
         .catch(() => {});
     }
     return () => {
+      abortController.abort();
       channel.unbind_all();
       pusher.unsubscribe(channelName);
       pusher.disconnect();
@@ -1973,6 +1993,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   // Also start the dessert reminder timer (20 min after order placed)
   useEffect(() => {
     if (!orderConfirmedDone) return;
+    // Prevent running multiple times for the same confirmation
+    if (orderProcessedRef.current) return;
+    orderProcessedRef.current = true;
 
     // Start dessert notification once per session (20 min after order)
     if (!dessertTimerStarted.current && menuItems.length) {
@@ -1984,7 +2007,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         "ëmbëlsirë",
         "desserts",
         "десерт",
-        "десерти",
+        "десерт��",
         "sweet",
         "sweets",
       ];
@@ -2033,16 +2056,21 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       });
     }
 
-    // Snapshot the cart into sessionOrder before clearing
-    // Snapshot the cart into sessionOrder before clearing
     // Snapshot the cart into sessionOrder before clearing AND sync to server
-    const merged = [...sessionOrder];
-    cart.forEach((item) => {
-      const existing = merged.find((i) => i.id === item.id);
-      if (existing) existing.qty += item.qty;
-      else merged.push({ ...item });
+    // Use functional update to avoid sessionOrder in deps (prevents infinite loop)
+    setSessionOrder((prev) => {
+      // Deep copy to avoid mutating prev state
+      const merged = prev.map((i) => ({ ...i }));
+      cart.forEach((item) => {
+        // Match by id AND addedBy so each person's items stay separate
+        const existing = merged.find(
+          (i) => i.id === item.id && i.addedBy === item.addedBy,
+        );
+        if (existing) existing.qty += item.qty;
+        else merged.push({ ...item });
+      });
+      return merged;
     });
-    setSessionOrder(merged);
 
     // Broadcast the updated sessionOrder to all devices at this table
     fetch("/api/table/place-order", {
@@ -2057,10 +2085,13 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       setWaiterCalledFromCart(false);
       setOrderConfirmedDone(false);
       setOrderConfirming(false);
-      localStorage.removeItem(`hajde-ts-${channelName}`);
+      orderProcessedRef.current = false; // Reset for next order
+      // Keep the timestamp alive so follow-up orders stay in the same session
+      localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
     }, 4000);
     return () => clearTimeout(timer);
-  }, [orderConfirmedDone, syncCart, channelName, cart, sessionOrder]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderConfirmedDone, syncCart, channelName]);
 
   const addItem = (item: MenuItem) => {
     setCart((prev) => {
@@ -2101,8 +2132,23 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     });
   };
 
-  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const itemCount = cart.reduce((s, i) => s + i.qty, 0);
+  // Merge sessionOrder (already ordered) + cart (new items) for display
+  // This ensures 2nd+ orders show the full accumulated cart
+  const fullCart = useMemo(() => {
+    // Deep copy to avoid mutating sessionOrder state
+    const merged = sessionOrder.map((item) => ({ ...item }));
+    cart.forEach((item) => {
+      const existing = merged.find(
+        (i) => i.id === item.id && i.addedBy === item.addedBy,
+      );
+      if (existing) existing.qty += item.qty;
+      else merged.push({ ...item });
+    });
+    return merged;
+  }, [sessionOrder, cart]);
+
+  const total = fullCart.reduce((s, i) => s + i.price * i.qty, 0);
+  const itemCount = fullCart.reduce((s, i) => s + i.qty, 0);
 
   // ── Loading skeleton
   if (isLoading) {
@@ -2187,7 +2233,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       <BillSplitDrawer
         open={splitOpen}
         onClose={() => setSplitOpen(false)}
-        cart={cart}
+        cart={fullCart}
         myId={myId}
         lang={lang}
       />
@@ -2274,7 +2320,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         phoneNumber={restaurant.phoneNumber}
         tableNumber={tableNumber}
         lang={lang}
-        receiptItems={sessionOrder.length > 0 ? sessionOrder : cart}
+        receiptItems={fullCart}
         restaurantName={restaurant.name}
       />
       <AIWaiterPanel
@@ -2623,7 +2669,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                   className="p-4 space-y-2.5 max-w-2xl mx-auto w-full"
                   style={{ paddingBottom: 24 }}
                 >
-                  {cart.length === 0 ? (
+                  {fullCart.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
                       <ShoppingBag className="h-12 w-12 text-muted-foreground/25" />
                       <p className="text-sm text-muted-foreground">
@@ -2645,7 +2691,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       {(() => {
                         // Assign a stable color to each unique person in the cart
                         const uniqueIds = Array.from(
-                          new Set(cart.map((i) => i.addedBy).filter(Boolean)),
+                          new Set(
+                            fullCart.map((i) => i.addedBy).filter(Boolean),
+                          ),
                         );
                         const personColor = (id?: string) =>
                           id != null
@@ -2653,7 +2701,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                                 uniqueIds.indexOf(id) % PERSON_COLORS.length
                               ]
                             : null;
-                        return cart.map((item) => {
+                        return fullCart.map((item) => {
                           const menuItem = menuItems.find(
                             (m) => m.id === item.id,
                           );
@@ -2729,7 +2777,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 </div>
               </div>
 
-              {cart.length > 0 && (
+              {fullCart.length > 0 && (
                 <div
                   className="flex-shrink-0 px-4 pt-3 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md border-t border-border space-y-3"
                   style={{
