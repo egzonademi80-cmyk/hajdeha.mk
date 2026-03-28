@@ -412,13 +412,21 @@ export default function Home() {
 
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
+
       result = result.filter((restaurant: any) => {
-        const nameMatch = restaurant.name.toLowerCase().includes(searchLower);
-        const menuMatch = restaurant.menuItems?.some(
-          (item: any) =>
-            item.name.toLowerCase().includes(searchLower) ||
-            item.description.toLowerCase().includes(searchLower),
-        );
+        const nameMatch = (restaurant.name || "")
+          .toLowerCase()
+          .includes(searchLower);
+
+        const menuMatch =
+          restaurant.menuItems &&
+          restaurant.menuItems.length > 0 &&
+          restaurant.menuItems.some(
+            (item: any) =>
+              (item.name || "").toLowerCase().includes(searchLower) ||
+              (item.description || "").toLowerCase().includes(searchLower),
+          );
+
         return nameMatch || menuMatch;
       });
     }

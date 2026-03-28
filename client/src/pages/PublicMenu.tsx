@@ -1362,7 +1362,7 @@ function AIRestaurantAssistant({
       send: "Испрати",
       addToCart: "Додај",
       added: "Додадено!",
-      greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
+      greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè e � го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
       errorMsg: "Се извинуваме, имаше проблем. Обидете се повторно!",
     },
   };
@@ -3139,83 +3139,90 @@ export default function PublicMenu() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/10" />
           )}
 
-          <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center space-y-5 sm:space-y-8 text-white">
-            {/* ✅ Improved: staggered hero with variants */}
-            <motion.div variants={heroVariants} initial="hidden" animate="show">
-              <motion.h1
-                variants={heroItem}
-                className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight"
-              >
-                {restaurant.name}
-              </motion.h1>
-
-              <motion.div variants={heroItem}>
-                <div
-                  className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
-                    isOpen
-                      ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
-                      : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
-                  }`}
-                >
-                  {isOpen ? (
-                    <>
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {t.openNow}
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="h-3.5 w-3.5" />
-                      {t.closed}
-                    </>
-                  )}
-                </div>
-              </motion.div>
-
-              {restaurant.description && (
-                <motion.p
-                  variants={heroItem}
-                  className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed mt-4"
-                >
-                  {restaurant.description}
-                </motion.p>
-              )}
-
+          <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+            {/* Restaurant Info Frame */}
+            <div className="bg-white/5 backdrop-blur-xl rounded-3xl border-2 border-primary/40 shadow-2xl p-8 sm:p-12 text-center space-y-5 sm:space-y-8 text-white">
+              {/* Staggered hero with variants */}
               <motion.div
-                variants={heroItem}
-                className="flex flex-wrap justify-center gap-3 pt-2"
+                variants={heroVariants}
+                initial="hidden"
+                animate="show"
               >
-                {restaurant.website && (
-                  <a
-                    href={restaurant.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
-                  >
-                    <Globe className="h-3.5 w-3.5" />
-                    {t.website}
-                  </a>
-                )}
-                <a
-                  href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
+                <motion.h1
+                  variants={heroItem}
+                  className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight"
                 >
-                  <Phone className="h-3.5 w-3.5" />
-                  {t.reserve}
-                </a>
-              </motion.div>
+                  {restaurant.name}
+                </motion.h1>
 
-              {restaurant.openingTime && restaurant.closingTime && (
+                <motion.div variants={heroItem}>
+                  <div
+                    className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
+                      isOpen
+                        ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
+                        : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
+                    }`}
+                  >
+                    {isOpen ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {t.openNow}
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="h-3.5 w-3.5" />
+                        {t.closed}
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+
+                {restaurant.description && (
+                  <motion.p
+                    variants={heroItem}
+                    className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed mt-4"
+                  >
+                    {restaurant.description}
+                  </motion.p>
+                )}
+
                 <motion.div
                   variants={heroItem}
-                  className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2"
+                  className="flex flex-wrap justify-center gap-3 pt-2"
                 >
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>
-                    {restaurant.openingTime} - {restaurant.closingTime}
-                  </span>
+                  {restaurant.website && (
+                    <a
+                      href={restaurant.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      {t.website}
+                    </a>
+                  )}
+                  <a
+                    href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                    {t.reserve}
+                  </a>
                 </motion.div>
-              )}
-            </motion.div>
+
+                {restaurant.openingTime && restaurant.closingTime && (
+                  <motion.div
+                    variants={heroItem}
+                    className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>
+                      {restaurant.openingTime} - {restaurant.closingTime}
+                    </span>
+                  </motion.div>
+                )}
+              </motion.div>
+            </div>
           </div>
         </header>
 
