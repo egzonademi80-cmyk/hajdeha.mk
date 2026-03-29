@@ -489,6 +489,20 @@ export default function Home() {
     }
     return arr;
   }
+  const [typed, setTyped] = useState("");
+
+  useEffect(() => {
+    let i = 0;
+
+    const interval = setInterval(() => {
+      setTyped(t.hero.slice(0, i + 1));
+      i++;
+
+      if (i === t.hero.length) clearInterval(interval);
+    }, 70);
+
+    return () => clearInterval(interval);
+  }, [t.hero]);
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
@@ -550,8 +564,8 @@ export default function Home() {
               <span className="text-sm font-medium">Hajde Ha</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 text-balance drop-shadow-lg">
-              {t.hero}
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 text-balance drop-shadow-lg text-white">
+              {typed}
             </h1>
 
             <p className="text-base sm:text-lg opacity-90 mb-8 text-pretty drop-shadow-md">
@@ -568,6 +582,18 @@ export default function Home() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 data-testid="input-search-restaurants"
               />
+            </div>
+          </div>
+          <div
+            onClick={() =>
+              window.scrollTo({ top: window.innerHeight, behavior: "smooth" })
+            }
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center animate-bounce cursor-pointer"
+          >
+            <span className="text-[10px] text-white/70 mb-1">Scroll</span>
+
+            <div className="w-4 h-7 border border-white/60 rounded-full flex items-start justify-center p-[2px]">
+              <div className="w-[2px] h-[4px] bg-white rounded-full animate-pulse" />
             </div>
           </div>
         </div>
