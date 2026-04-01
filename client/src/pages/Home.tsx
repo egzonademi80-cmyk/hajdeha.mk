@@ -171,7 +171,7 @@ const translations: Record<string, any> = {
     matches: "резултати",
     explore: "Истражете го вкусот на Тетово",
     noResults: "Нема резултати што одговараат на вашето пребарување.",
-    noRestaurants: "Ниту еден ресторан сè уште не се приклучил на HAJDE HA.",
+    noRestaurants: "Ниту еден ресторан сè уште не се ��риклучил на HAJDE HA.",
     whyUs: "Зошто да изберете HAJDE HA?",
     whyUsSub:
       "Модерен начин за јадење во Тетово. Едноставно, ефикасно и без контакт.",
@@ -941,7 +941,43 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="mt-12 pt-12 border-t border-white/10 dark:border-stone-700">
+                {/* Social Media Links */}
+                <div className="mt-8 pt-8 border-t border-white/10 dark:border-stone-700">
+                  <p className="text-sm font-semibold text-primary-foreground dark:text-stone-100 mb-4 transition-colors duration-300">
+                    {lang === "en" ? "Follow Us" : lang === "al" ? "Na Ndiqni" : "Следете Не"}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href="https://instagram.com/hajdeha.mk"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Instagram"
+                      className="w-10 h-10 rounded-xl bg-white/10 dark:bg-stone-700/50 flex items-center justify-center text-primary-foreground dark:text-stone-100 hover:bg-white/20 dark:hover:bg-stone-600/50 transition-all duration-300 hover:scale-110"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+                    </a>
+                    <a
+                      href="https://facebook.com/hajdeha.mk"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Facebook"
+                      className="w-10 h-10 rounded-xl bg-white/10 dark:bg-stone-700/50 flex items-center justify-center text-primary-foreground dark:text-stone-100 hover:bg-white/20 dark:hover:bg-stone-600/50 transition-all duration-300 hover:scale-110"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                    </a>
+                    <a
+                      href="https://tiktok.com/@hajdeha.mk"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="TikTok"
+                      className="w-10 h-10 rounded-xl bg-white/10 dark:bg-stone-700/50 flex items-center justify-center text-primary-foreground dark:text-stone-100 hover:bg-white/20 dark:hover:bg-stone-600/50 transition-all duration-300 hover:scale-110"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.76a8.28 8.28 0 0 0 4.76 1.5v-3.4a4.85 4.85 0 0 1-1-.17z"/></svg>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-white/10 dark:border-stone-700">
                   <p className="text-sm text-primary-foreground/60 dark:text-stone-300 leading-relaxed transition-colors duration-300">
                     Based in Tetovë, supporting local businesses transition to
                     the digital era.
@@ -1087,8 +1123,41 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="py-12 border-t text-center text-stone-400 text-sm">
-        <p>© 2026 HAJDE HA - Tetovë Digital Menu Platform</p>
+      <footer className="py-12 border-t border-stone-200 dark:border-stone-800 transition-colors duration-300">
+        <div className="max-w-4xl mx-auto px-4 flex flex-col items-center gap-5">
+          <div className="flex items-center gap-4">
+            <a
+              href="https://instagram.com/hajdeha.mk"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="w-9 h-9 rounded-lg bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-500 dark:text-stone-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary transition-all duration-300 hover:scale-110"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+            </a>
+            <a
+              href="https://facebook.com/hajdeha.mk"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              className="w-9 h-9 rounded-lg bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-500 dark:text-stone-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary transition-all duration-300 hover:scale-110"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+            </a>
+            <a
+              href="https://tiktok.com/@hajdeha.mk"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="TikTok"
+              className="w-9 h-9 rounded-lg bg-stone-100 dark:bg-stone-800 flex items-center justify-center text-stone-500 dark:text-stone-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary transition-all duration-300 hover:scale-110"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.76a8.28 8.28 0 0 0 4.76 1.5v-3.4a4.85 4.85 0 0 1-1-.17z"/></svg>
+            </a>
+          </div>
+          <p className="text-stone-400 dark:text-stone-500 text-sm transition-colors duration-300">
+            {"© 2026 HAJDE HA - Tetovë Digital Menu Platform"}
+          </p>
+        </div>
       </footer>
 
       {/* ── PWA Install Banner ── */}
