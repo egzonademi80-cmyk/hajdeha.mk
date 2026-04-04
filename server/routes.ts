@@ -26,7 +26,12 @@ interface TableRoom {
 }
 
 const tableRooms = new Map<string, TableRoom>();
-
+console.log("Pusher ENV:", {
+  appId: process.env.PUSHER_APP_ID,
+  key: process.env.PUSHER_KEY,
+  secret: process.env.PUSHER_SECRET,
+  cluster: process.env.PUSHER_CLUSTER,
+});
 // ── Pusher server client ──────────────────────────────────────────────────────
 const pusherServer = new Pusher({
   appId: process.env.PUSHER_APP_ID!,
@@ -146,21 +151,33 @@ export async function registerRoutes(
     }
   });
 
-  // === TABLE / PUSHER ROUTES ===
   app.post("/api/table/cart-update", async (req, res) => {
     try {
       const { channel, cart } = req.body;
-      if (!channel || !Array.isArray(cart))
+
+      console.log("cart-update hit:", { channel, cartLength: cart?.length });
+
+      if (!channel || !Array.isArray(cart)) {
         return res.status(400).json({ message: "Missing fields" });
+      }
+
       const existing = tableRooms.get(channel);
       tableRooms.set(channel, {
         cart,
         sessionOrder: existing?.sessionOrder || [],
       });
-      await pusherServer.trigger(channel, "cart-update", { cart });
+
+      try {
+        console.log("triggering pusher on channel:", channel);
+        await pusherServer.trigger(channel, "cart-update", { cart });
+        console.log("pusher trigger succeeded");
+      } catch (e: any) {
+        console.error("PUSHER FAIL:", e.message, e.status, e.stack);
+      }
+
       res.json({ ok: true });
     } catch (err: any) {
-      console.error("cart-update error:", err);
+      console.error("cart-update error:", err.message, err.stack);
       res.status(500).json({ message: err.message });
     }
   });
@@ -173,25 +190,38 @@ export async function registerRoutes(
   app.post("/api/table/place-order", async (req, res) => {
     try {
       const { channel, cart, tableNumber } = req.body;
+
+      if (!channel) {
+        return res.status(400).json({ message: "Missing channel" });
+      }
+
+      if (!Array.isArray(cart)) {
+        return res.status(400).json({ message: "Cart must be an array" });
+      }
+
+      const safeCart = cart as CartItem[];
+
       await pusherServer.trigger(channel, "order-placed", {
-        cart,
+        cart: safeCart,
         tableNumber,
       });
 
-      // Accumulate ordered items into a shared session order for the whole table
       const room = tableRooms.get(channel) || { cart: [], sessionOrder: [] };
       const merged = [...room.sessionOrder];
-      (cart as CartItem[]).forEach((item) => {
+
+      safeCart.forEach((item) => {
         const existing = merged.find((i) => i.id === item.id);
         if (existing) existing.qty += item.qty;
         else merged.push({ ...item });
       });
+
       tableRooms.set(channel, { cart: [], sessionOrder: merged });
 
       await pusherServer.trigger(channel, "cart-update", { cart: [] });
       await pusherServer.trigger(channel, "order-snapshot", {
         sessionOrder: merged,
       });
+
       res.json({ ok: true });
     } catch (err: any) {
       console.error("place-order error:", err);
@@ -354,11 +384,9 @@ export async function registerRoutes(
       if (action === "create") {
         const result = api.restaurants.create.input.safeParse(req.body);
         if (!result.success)
-          return res
-            .status(400)
-            .json({
-              message: result.error.errors[0]?.message || "Invalid input",
-            });
+          return res.status(400).json({
+            message: result.error.errors[0]?.message || "Invalid input",
+          });
         const restaurant = await storage.createRestaurant({
           ...result.data,
           userId: user.id,
@@ -377,11 +405,9 @@ export async function registerRoutes(
           return res.status(403).json({ message: "Forbidden" });
         const result = api.restaurants.update.input.safeParse(req.body);
         if (!result.success)
-          return res
-            .status(400)
-            .json({
-              message: result.error.errors[0]?.message || "Invalid input",
-            });
+          return res.status(400).json({
+            message: result.error.errors[0]?.message || "Invalid input",
+          });
         const updated = await storage.updateRestaurant(id, result.data);
         return res.json(updated);
       }
@@ -435,11 +461,9 @@ export async function registerRoutes(
       if (action === "create") {
         const result = api.menuItems.create.input.safeParse(req.body);
         if (!result.success)
-          return res
-            .status(400)
-            .json({
-              message: result.error.errors[0]?.message || "Invalid input",
-            });
+          return res.status(400).json({
+            message: result.error.errors[0]?.message || "Invalid input",
+          });
         const restaurant = await storage.getRestaurant(
           result.data.restaurantId,
         );
@@ -456,11 +480,9 @@ export async function registerRoutes(
         if (!item) return res.status(404).json({ message: "Item not found" });
         const result = api.menuItems.update.input.safeParse(req.body);
         if (!result.success)
-          return res
-            .status(400)
-            .json({
-              message: result.error.errors[0]?.message || "Invalid input",
-            });
+          return res.status(400).json({
+            message: result.error.errors[0]?.message || "Invalid input",
+          });
         const updated = await storage.updateMenuItem(id, result.data);
         return res.json(updated);
       }
@@ -533,7 +555,7 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
     location: "Rruga e Marshit, Tetovë 1200",
     latitude: 42.01,
     longitude: 20.97,
-      wifi_password: "12345678", // ✅ add this
+    wifiPassword: "12345678",
   });
   const r2 = await storage.createRestaurant({
     userId: user2.id,
@@ -547,7 +569,7 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
     location: "Bulevardi Iliria, Tetovë 1200",
     latitude: 42.008,
     longitude: 20.965,
-    wifi_password: "12345678", // ✅ add this
+    wifiPassword: "12345678",
   });
   const r3 = await storage.createRestaurant({
     userId: user3.id,
@@ -561,7 +583,7 @@ async function seedDatabase(hashPassword: (pwd: string) => Promise<string>) {
     location: "Sheshi Iliria, Tetovë 1200",
     latitude: 42.012,
     longitude: 20.972,
-    wifi_password: "12345678", // ✅ add this
+    wifiPassword: "12345678",
   });
   const items = [
     {

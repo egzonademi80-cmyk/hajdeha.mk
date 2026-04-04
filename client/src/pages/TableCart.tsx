@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
+import confetti from "canvas-confetti";
 import Pusher from "pusher-js";
 import {
   Plus,
@@ -223,7 +224,7 @@ const t = {
     ],
     aiSystemRules: `1. Përgjigju GJITHMONË në shqip.\n2. Kur rekomandon pjata, përmend emrat SAKTË si janë në meni me çmimet.\n3. Nëse shporta ka artikuj, suggjero diçka plotësuese (pije, ëmbëlsirë).\n4. Përgjigjet duhet të jenë TË SHKURTRA — max 3-4 fjali.\n5. Mos huto informacione për pjata që nuk janë në meni.\n6. Përdor emoji me moderim.`,
     callWaiter: "Thirr kamarierin",
-    callWaiterToOrder: "Thirr kamarierin për të porositur",
+    callWaiterToOrder: "Thirr kamarierin",
     orderPlaced: "Porosia u dërgua",
     confirmingOrder: "Duke konfirmuar porosinë…",
     orderConfirmed: "Porosia juaj u vendos! ✓",
@@ -1775,7 +1776,22 @@ function AIWaiterPanel({
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const channelName = `table-${restaurantSlug}-${tableNumber}`;
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
 
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
   const getDefaultLang = (): Lang => {
     const saved = localStorage.getItem("hajdeha_lang") as Lang | null;
     if (saved && ["al", "mk", "en"].includes(saved)) return saved;
@@ -1784,7 +1800,37 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     if (bl.startsWith("mk")) return "mk";
     return "en";
   };
+  const playSuccessChime = () => {
+    try {
+      const ctx = new AudioContext();
+      const notes = [523, 659, 784]; // C, E, G — major chord
+      notes.forEach((freq, i) => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.frequency.value = freq;
+        o.type = "sine";
+        const start = ctx.currentTime + i * 0.12;
+        g.gain.setValueAtTime(0, start);
+        g.gain.linearRampToValueAtTime(0.12, start + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+        o.start(start);
+        o.stop(start + 0.4);
+      });
+    } catch {}
+  };
 
+  const fireConfetti = () => {
+    confetti({
+      particleCount: 80,
+      spread: 60,
+      origin: { y: 0.7 },
+      colors: ["#f97316", "#fb923c", "#fdba74", "#ffffff", "#fef3c7"],
+      scalar: 0.9,
+      ticks: 80,
+    });
+  };
   const [lang, setLang] = useState<Lang>(getDefaultLang);
   const tr = t[lang];
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -1945,7 +1991,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       setTimeout(() => {
         isLocal.current = false;
       }, 200);
-      // Keep the timestamp fresh so friends joining the same table can share the cart
       if (newCart.length > 0) {
         localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
       }
@@ -2076,7 +2121,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     fetch("/api/table/place-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: channelName, items: cart }),
+      body: JSON.stringify({ channel: channelName, cart: cart }), // ← items → cart
     }).catch(() => {});
 
     const timer = setTimeout(() => {
@@ -2094,6 +2139,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   }, [orderConfirmedDone, syncCart, channelName]);
 
   const addItem = (item: MenuItem) => {
+    if (navigator.vibrate) navigator.vibrate(50);
     setCart((prev) => {
       // Match by item id AND current user — each person's items stay separate
       const idx = prev.findIndex((i) => i.id === item.id && i.addedBy === myId);
@@ -2119,6 +2165,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
   // When addedBy is provided, only affect that person's entry; otherwise affect any
   const updateQty = (id: number, delta: number, addedBy?: string) => {
+    if (delta < 0 && navigator.vibrate) navigator.vibrate([30, 20, 30]);
     setCart((prev) => {
       const next = prev
         .map((i) => {
@@ -2228,7 +2275,29 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         .shimmer { background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.28) 50%,transparent 100%); animation: shimmer 1.4s infinite; }
         html, body { overscroll-behavior: none; }
       `}</style>
-
+      <AnimatePresence>
+        {!isOnline && (
+          <motion.div
+            initial={{ y: -60, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -60, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            className="fixed top-0 left-0 right-0 z-[60] flex justify-center"
+            style={{ paddingTop: "max(8px, env(safe-area-inset-top, 8px))" }}
+          >
+            <div className="mx-3 flex items-center gap-2.5 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 px-4 py-2.5 rounded-2xl shadow-xl text-sm font-semibold">
+              <WifiOff className="h-4 w-4 flex-shrink-0" />
+              <span>
+                {lang === "al"
+                  ? "Jeni offline — ndryshimet do të sinkronizohen"
+                  : lang === "mk"
+                    ? "Сте офлајн — промените ќе се синхронизираат"
+                    : "You're offline — changes will sync when reconnected"}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Bill Split Drawer */}
       <BillSplitDrawer
         open={splitOpen}
@@ -2870,6 +2939,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                                 setTimeout(() => {
                                   setOrderConfirming(false);
                                   setOrderConfirmedDone(true);
+                                  // 🎉 Fire confetti + chime
+                                  fireConfetti();
+                                  playSuccessChime();
+                                  if (navigator.vibrate)
+                                    navigator.vibrate([50, 30, 100]);
                                 }, 2000);
                               }}
                               className="w-full rounded-2xl bg-foreground dark:bg-stone-100 flex items-center justify-center gap-2.5 active:opacity-80 transition-opacity shadow-sm disabled:opacity-80"
