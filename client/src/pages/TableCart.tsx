@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import confetti from "canvas-confetti";
 import Pusher from "pusher-js";
 import {
+  Lock,
   Plus,
   Minus,
   ShoppingBag,
@@ -401,7 +402,7 @@ const t = {
       {
         icon: "🗂️",
         title: "Филтрирај по категорија",
-        desc: "Притиснете ги копчињата за категории на врвот за да видите само она што го сакате.",
+        desc: "Притиснете ги копчињата за категории на врвt�т за да видите само она што го сакате.",
       },
       {
         icon: "➕",
@@ -533,7 +534,70 @@ const t = {
     ],
   },
 } as const;
+function SwipeToDelete({
+  children,
+  onDelete,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onDelete: () => void;
+  disabled: boolean;
+}) {
+  const [offsetX, setOffsetX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startX = useRef(0);
+  const THRESHOLD = -80;
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (disabled) return;
+    startX.current = e.touches[0].clientX;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (disabled || !isDragging) return;
+    const delta = e.touches[0].clientX - startX.current;
+    if (delta < 0) setOffsetX(Math.max(delta, -100));
+  };
+
+  const handleTouchEnd = () => {
+    if (disabled) return;
+    setIsDragging(false);
+    if (offsetX < THRESHOLD) {
+      onDelete();
+    }
+    setOffsetX(0);
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl">
+      {/* Red delete background */}
+      <div className="absolute inset-0 bg-red-500 flex items-center justify-end pr-5 rounded-2xl">
+        <div className="flex flex-col items-center gap-1">
+          <X className="h-5 w-5 text-white" />
+          <span className="text-[10px] text-white font-bold">
+            {Math.abs(offsetX) > 40 ? "Release" : "Swipe"}
+          </span>
+        </div>
+      </div>
+      {/* Swipeable content */}
+      <motion.div
+        animate={{ x: offsetX }}
+        transition={
+          isDragging
+            ? { duration: 0 }
+            : { type: "spring", stiffness: 400, damping: 30 }
+        }
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="relative"
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
 // ─── Bill Split Drawer ────────────────────────────────────────────────────────
 const PERSON_COLORS = [
   {
@@ -2182,7 +2246,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   // Merge sessionOrder (already ordered) + cart (new items) for display
   // This ensures 2nd+ orders show the full accumulated cart
   const fullCart = useMemo(() => {
-    // Deep copy to avoid mutating sessionOrder state
+    // While order is being confirmed, only show sessionOrder to avoid doubling
+    if (orderConfirming || orderConfirmedDone) {
+      return sessionOrder;
+    }
+
     const merged = sessionOrder.map((item) => ({ ...item }));
     cart.forEach((item) => {
       const existing = merged.find(
@@ -2192,8 +2260,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       else merged.push({ ...item });
     });
     return merged;
-  }, [sessionOrder, cart]);
-
+  }, [sessionOrder, cart, orderConfirming, orderConfirmedDone]);
   const total = fullCart.reduce((s, i) => s + i.price * i.qty, 0);
   const itemCount = fullCart.reduce((s, i) => s + i.qty, 0);
 
@@ -2758,7 +2825,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                         {tr.yourOrder(tableNumber)}
                       </p>
                       {(() => {
-                        // Assign a stable color to each unique person in the cart
                         const uniqueIds = Array.from(
                           new Set(
                             fullCart.map((i) => i.addedBy).filter(Boolean),
@@ -2779,65 +2845,108 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             : item.name;
                           const color = personColor(item.addedBy);
                           const isMe = item.addedBy === myId;
+                          const isInSession = sessionOrder.some(
+                            (s) =>
+                              s.id === item.id && s.addedBy === item.addedBy,
+                          );
+                          const isInCart = cart.some(
+                            (c) =>
+                              c.id === item.id && c.addedBy === item.addedBy,
+                          );
+                          const isLocked = isInSession && !isInCart;
+                          const canSwipe = !isLocked;
+
                           return (
-                            <motion.div
+                            <SwipeToDelete
                               key={`${item.id}-${item.addedBy ?? "shared"}`}
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
-                              className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-stone-200 dark:border-orange-800/50"
+                              onDelete={() =>
+                                updateQty(item.id, -item.qty, item.addedBy)
+                              }
+                              disabled={!canSwipe}
                             >
-                              {/* Person color dot */}
-                              {color && (
-                                <div
-                                  className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${color.dot}`}
-                                />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <p className="text-sm font-semibold text-foreground truncate">
-                                    {displayName}
+                              <motion.div
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -8 }}
+                                className="flex items-center gap-3 p-3.5 bg-white dark:bg-stone-800/60 rounded-2xl border border-stone-200 dark:border-orange-800/50"
+                              >
+                                {color && (
+                                  <div
+                                    className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${color.dot}`}
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <p className="text-sm font-semibold text-foreground truncate">
+                                      {displayName}
+                                    </p>
+                                    {isMe && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-muted text-muted-foreground">
+                                        {tr.splitYou}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-primary font-mono mt-0.5">
+                                    {item.price} × {item.qty} ={" "}
+                                    <span className="font-bold">
+                                      {item.price * item.qty}
+                                    </span>{" "}
+                                    DEN
                                   </p>
-                                  {isMe && (
-                                    <span
-                                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 bg-muted text-muted-foreground`}
-                                    >
-                                      {tr.splitYou}
-                                    </span>
-                                  )}
                                 </div>
-                                <p className="text-xs text-primary font-mono mt-0.5">
-                                  {item.price} × {item.qty} ={" "}
-                                  <span className="font-bold">
-                                    {item.price * item.qty}
-                                  </span>{" "}
-                                  DEN
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
-                                <button
-                                  data-testid={`button-cart-decrease-${item.id}`}
-                                  onClick={() =>
-                                    updateQty(item.id, -1, item.addedBy)
-                                  }
-                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                                >
-                                  <Minus className="h-3 w-3 text-muted-foreground" />
-                                </button>
-                                <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
-                                  {item.qty}
-                                </span>
-                                <button
-                                  data-testid={`button-cart-increase-${item.id}`}
-                                  onClick={() =>
-                                    updateQty(item.id, 1, item.addedBy)
-                                  }
-                                  className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
-                                >
-                                  <Plus className="h-3 w-3 text-muted-foreground" />
-                                </button>
-                              </div>
-                            </motion.div>
+                                <div className="flex items-center gap-1 bg-muted rounded-xl px-1.5 py-1 flex-shrink-0">
+                                  <button
+                                    data-testid={`button-cart-decrease-${item.id}`}
+                                    onClick={() => {
+                                      if (isLocked) {
+                                        const msg =
+                                          lang === "al"
+                                            ? "Ky artikull është porositur tashmë."
+                                            : lang === "mk"
+                                              ? "Овој артикл е веќе нарачан."
+                                              : "This item is already ordered.";
+                                        alert(msg);
+                                        return;
+                                      }
+                                      updateQty(item.id, -1, item.addedBy);
+                                    }}
+                                    className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                                  >
+                                    {isLocked ? (
+                                      <Lock className="h-3 w-3 text-muted-foreground" />
+                                    ) : (
+                                      <Minus className="h-3 w-3 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                  <span className="text-sm font-bold text-foreground w-5 text-center font-mono">
+                                    {item.qty}
+                                  </span>
+                                  <button
+                                    data-testid={`button-cart-increase-${item.id}`}
+                                    onClick={() => {
+                                      if (isLocked) {
+                                        const msg =
+                                          lang === "al"
+                                            ? "Ky artikull është porositur tashmë."
+                                            : lang === "mk"
+                                              ? "Овој артикл е веќе нарачан."
+                                              : "This item is already ordered.";
+                                        alert(msg);
+                                        return;
+                                      }
+                                      updateQty(item.id, 1, item.addedBy);
+                                    }}
+                                    className="h-7 w-7 rounded-lg flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                                  >
+                                    {isLocked ? (
+                                      <Lock className="h-3 w-3 text-muted-foreground" />
+                                    ) : (
+                                      <Plus className="h-3 w-3 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                </div>
+                              </motion.div>
+                            </SwipeToDelete>
                           );
                         });
                       })()}
