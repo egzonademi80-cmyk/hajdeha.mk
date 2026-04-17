@@ -57,6 +57,79 @@ const LANG_KEY = "hajdeha-lang" as const;
 const DEFAULT_COORDS: [number, number] = [42.01, 20.97];
 const LEAFLET_CDN = "https://unpkg.com/leaflet@1.7.1/dist/images";
 
+// ─── Category name translations ───────────────────────────────────────────────
+
+const CATEGORY_NAMES: Record<string, { al: string; mk: string }> = {
+  food: { al: "Ushqim", mk: "Храна" },
+  foods: { al: "Ushqime", mk: "Храна" },
+  drinks: { al: "Pije", mk: "Пијалоци" },
+  beverages: { al: "Pije", mk: "Пијалоци" },
+  coffee: { al: "Kafe", mk: "Кафе" },
+  coffees: { al: "Kafeja", mk: "Кафиња" },
+  dessert: { al: "Ëmbëlsirë", mk: "Десерт" },
+  desserts: { al: "Ëmbëlsirat", mk: "Десерти" },
+  sweet: { al: "Të ëmbla", mk: "Слатко" },
+  sweets: { al: "Ëmbëlsirat", mk: "Слатки" },
+  mains: { al: "Pjata kryesore", mk: "Главни јадења" },
+  main: { al: "Pjata kryesore", mk: "Главно јадење" },
+  starters: { al: "Antipastet", mk: "Предјадења" },
+  starter: { al: "Antipaste", mk: "Предјадење" },
+  salads: { al: "Sallata", mk: "Салати" },
+  salad: { al: "Sallatë", mk: "Салата" },
+  soups: { al: "Supa", mk: "Супи" },
+  soup: { al: "Supë", mk: "Супа" },
+  pizza: { al: "Picë", mk: "Пица" },
+  pizzas: { al: "Pica", mk: "Пици" },
+  burgers: { al: "Hamburgerë", mk: "Бургери" },
+  burger: { al: "Hamburger", mk: "Бургер" },
+  grill: { al: "Skarë", mk: "Скара" },
+  grills: { al: "Skarë", mk: "Скара" },
+  sandwiches: { al: "Sanduiçe", mk: "Сендвичи" },
+  sandwich: { al: "Sanduiç", mk: "Сендвич" },
+  pasta: { al: "Paste", mk: "Тестенини" },
+  seafood: { al: "Fruta deti", mk: "Морска храна" },
+  meat: { al: "Mish", mk: "Месо" },
+  chicken: { al: "Pule", mk: "Пилешко" },
+  snacks: { al: "Snacks", mk: "Грицки" },
+  breakfast: { al: "Mëngjes", mk: "Појадок" },
+  lunch: { al: "Drekë", mk: "Ручек" },
+  dinner: { al: "Darkë", mk: "Вечера" },
+  specials: { al: "Specialitete", mk: "Специјалитети" },
+  special: { al: "Specialitet", mk: "Специјалитет" },
+  vegetarian: { al: "Vegjetarian", mk: "Вегетаријанско" },
+  vegan: { al: "Vegan", mk: "Веганско" },
+  sides: { al: "Anëse", mk: "Прилози" },
+  side: { al: "Anëse", mk: "Прилог" },
+  sauces: { al: "Salca", mk: "Сосови" },
+  alcohol: { al: "Alkool", mk: "Алкохол" },
+  wine: { al: "Verë", mk: "Вино" },
+  beer: { al: "Birrë", mk: "Пиво" },
+  cocktails: { al: "Kokteje", mk: "Коктели" },
+  juices: { al: "Lëngje", mk: "Сокови" },
+  juice: { al: "Lëng", mk: "Сок" },
+  tea: { al: "Çaj", mk: "Чај" },
+  water: { al: "Ujë", mk: "Вода" },
+  extra: { al: "Ekstra", mk: "Екстра" },
+  extras: { al: "Ekstra", mk: "Екстра" },
+  "hot drinks": { al: "Pije të nxehta", mk: "Топли пијалоци" },
+  "hot drink": { al: "Pije e nxehtë", mk: "Топол пијалок" },
+  "cold drinks": { al: "Pije të ftohta", mk: "Ладни пијалоци" },
+  "soft drinks": { al: "Pije freskuese", mk: "Безалкохолни пијалоци" },
+  appetizers: { al: "Antipastet", mk: "Предјадења" },
+  appetizer: { al: "Antipaste", mk: "Предјадење" },
+  wraps: { al: "Rolat", mk: "Ролати" },
+  wrap: { al: "Rolat", mk: "Ролат" },
+  sushi: { al: "Sushi", mk: "Суши" },
+  tacos: { al: "Takos", mk: "Такос" },
+};
+
+function getCategoryDisplay(cat: string, lang: "en" | "al" | "mk"): string {
+  if (lang === "en") return cat;
+  const entry = CATEGORY_NAMES[cat.toLowerCase().trim()];
+  if (entry) return entry[lang];
+  return cat;
+}
+
 // ─── Translations ─────────────────────────────────────────────────────────────
 
 const translations: Record<string, any> = {
@@ -3327,7 +3400,7 @@ export default function PublicMenu() {
                   }}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
                 >
-                  {cat}
+                  {getCategoryDisplay(cat, lang)}
                 </button>
               ))}
             </div>
@@ -3386,7 +3459,7 @@ export default function PublicMenu() {
                 <div className="flex items-center gap-3 mb-5">
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent to-stone-200 dark:to-stone-700" />
                   <h2 className="font-display font-bold text-xl text-primary px-4 py-1.5 bg-primary/5 dark:bg-primary/10 rounded-full">
-                    {category}
+                    {getCategoryDisplay(category, lang)}
                   </h2>
                   <div className="h-px flex-1 bg-gradient-to-l from-transparent to-stone-200 dark:to-stone-700" />
                 </div>
