@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -10,6 +10,9 @@ import {
   Receipt,
   ChevronLeft,
   ShoppingBag,
+  UserPlus,
+  X,
+  User,
 } from "lucide-react";
 
 interface MenuItem {
@@ -32,8 +35,16 @@ interface TableOrder {
   startedAt: Date | null;
 }
 
+interface PersonTab {
+  name: string;
+  items: OrderItem[];
+  startedAt: Date | null;
+}
+
 const RESTAURANT_SLUG = "embeltoresport";
-const TABLE_COUNT = 16;
+const TABLE_COUNT = 6;
+const TABLES_KEY = "pos-bujar-tables-v2";
+const PERSONS_KEY = "pos-bujar-persons-v1";
 
 const emptyTable = (): TableOrder => ({ items: [], startedAt: null });
 
@@ -41,25 +52,42 @@ function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
 }
 
+type ActiveSlot =
+  | { kind: "table"; idx: number }
+  | { kind: "person"; idx: number }
+  | null;
+
 type Screen = "tables" | "menu" | "order";
 
 export default function POS() {
   const [tables, setTables] = useState<TableOrder[]>(() => {
     try {
-      const saved = localStorage.getItem("pos-tables-v1");
+      const saved = localStorage.getItem(TABLES_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as TableOrder[];
-        // Ensure correct length
         if (parsed.length === TABLE_COUNT) return parsed;
       }
     } catch {}
     return Array.from({ length: TABLE_COUNT }, emptyTable);
   });
-  const [activeTable, setActiveTable] = useState<number | null>(null);
+
+  const [personTabs, setPersonTabs] = useState<PersonTab[]>(() => {
+    try {
+      const saved = localStorage.getItem(PERSONS_KEY);
+      if (saved) return JSON.parse(saved) as PersonTab[];
+    } catch {}
+    return [];
+  });
+
+  const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [screen, setScreen] = useState<Screen>("tables");
   const [payConfirm, setPayConfirm] = useState(false);
-  const [justPaid, setJustPaid] = useState<number | null>(null);
+  const [justPaid, setJustPaid] = useState<ActiveSlot>(null);
+  const [showNewPerson, setShowNewPerson] = useState(false);
+  const [newPersonName, setNewPersonName] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [, forceUpdate] = useState(0);
 
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["pos-restaurant"],
@@ -89,117 +117,164 @@ export default function POS() {
     [menuItems, activeCategory],
   );
 
-  const currentTable = activeTable !== null ? tables[activeTable] : null;
+  // Current order (either a table or a person tab)
+  const currentOrder: TableOrder | PersonTab | null = useMemo(() => {
+    if (!active) return null;
+    if (active.kind === "table") return tables[active.idx] ?? null;
+    return personTabs[active.idx] ?? null;
+  }, [active, tables, personTabs]);
 
-  const tableTotal = (t: TableOrder) =>
-    t.items.reduce((s, i) => s + i.price * i.qty, 0);
-  const tableCount = (t: TableOrder) => t.items.reduce((s, i) => s + i.qty, 0);
+  const orderTotal = (o: TableOrder | PersonTab) =>
+    o.items.reduce((s, i) => s + i.price * i.qty, 0);
+  const orderCount = (o: TableOrder | PersonTab) =>
+    o.items.reduce((s, i) => s + i.qty, 0);
 
-  const elapsed = (t: TableOrder) => {
-    if (!t.startedAt) return null;
+  const elapsed = (o: TableOrder | PersonTab) => {
+    if (!o.startedAt) return null;
     const mins = Math.floor(
-      (Date.now() - new Date(t.startedAt).getTime()) / 60000,
+      (Date.now() - new Date(o.startedAt).getTime()) / 60000,
     );
     if (mins < 1) return "< 1 min";
     if (mins < 60) return `${mins}min`;
     return `${Math.floor(mins / 60)}h${mins % 60}m`;
   };
 
+  // ── Shared mutations ──
   const addItem = (item: MenuItem) => {
-    if (activeTable === null) return;
-    setTables((prev) => {
-      const next = [...prev];
-      const table = {
-        ...next[activeTable],
-        items: [...next[activeTable].items],
-      };
-      const idx = table.items.findIndex((i) => i.id === item.id);
+    if (!active) return;
+    const add = (order: TableOrder | PersonTab): TableOrder | PersonTab => {
+      const items = [...order.items];
+      const idx = items.findIndex((i) => i.id === item.id);
       if (idx >= 0) {
-        table.items[idx] = {
-          ...table.items[idx],
-          qty: table.items[idx].qty + 1,
-        };
+        items[idx] = { ...items[idx], qty: items[idx].qty + 1 };
       } else {
-        table.items.push({
+        items.push({
           id: item.id,
           name: item.name,
           price: parsePrice(item.price),
           qty: 1,
         });
       }
-      if (!table.startedAt) table.startedAt = new Date();
-      next[activeTable] = table;
-      return next;
-    });
+      return { ...order, items, startedAt: order.startedAt ?? new Date() };
+    };
+
+    if (active.kind === "table") {
+      setTables((prev) => {
+        const next = [...prev];
+        next[active.idx] = add(next[active.idx]) as TableOrder;
+        return next;
+      });
+    } else {
+      setPersonTabs((prev) => {
+        const next = [...prev];
+        next[active.idx] = add(next[active.idx]) as PersonTab;
+        return next;
+      });
+    }
   };
 
   const updateQty = (itemId: number, delta: number) => {
-    if (activeTable === null) return;
-    setTables((prev) => {
-      const next = [...prev];
-      const table = {
-        ...next[activeTable],
-        items: [...next[activeTable].items],
-      };
-      table.items = table.items
+    if (!active) return;
+    const upd = (order: TableOrder | PersonTab): TableOrder | PersonTab => {
+      const items = order.items
         .map((i) => (i.id === itemId ? { ...i, qty: i.qty + delta } : i))
         .filter((i) => i.qty > 0);
-      if (table.items.length === 0) table.startedAt = null;
-      next[activeTable] = table;
-      return next;
-    });
+      return { ...order, items, startedAt: items.length ? order.startedAt : null };
+    };
+    if (active.kind === "table") {
+      setTables((prev) => {
+        const next = [...prev];
+        next[active.idx] = upd(next[active.idx]) as TableOrder;
+        return next;
+      });
+    } else {
+      setPersonTabs((prev) => {
+        const next = [...prev];
+        next[active.idx] = upd(next[active.idx]) as PersonTab;
+        return next;
+      });
+    }
   };
 
-  const payTable = () => {
-    if (activeTable === null) return;
-    const idx = activeTable;
-    setTables((prev) => {
-      const next = [...prev];
-      next[idx] = emptyTable();
-      return next;
-    });
-    setJustPaid(idx);
+  const payOrder = () => {
+    if (!active) return;
+    const slot = active;
+    if (slot.kind === "table") {
+      setTables((prev) => {
+        const next = [...prev];
+        next[slot.idx] = emptyTable();
+        return next;
+      });
+    } else {
+      setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
+    }
+    setJustPaid(slot);
     setPayConfirm(false);
-    setActiveTable(null);
+    setActive(null);
     setScreen("tables");
     setTimeout(() => setJustPaid(null), 2500);
   };
 
-  const [, forceUpdate] = useState(0);
+  const deletePersonTab = (idx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
+  };
 
-  // Override PWA manifest so Chrome installs POS not HAJDE HA
+  const openSlot = (slot: ActiveSlot) => {
+    setActive(slot);
+    setScreen("menu");
+    setActiveCategory("All");
+  };
+
+  const handleCreatePerson = () => {
+    const trimmed = newPersonName.trim();
+    if (!trimmed) return;
+    setPersonTabs((prev) => {
+      const newIdx = prev.length;
+      const newTab: PersonTab = { name: trimmed, items: [], startedAt: null };
+      const next = [...prev, newTab];
+      // Open it after state settles
+      setTimeout(() => {
+        setActive({ kind: "person", idx: newIdx });
+        setScreen("menu");
+        setActiveCategory("All");
+      }, 50);
+      return next;
+    });
+    setNewPersonName("");
+    setShowNewPerson(false);
+  };
+
+  // PWA manifest override
   useEffect(() => {
-    const link = document.querySelector("link[rel=\"manifest\"]") as HTMLLinkElement;
+    const link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
     if (link) link.href = "/pos-manifest.json";
     return () => { if (link) link.href = "/manifest.json"; };
   }, []);
-  useEffect(() => {
-    // Override manifest for POS page
-    const link = document.querySelector(
-      'link[rel="manifest"]',
-    ) as HTMLLinkElement;
-    if (link) link.href = "/pos-manifest.json";
-    return () => {
-      if (link) link.href = "/manifest.json";
-    };
-  }, []);
+
   // Tick every 30s so elapsed times update live
   useEffect(() => {
     const id = setInterval(() => forceUpdate((n) => n + 1), 30000);
     return () => clearInterval(id);
   }, []);
 
-  // Persist tables to localStorage on every change
+  // Persist to localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem("pos-tables-v1", JSON.stringify(tables));
-    } catch {}
+    try { localStorage.setItem(TABLES_KEY, JSON.stringify(tables)); } catch {}
   }, [tables]);
+  useEffect(() => {
+    try { localStorage.setItem(PERSONS_KEY, JSON.stringify(personTabs)); } catch {}
+  }, [personTabs]);
 
-  const tableStatus = (t: TableOrder): "empty" | "fresh" | "mid" | "late" => {
-    if (!t.startedAt || t.items.length === 0) return "empty";
+  // Focus name input when modal opens
+  useEffect(() => {
+    if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
+  }, [showNewPerson]);
+
+  const tableStatus = (o: TableOrder | PersonTab): "empty" | "fresh" | "mid" | "late" => {
+    if (!o.startedAt || o.items.length === 0) return "empty";
     const mins = Math.floor(
-      (Date.now() - new Date(t.startedAt).getTime()) / 60000,
+      (Date.now() - new Date(o.startedAt).getTime()) / 60000,
     );
     if (mins < 15) return "fresh";
     if (mins < 30) return "mid";
@@ -237,11 +312,21 @@ export default function POS() {
     },
   };
 
-  const openTable = (idx: number) => {
-    setActiveTable(idx);
-    setScreen("menu");
-    setActiveCategory("All");
-  };
+  // Label shown in header
+  const activeLabel =
+    active === null
+      ? null
+      : active.kind === "table"
+        ? `T${active.idx + 1}`
+        : personTabs[active.idx]?.name ?? "—";
+
+  const allTotal =
+    tables.reduce((s, t) => s + orderTotal(t), 0) +
+    personTabs.reduce((s, p) => s + orderTotal(p), 0);
+
+  const allActive =
+    tables.filter((t) => t.items.length > 0).length +
+    personTabs.filter((p) => p.items.length > 0).length;
 
   return (
     <div
@@ -273,8 +358,8 @@ export default function POS() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold leading-none truncate">
             {restaurant?.name || "POS"}
-            {activeTable !== null && (
-              <span className="text-amber-400"> · T{activeTable + 1}</span>
+            {activeLabel && (
+              <span className="text-amber-400"> · {activeLabel}</span>
             )}
           </p>
           <p
@@ -282,30 +367,27 @@ export default function POS() {
             style={{ fontFamily: "'DM Mono', monospace" }}
           >
             {screen === "tables"
-              ? `${tables.filter((t) => t.items.length > 0).length}/${TABLE_COUNT} ACTIVE`
+              ? `${allActive} ACTIVE`
               : screen === "menu"
                 ? "ADD ITEMS"
                 : "ORDER"}
           </p>
         </div>
         {/* Cart badge — only in menu screen */}
-        {screen === "menu" &&
-          activeTable !== null &&
-          currentTable &&
-          currentTable.items.length > 0 && (
-            <button
-              onClick={() => setScreen("order")}
-              className="flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
+        {screen === "menu" && active !== null && currentOrder && currentOrder.items.length > 0 && (
+          <button
+            onClick={() => setScreen("order")}
+            className="flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
+          >
+            <ShoppingBag className="h-3.5 w-3.5 text-black" />
+            <span
+              className="text-xs font-bold text-black"
+              style={{ fontFamily: "'DM Mono', monospace" }}
             >
-              <ShoppingBag className="h-3.5 w-3.5 text-black" />
-              <span
-                className="text-xs font-bold text-black"
-                style={{ fontFamily: "'DM Mono', monospace" }}
-              >
-                {tableCount(currentTable)} · {tableTotal(currentTable)} DEN
-              </span>
-            </button>
-          )}
+              {orderCount(currentOrder)} · {orderTotal(currentOrder)} DEN
+            </span>
+          </button>
+        )}
       </div>
 
       {/* ── SCREEN: TABLES ── */}
@@ -317,66 +399,178 @@ export default function POS() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.18 }}
-            className="flex-1 overflow-y-auto p-4"
+            className="flex-1 overflow-y-auto p-4 space-y-4"
           >
-            <div className="grid grid-cols-4 gap-3">
-              {tables.map((table, idx) => {
-                const occupied = table.items.length > 0;
-                const wasJustPaid = justPaid === idx;
-                return (
-                  <motion.button
-                    key={idx}
-                    onClick={() => openTable(idx)}
-                    whileTap={{ scale: 0.9 }}
-                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
-                      wasJustPaid
-                        ? "bg-emerald-500/20 border-emerald-500/40"
-                        : `${statusColors[tableStatus(table)].bg} ${statusColors[tableStatus(table)].border}`
-                    }`}
-                  >
-                    {wasJustPaid ? (
-                      <CheckCircle className="h-6 w-6 text-emerald-400" />
-                    ) : (
-                      <>
-                        <span
-                          className={`text-sm font-bold font-['DM_Mono'] ${statusColors[tableStatus(table)].text}`}
-                        >
-                          T{idx + 1}
-                        </span>
-                        {occupied && (
-                          <>
-                            <span
-                              className={`text-[10px] font-bold font-['DM_Mono'] ${statusColors[tableStatus(table)].time}`}
-                            >
-                              {tableTotal(table)}
-                            </span>
-                            {table.startedAt && (
+            {/* ── Fixed tables grid ── */}
+            <div>
+              <p
+                className="text-[10px] text-white/25 mb-2 px-0.5"
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                TAVOLINA
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {tables.map((table, idx) => {
+                  const status = tableStatus(table);
+                  const c = statusColors[status];
+                  const wasJustPaid =
+                    justPaid?.kind === "table" && justPaid.idx === idx;
+                  return (
+                    <motion.button
+                      key={idx}
+                      onClick={() => openSlot({ kind: "table", idx })}
+                      whileTap={{ scale: 0.92 }}
+                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
+                        wasJustPaid
+                          ? "bg-emerald-500/20 border-emerald-500/40"
+                          : `${c.bg} ${c.border}`
+                      }`}
+                    >
+                      {wasJustPaid ? (
+                        <CheckCircle className="h-6 w-6 text-emerald-400" />
+                      ) : (
+                        <>
+                          <span
+                            className={`text-sm font-bold font-['DM_Mono'] ${c.text}`}
+                          >
+                            T{idx + 1}
+                          </span>
+                          {table.items.length > 0 && (
+                            <>
                               <span
-                                className={`text-[9px] font-['DM_Mono'] ${statusColors[tableStatus(table)].time}`}
+                                className={`text-[10px] font-bold font-['DM_Mono'] ${c.time}`}
                               >
-                                {elapsed(table)}
+                                {orderTotal(table)}
                               </span>
+                              {table.startedAt && (
+                                <span className={`text-[9px] font-['DM_Mono'] ${c.time}`}>
+                                  {elapsed(table)}
+                                </span>
+                              )}
+                              <motion.div
+                                animate={
+                                  status === "late" ? { scale: [1, 1.4, 1] } : {}
+                                }
+                                transition={{ duration: 1.2, repeat: Infinity }}
+                                className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${c.dot}`}
+                              />
+                            </>
+                          )}
+                        </>
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Person tabs section ── */}
+            <div>
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <p
+                  className="text-[10px] text-white/25"
+                  style={{ fontFamily: "'DM Mono', monospace" }}
+                >
+                  PERSONAT
+                </p>
+                <button
+                  onClick={() => setShowNewPerson(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold active:bg-amber-500/25"
+                >
+                  <UserPlus className="h-3 w-3" />
+                  Krijo
+                </button>
+              </div>
+
+              {personTabs.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 flex items-center justify-center py-6">
+                  <p className="text-white/20 text-xs">Nuk ka persona aktiv</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {personTabs.map((person, idx) => {
+                    const status = tableStatus(person);
+                    const c = statusColors[status];
+                    const wasJustPaid =
+                      justPaid?.kind === "person" && justPaid.idx === idx;
+                    const occupied = person.items.length > 0;
+                    return (
+                      <motion.button
+                        key={idx}
+                        onClick={() => openSlot({ kind: "person", idx })}
+                        whileTap={{ scale: 0.98 }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border relative transition-all duration-500 ${
+                          wasJustPaid
+                            ? "bg-emerald-500/20 border-emerald-500/40"
+                            : `${c.bg} ${c.border}`
+                        }`}
+                      >
+                        {wasJustPaid ? (
+                          <>
+                            <CheckCircle className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+                            <span className="text-sm text-emerald-400 font-semibold">
+                              Paguar ✓
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <div
+                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${occupied ? "bg-amber-500/20" : "bg-white/6"}`}
+                            >
+                              <User
+                                className={`h-4 w-4 ${occupied ? "text-amber-400" : "text-white/30"}`}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className={`text-sm font-semibold ${c.text} truncate`}>
+                                {person.name}
+                              </p>
+                              {occupied ? (
+                                <p
+                                  className={`text-xs font-bold mt-0.5 ${c.time}`}
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {orderTotal(person)} DEN
+                                  {person.startedAt && (
+                                    <span className="font-normal text-white/25 ml-2">
+                                      {elapsed(person)}
+                                    </span>
+                                  )}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-white/20 mt-0.5">
+                                  Bosh
+                                </p>
+                              )}
+                            </div>
+                            {occupied && status !== "empty" && (
+                              <motion.div
+                                animate={
+                                  status === "late" ? { scale: [1, 1.4, 1] } : {}
+                                }
+                                transition={{ duration: 1.2, repeat: Infinity }}
+                                className={`h-2 w-2 rounded-full flex-shrink-0 ${c.dot}`}
+                              />
                             )}
-                            <motion.div
-                              animate={
-                                tableStatus(table) === "late"
-                                  ? { scale: [1, 1.4, 1] }
-                                  : {}
-                              }
-                              transition={{ duration: 1.2, repeat: Infinity }}
-                              className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${statusColors[tableStatus(table)].dot}`}
-                            />
+                            {!occupied && (
+                              <button
+                                onClick={(e) => deletePersonTab(idx, e)}
+                                className="h-6 w-6 rounded-full bg-white/6 flex items-center justify-center flex-shrink-0 active:bg-red-500/20"
+                              >
+                                <X className="h-3 w-3 text-white/30" />
+                              </button>
+                            )}
                           </>
                         )}
-                      </>
-                    )}
-                  </motion.button>
-                );
-              })}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Status legend */}
-            <div className="mt-4 flex items-center gap-4 px-1">
+            <div className="flex items-center gap-4 px-1">
               {[
                 { dot: "bg-emerald-400", label: "< 15min" },
                 { dot: "bg-amber-400", label: "15–30min" },
@@ -395,7 +589,7 @@ export default function POS() {
             </div>
 
             {/* Summary bar */}
-            <div className="mt-3 p-4 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-between">
               <div>
                 <p
                   className="text-[10px] text-white/30"
@@ -407,7 +601,7 @@ export default function POS() {
                   className="text-xl font-bold text-amber-400"
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  {tables.reduce((s, t) => s + tableTotal(t), 0)}{" "}
+                  {allTotal}{" "}
                   <span className="text-sm text-white/30">DEN</span>
                 </p>
               </div>
@@ -416,14 +610,16 @@ export default function POS() {
                   className="text-[10px] text-white/30"
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  TABLES IN USE
+                  AKTIV
                 </p>
                 <p
                   className="text-xl font-bold text-white"
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  {tables.filter((t) => t.items.length > 0).length}
-                  <span className="text-sm text-white/30">/{TABLE_COUNT}</span>
+                  {allActive}
+                  <span className="text-sm text-white/30">
+                    /{TABLE_COUNT + personTabs.length}
+                  </span>
                 </p>
               </div>
             </div>
@@ -463,11 +659,7 @@ export default function POS() {
                 <div className="flex items-center justify-center h-40">
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 1,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                   >
                     <Coffee className="h-7 w-7 text-amber-500" />
                   </motion.div>
@@ -475,9 +667,7 @@ export default function POS() {
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {filteredItems.map((item) => {
-                    const inCart = currentTable?.items.find(
-                      (i) => i.id === item.id,
-                    );
+                    const inCart = currentOrder?.items.find((i) => i.id === item.id);
                     return (
                       <motion.button
                         key={item.id}
@@ -516,7 +706,7 @@ export default function POS() {
         )}
 
         {/* ── SCREEN: ORDER ── */}
-        {screen === "order" && activeTable !== null && currentTable && (
+        {screen === "order" && active !== null && currentOrder && (
           <motion.div
             key="order"
             initial={{ opacity: 0, y: 20 }}
@@ -526,12 +716,12 @@ export default function POS() {
             className="flex-1 flex flex-col overflow-hidden"
           >
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {currentTable.items.length === 0 ? (
+              {currentOrder.items.length === 0 ? (
                 <div className="flex items-center justify-center h-40">
-                  <p className="text-white/20 text-sm">Empty table</p>
+                  <p className="text-white/20 text-sm">Asnjë artikull</p>
                 </div>
               ) : (
-                currentTable.items.map((item) => (
+                currentOrder.items.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center gap-3 p-3 rounded-xl bg-white/4 border border-white/8"
@@ -573,7 +763,7 @@ export default function POS() {
             </div>
 
             {/* Total + Pay */}
-            {currentTable.items.length > 0 && (
+            {currentOrder.items.length > 0 && (
               <div
                 className="flex-shrink-0 p-4 border-t border-white/8 space-y-3"
                 style={{
@@ -583,7 +773,7 @@ export default function POS() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-white/40 text-xs">
                     <Clock className="h-3.5 w-3.5" />
-                    {currentTable.startedAt ? elapsed(currentTable) : "—"}
+                    {currentOrder.startedAt ? elapsed(currentOrder) : "—"}
                   </div>
                   <div className="text-right">
                     <p
@@ -596,7 +786,7 @@ export default function POS() {
                       className="text-2xl font-bold text-white"
                       style={{ fontFamily: "'DM Mono', monospace" }}
                     >
-                      {tableTotal(currentTable)}{" "}
+                      {orderTotal(currentOrder)}{" "}
                       <span className="text-sm text-white/30">DEN</span>
                     </p>
                   </div>
@@ -608,13 +798,13 @@ export default function POS() {
                       onClick={() => setPayConfirm(false)}
                       className="flex-1 h-12 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold"
                     >
-                      Cancel
+                      Anulo
                     </button>
                     <button
-                      onClick={payTable}
+                      onClick={payOrder}
                       className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white"
                     >
-                      ✓ Paid — Cash
+                      ✓ Paguar
                     </button>
                   </div>
                 ) : (
@@ -623,12 +813,60 @@ export default function POS() {
                     className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400"
                   >
                     <Receipt className="h-4 w-4" />
-                    Pay {tableTotal(currentTable)} DEN — Cash
+                    Paguaj {orderTotal(currentOrder)} DEN
                   </button>
                 )}
               </div>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── New Person Modal ── */}
+      <AnimatePresence>
+        {showNewPerson && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/70 z-40"
+              onClick={() => { setShowNewPerson(false); setNewPersonName(""); }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className="fixed left-4 right-4 bottom-1/3 z-50 bg-[#1A1A1A] rounded-3xl p-6 border border-white/10 shadow-2xl"
+            >
+              <p className="text-base font-bold text-white mb-1">Krijo Person</p>
+              <p className="text-xs text-white/30 mb-4">Shkruaj emrin e personit</p>
+              <input
+                ref={nameInputRef}
+                value={newPersonName}
+                onChange={(e) => setNewPersonName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleCreatePerson(); }}
+                placeholder="p.sh. Besart, Mirem, Person1…"
+                className="w-full h-12 rounded-xl bg-white/6 border border-white/12 text-white placeholder-white/20 px-4 text-sm outline-none focus:border-amber-500/50 mb-4"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowNewPerson(false); setNewPersonName(""); }}
+                  className="flex-1 h-11 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold"
+                >
+                  Anulo
+                </button>
+                <button
+                  onClick={handleCreatePerson}
+                  disabled={!newPersonName.trim()}
+                  className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
+                >
+                  Krijo
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
