@@ -246,11 +246,12 @@ const t = {
     billPayHow: "Si do të paguani?",
     cash: "Kesh",
     card: "Kartë",
-    billTextCash: (table: number) =>
+    sendOrder: "Dërgo porosinë",
+    billTextCash: (table: number | string) =>
       `Përshëndetje! Tavolina ${table} dëshiron faturën — me KESH, ju lutem.`,
-    billTextCard: (table: number) =>
+    billTextCard: (table: number | string) =>
       `Përshëndetje! Tavolina ${table} dëshiron faturën — me KARTË, ju lutem.`,
-    waiterMessages: (table: number) => [
+    waiterMessages: (table: number | string) => [
       {
         icon: "🙋",
         label: "Thirr kamarierin",
@@ -359,11 +360,12 @@ const t = {
     billPayHow: "Како ќе платите?",
     cash: "Готово",
     card: "Картичка",
-    billTextCash: (table: number) =>
+    sendOrder: "Испрати нарачка",
+    billTextCash: (table: number | string) =>
       `Здраво! Маса ${table} би сакала сметката — ГОТОВО, ве молам.`,
-    billTextCard: (table: number) =>
+    billTextCard: (table: number | string) =>
       `Здраво! Маса ${table} би сакала сметката — КАРТИЧКА, ве молам.`,
-    waiterMessages: (table: number) => [
+    waiterMessages: (table: number | string) => [
       {
         icon: "🙋",
         label: "Повикај келнер",
@@ -471,11 +473,12 @@ const t = {
     billPayHow: "How will you pay?",
     cash: "Cash",
     card: "Card",
-    billTextCash: (table: number) =>
+    sendOrder: "Send Order",
+    billTextCash: (table: number | string) =>
       `Hi! Table ${table} would like the bill — CASH, please.`,
-    billTextCard: (table: number) =>
+    billTextCard: (table: number | string) =>
       `Hi! Table ${table} would like the bill — CARD, please.`,
-    waiterMessages: (table: number) => [
+    waiterMessages: (table: number | string) => [
       {
         icon: "🙋",
         label: "Call a waiter",
@@ -1907,7 +1910,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [justAdded, setJustAdded] = useState<number | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [waiterSheetOpen, setWaiterSheetOpen] = useState(false);
-  const [waiterCalledFromCart, setWaiterCalledFromCart] = useState(false);
   const [orderConfirming, setOrderConfirming] = useState(false);
   const [orderConfirmedDone, setOrderConfirmedDone] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
@@ -2181,17 +2183,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       return merged;
     });
 
-    // Broadcast the updated sessionOrder to all devices at this table
-    fetch("/api/table/place-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: channelName, cart: cart }), // ← items → cart
-    }).catch(() => {});
-
     const timer = setTimeout(() => {
       setCart([]);
       syncCart([]);
-      setWaiterCalledFromCart(false);
       setOrderConfirmedDone(false);
       setOrderConfirming(false);
       orderProcessedRef.current = false; // Reset for next order
@@ -2241,6 +2235,46 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       syncCart(next);
       return next;
     });
+  };
+
+  // Table display label — uses optional prefix (e.g. "D3" vs "3")
+  const displayTable: string = restaurant?.tablePrefix
+    ? `${restaurant.tablePrefix}${tableNumber}`
+    : String(tableNumber);
+
+  // Send order to backend, trigger success effects, then clear cart via useEffect
+  const handleSendOrder = async () => {
+    if (orderConfirming || orderConfirmedDone || cart.length === 0) return;
+    setOrderConfirming(true);
+    try {
+      const res = await fetch("/api/table/place-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: channelName,
+          cart,
+          tableNumber: displayTable,
+          restaurantName: restaurant?.name ?? "",
+          total: cart.reduce((s, i) => s + i.price * i.qty, 0),
+          timestamp: Date.now(),
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // 🎉 Success — fire effects then let useEffect handle cart clear
+      fireConfetti();
+      playSuccessChime();
+      if (navigator.vibrate) navigator.vibrate([50, 30, 100]);
+      setOrderConfirmedDone(true);
+    } catch {
+      setOrderConfirming(false);
+      alert(
+        lang === "al"
+          ? "Gabim gjatë dërgimit të porosisë. Provoni përsëri."
+          : lang === "mk"
+            ? "Грешка при испраќање на нарачката. Обидете се повторно."
+            : "Error sending order. Please try again.",
+      );
+    }
   };
 
   // Merge sessionOrder (already ordered) + cart (new items) for display
@@ -2454,7 +2488,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         open={waiterSheetOpen}
         onClose={() => setWaiterSheetOpen(false)}
         phoneNumber={restaurant.phoneNumber}
-        tableNumber={tableNumber}
+        tableNumber={displayTable}
         lang={lang}
         receiptItems={fullCart}
         restaurantName={restaurant.name}
@@ -2465,7 +2499,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         restaurantName={restaurant.name}
         menuItems={menuItems}
         cart={cart}
-        tableNumber={tableNumber}
+        tableNumber={displayTable}
         onAddItem={addItem}
         lang={lang}
       />
@@ -2531,7 +2565,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             </p>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-widest">
-                {tr.table} {tableNumber}
+                {tr.table} {displayTable}
               </p>
               {restaurant.wifiPassword && (
                 <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded-full">
@@ -2792,7 +2826,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     {tr.cart}
                   </p>
                   <p className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider">
-                    {tr.table} {tableNumber} · {tr.cartItems(itemCount)}
+                    {tr.table} {displayTable} · {tr.cartItems(itemCount)}
                   </p>
                 </div>
               </div>
@@ -2822,7 +2856,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                   ) : (
                     <>
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1 pb-1 font-mono">
-                        {tr.yourOrder(tableNumber)}
+                        {tr.yourOrder(displayTable)}
                       </p>
                       {(() => {
                         const uniqueIds = Array.from(
@@ -2976,7 +3010,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                     </span>
                   </div>
 
-                  {/* Action buttons row */}
+                  {/* Action buttons row: Split Bill + Send Order */}
                   <div className="flex gap-3">
                     {/* 💸 Split Bill button */}
                     <motion.button
@@ -2990,92 +3024,64 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       </span>
                     </motion.button>
 
-                    {/* Call Waiter button */}
-                    <motion.button
-                      data-testid="button-call-waiter-cart"
-                      onClick={() => {
-                        setWaiterSheetOpen(true);
-                        setWaiterCalledFromCart(true);
-                      }}
-                      whileTap={{ scale: 0.97 }}
-                      className="flex-1 rounded-2xl bg-emerald-500 active:bg-emerald-600 transition-colors shadow-md relative"
-                      style={{ height: 52 }}
-                    >
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-xl bg-white/20 flex items-center justify-center">
-                        <Bell className="h-3.5 w-3.5 text-white" />
-                      </div>
-                      <span className="block text-sm font-bold text-white text-center leading-none px-10">
-                        {tr.callWaiterToOrder}
-                      </span>
-                    </motion.button>
+                    {/* 📤 Send Order button */}
+                    <AnimatePresence mode="wait">
+                      {orderConfirmedDone ? (
+                        <motion.div
+                          key="confirmed"
+                          initial={{ scale: 0.92, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="flex-1 rounded-2xl bg-primary flex items-center justify-center gap-2 shadow-md"
+                          style={{ height: 52 }}
+                        >
+                          <CheckCircle className="h-4 w-4 text-primary-foreground" />
+                          <span className="text-sm font-bold text-primary-foreground">
+                            {tr.orderConfirmed}
+                          </span>
+                        </motion.div>
+                      ) : (
+                        <motion.button
+                          key="send"
+                          data-testid="button-send-order"
+                          whileTap={{ scale: 0.97 }}
+                          disabled={orderConfirming || cart.length === 0}
+                          onClick={handleSendOrder}
+                          className="flex-1 rounded-2xl bg-foreground dark:bg-stone-100 flex items-center justify-center gap-2.5 active:opacity-80 transition-opacity shadow-md disabled:opacity-60"
+                          style={{ height: 52 }}
+                        >
+                          {orderConfirming ? (
+                            <>
+                              <Loader2 className="h-4 w-4 text-background dark:text-stone-900 animate-spin" />
+                              <span className="text-sm font-bold text-background dark:text-stone-900">
+                                {tr.confirmingOrder}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 text-background dark:text-stone-900" />
+                              <span className="text-sm font-bold text-background dark:text-stone-900">
+                                {tr.sendOrder}
+                              </span>
+                            </>
+                          )}
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
                   </div>
 
-                  {/* Order placed button — appears after waiter is called */}
-                  <AnimatePresence>
-                    {waiterCalledFromCart && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 12 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 380,
-                          damping: 30,
-                        }}
-                      >
-                        <AnimatePresence mode="wait">
-                          {orderConfirmedDone ? (
-                            <motion.div
-                              key="confirmed"
-                              initial={{ scale: 0.92, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="w-full rounded-2xl bg-primary flex items-center justify-center gap-2 shadow-sm"
-                              style={{ height: 52 }}
-                            >
-                              <CheckCircle className="h-4 w-4 text-primary-foreground" />
-                              <span className="text-sm font-bold text-primary-foreground">
-                                {tr.orderConfirmed}
-                              </span>
-                            </motion.div>
-                          ) : (
-                            <motion.button
-                              key="place"
-                              data-testid="button-order-placed"
-                              whileTap={{ scale: 0.97 }}
-                              disabled={orderConfirming}
-                              onClick={() => {
-                                setOrderConfirming(true);
-                                setTimeout(() => {
-                                  setOrderConfirming(false);
-                                  setOrderConfirmedDone(true);
-                                  // 🎉 Fire confetti + chime
-                                  fireConfetti();
-                                  playSuccessChime();
-                                  if (navigator.vibrate)
-                                    navigator.vibrate([50, 30, 100]);
-                                }, 2000);
-                              }}
-                              className="w-full rounded-2xl bg-foreground dark:bg-stone-100 flex items-center justify-center gap-2.5 active:opacity-80 transition-opacity shadow-sm disabled:opacity-80"
-                              style={{ height: 52 }}
-                            >
-                              {orderConfirming ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 text-background dark:text-stone-900 animate-spin" />
-                                  <span className="text-sm font-bold text-background dark:text-stone-900">
-                                    {tr.confirmingOrder}
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-sm font-bold text-background dark:text-stone-900">
-                                  {tr.orderPlaced}
-                                </span>
-                              )}
-                            </motion.button>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  {/* 🔔 Secondary Call Waiter button */}
+                  <motion.button
+                    data-testid="button-call-waiter-cart"
+                    onClick={() => setWaiterSheetOpen(true)}
+                    whileTap={{ scale: 0.97 }}
+                    disabled={orderConfirmedDone}
+                    className="w-full h-10 rounded-xl border border-border bg-transparent flex items-center justify-center gap-2 active:bg-muted/60 transition-colors disabled:opacity-40"
+                  >
+                    <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {tr.callWaiter}
+                    </span>
+                  </motion.button>
                 </div>
               )}
             </motion.div>
