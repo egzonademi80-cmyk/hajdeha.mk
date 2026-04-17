@@ -848,7 +848,8 @@ export default function POS() {
                 onChange={(e) => setNewPersonName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreatePerson(); }}
                 placeholder="p.sh. Besart, Mirem, Person1…"
-                className="w-full h-12 rounded-xl bg-white/6 border border-white/12 text-white placeholder-white/20 px-4 text-sm outline-none focus:border-amber-500/50 mb-4"
+                className="w-full h-12 rounded-xl border border-white/12 px-4 text-sm outline-none focus:border-amber-500/50 mb-4"
+                style={{ background: "#2A2A2A", color: "#fff" }}
               />
               <div className="flex gap-2">
                 <button
