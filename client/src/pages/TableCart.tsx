@@ -2242,7 +2242,29 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     ? `${restaurant.tablePrefix}${tableNumber}`
     : String(tableNumber);
 
-  // Send order to backend, trigger success effects, then clear cart via useEffect
+  // Build a WhatsApp order message in the current language
+  const buildOrderWhatsApp = () => {
+    const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const L =
+      lang === "al"
+        ? { title: "Porosi e re", table: "Tavolina", totalLbl: "Totali" }
+        : lang === "mk"
+          ? { title: "Нова нарачка", table: "Маса", totalLbl: "Вкупно" }
+          : { title: "New Order", table: "Table", totalLbl: "Total" };
+    const itemLines = cart.map(
+      (i) => `• ${i.qty}x ${i.name}  ${(i.price * i.qty).toLocaleString()} DEN`,
+    );
+    return [
+      `🍽️ *${L.title} — ${restaurant?.name ?? ""}*`,
+      `📍 ${L.table} ${displayTable}`,
+      ``,
+      ...itemLines,
+      `─────────────────────`,
+      `💰 *${L.totalLbl}: ${total.toLocaleString()} DEN*`,
+    ].join("\n");
+  };
+
+  // Send order to backend, open WhatsApp, fire success effects
   const handleSendOrder = async () => {
     if (orderConfirming || orderConfirmedDone || cart.length === 0) return;
     setOrderConfirming(true);
@@ -2260,7 +2282,16 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // 🎉 Success — fire effects then let useEffect handle cart clear
+
+      // 📲 Open WhatsApp with the order summary
+      const phone = (restaurant?.phoneNumber ?? "").replace(/\D/g, "");
+      const msg = buildOrderWhatsApp();
+      const waUrl = phone
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, "_blank");
+
+      // 🎉 Fire success effects then let useEffect handle cart clear
       fireConfetti();
       playSuccessChime();
       if (navigator.vibrate) navigator.vibrate([50, 30, 100]);
