@@ -2656,24 +2656,30 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               transition={{ duration: 0.18 }}
               className="absolute inset-0 flex flex-col overflow-hidden"
             >
-              <div className="flex-shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto bg-white dark:bg-stone-900 border-b border-border">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setActiveCategory(cat);
-                      menuScrollRef.current?.scrollTo({
-                        top: 0,
-                        behavior: "smooth",
-                      });
-                    }}
-                    className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${activeCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                  >
-                    {cat === tr.allCategories
-                      ? cat
-                      : getCategoryDisplay(cat, lang)}
-                  </button>
-                ))}
+              <div className="flex-shrink-0 relative border-b border-border bg-white dark:bg-stone-900">
+                <div className="flex gap-2 px-4 py-2.5 overflow-x-auto no-scrollbar">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        setActiveCategory(cat);
+                        menuScrollRef.current?.scrollTo({
+                          top: 0,
+                          behavior: "smooth",
+                        });
+                      }}
+                      className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${activeCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                    >
+                      {cat === tr.allCategories
+                        ? cat
+                        : getCategoryDisplay(cat, lang)}
+                    </button>
+                  ))}
+                  {/* Spacer so last pill isn't hidden behind fade */}
+                  <div className="flex-shrink-0 w-8" />
+                </div>
+                {/* Right-edge fade hint */}
+                <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-white dark:from-stone-900 to-transparent" />
               </div>
               <div
                 ref={menuScrollRef}
