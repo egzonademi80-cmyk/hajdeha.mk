@@ -15,6 +15,8 @@ import {
   X,
   User,
   Bell,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 interface MenuItem {
@@ -95,6 +97,98 @@ export default function POS({ slug }: POSProps) {
 
   const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(null);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
+
+  // ── Theme (light/dark) ──
+  const THEME_KEY = `pos-${slug}-theme`;
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === "light" || saved === "dark") return saved;
+    } catch {}
+    return "dark";
+  });
+  useEffect(() => {
+    try { localStorage.setItem(THEME_KEY, theme); } catch {}
+  }, [theme]);
+  const isLight = theme === "light";
+
+  const t = isLight
+    ? {
+        appBg: "bg-[#FAFAF9]",
+        panelBg: "bg-white",
+        text: "text-[#1A1A1A]",
+        textSoft: "text-[#3A3A3A]",
+        textMuted: "text-[#7A7A7A]",
+        textFaint: "text-[#A8A8A8]",
+        textDim: "text-[#BFBDB9]",
+        border: "border-[#E8E6E3]",
+        borderSoft: "border-[#EFEDEA]",
+        borderDashed: "border-[#D8D4CF]",
+        surface: "bg-[#F4F2EF]",
+        surfaceSoft: "bg-[#EDEAE5]",
+        surfaceHover: "hover:bg-[#ECE9E5]",
+        chipInactive: "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
+        cartItemActive: "bg-amber-100 border-amber-400",
+        cartItemInactive: "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
+        backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
+        modalBg: "bg-white",
+        inputBgStyle: "#F4F2EF",
+        inputTextStyle: "#1A1A1A",
+        inputBorder: "border-[#E0DDD8]",
+        cancelBtn: "bg-[#EDEAE5] text-[#7A7A7A] hover:bg-[#E2DED9]",
+        deletePersonBtn: "bg-[#EDEAE5] hover:bg-red-100 text-[#7A7A7A]",
+        personIconEmpty: "bg-[#EDEAE5] text-[#A8A8A8]",
+        qtyControlBg: "bg-[#EDEAE5]",
+        qtyBtnText: "text-[#5A5A5A] hover:bg-[#D8D4CF]",
+      }
+    : {
+        appBg: "bg-[#0F0F0F]",
+        panelBg: "bg-[#0B0B0B]",
+        text: "text-white",
+        textSoft: "text-white/85",
+        textMuted: "text-white/40",
+        textFaint: "text-white/25",
+        textDim: "text-white/30",
+        border: "border-white/10",
+        borderSoft: "border-white/5",
+        borderDashed: "border-white/10",
+        surface: "bg-white/[0.04]",
+        surfaceSoft: "bg-white/[0.08]",
+        surfaceHover: "hover:bg-white/[0.06]",
+        chipInactive: "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
+        cartItemActive: "bg-amber-500/15 border-amber-500/50",
+        cartItemInactive: "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
+        backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
+        modalBg: "bg-[#1A1A1A]",
+        inputBgStyle: "#2A2A2A",
+        inputTextStyle: "#FFFFFF",
+        inputBorder: "border-white/12",
+        cancelBtn: "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]",
+        deletePersonBtn: "bg-white/[0.06] hover:bg-red-500/20 text-white/30",
+        personIconEmpty: "bg-white/[0.06] text-white/30",
+        qtyControlBg: "bg-white/[0.06]",
+        qtyBtnText: "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
+      };
+
+  // Per-status colors (for table tiles + person rows)
+  const statusColorsLight = {
+    empty: { bg: "bg-[#F4F2EF]", border: "border-[#E8E6E3]", dot: "", text: "text-[#A8A8A8]", time: "text-[#A8A8A8]" },
+    fresh: { bg: "bg-emerald-50", border: "border-emerald-300", dot: "bg-emerald-500", text: "text-[#1A1A1A]", time: "text-emerald-600" },
+    mid: { bg: "bg-amber-50", border: "border-amber-300", dot: "bg-amber-500", text: "text-[#1A1A1A]", time: "text-amber-600" },
+    late: { bg: "bg-red-50", border: "border-red-300", dot: "bg-red-500", text: "text-[#1A1A1A]", time: "text-red-600" },
+  };
+  const statusColorsDark = {
+    empty: { bg: "bg-white/[0.04]", border: "border-white/10", dot: "", text: "text-white/25", time: "text-white/20" },
+    fresh: { bg: "bg-emerald-500/12", border: "border-emerald-500/35", dot: "bg-emerald-400", text: "text-white", time: "text-emerald-400" },
+    mid: { bg: "bg-amber-500/15", border: "border-amber-400/45", dot: "bg-amber-400", text: "text-white", time: "text-amber-400" },
+    late: { bg: "bg-red-500/15", border: "border-red-400/50", dot: "bg-red-400", text: "text-white", time: "text-red-400" },
+  };
+  const dotColors = isLight
+    ? { fresh: "bg-emerald-500", mid: "bg-amber-500", late: "bg-red-500" }
+    : { fresh: "bg-emerald-400", mid: "bg-amber-400", late: "bg-red-400" };
+  const dotTextColors = isLight
+    ? { fresh: "text-emerald-700", mid: "text-amber-700", late: "text-red-700" }
+    : { fresh: "text-emerald-400", mid: "text-amber-400", late: "text-red-400" };
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -384,36 +478,7 @@ export default function POS({ slug }: POSProps) {
     return "late";
   };
 
-  const statusColors = {
-    empty: {
-      bg: "bg-white/4",
-      border: "border-white/8",
-      dot: "",
-      text: "text-white/25",
-      time: "text-white/20",
-    },
-    fresh: {
-      bg: "bg-emerald-500/12",
-      border: "border-emerald-500/35",
-      dot: "bg-emerald-400",
-      text: "text-white",
-      time: "text-emerald-400",
-    },
-    mid: {
-      bg: "bg-amber-500/15",
-      border: "border-amber-400/45",
-      dot: "bg-amber-400",
-      text: "text-white",
-      time: "text-amber-400",
-    },
-    late: {
-      bg: "bg-red-500/15",
-      border: "border-red-400/50",
-      dot: "bg-red-400",
-      text: "text-white",
-      time: "text-red-400",
-    },
-  };
+  const statusColors = isLight ? statusColorsLight : statusColorsDark;
 
   // Label shown in header
   const activeLabel =
@@ -433,7 +498,7 @@ export default function POS({ slug }: POSProps) {
 
   return (
     <div
-      className="h-[100dvh] w-screen bg-[#0F0F0F] text-white flex flex-col overflow-hidden"
+      className={`h-[100dvh] w-screen ${t.appBg} ${t.text} flex flex-col overflow-hidden transition-colors`}
       style={{ fontFamily: "'DM Sans', sans-serif" }}
     >
       <style>{`
@@ -444,13 +509,13 @@ export default function POS({ slug }: POSProps) {
 
       {/* ── Header ── */}
       <div
-        className="flex-shrink-0 flex items-center gap-3 px-4 lg:px-6 py-3 lg:py-4 border-b border-white/8"
+        className={`flex-shrink-0 flex items-center gap-3 px-4 lg:px-6 py-3 lg:py-4 border-b ${t.border}`}
         style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
       >
         {screen !== "tables" && (
           <button
             onClick={() => setScreen(screen === "order" ? "menu" : "tables")}
-            className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-white/8 hover:bg-white/12 flex items-center justify-center flex-shrink-0"
+            className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full ${t.backBtn} flex items-center justify-center flex-shrink-0 transition-colors`}
           >
             <ChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
           </button>
@@ -466,7 +531,7 @@ export default function POS({ slug }: POSProps) {
             )}
           </p>
           <p
-            className="text-[10px] lg:text-[11px] text-white/30 mt-0.5"
+            className={`text-[10px] lg:text-[11px] ${t.textDim} mt-0.5`}
             style={{ fontFamily: "'DM Mono', monospace" }}
           >
             {screen === "tables"
@@ -476,6 +541,19 @@ export default function POS({ slug }: POSProps) {
                 : "ORDER"}
           </p>
         </div>
+        {/* Theme toggle */}
+        <button
+          onClick={() => setTheme(isLight ? "dark" : "light")}
+          className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
+          aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
+          data-testid="button-toggle-theme"
+        >
+          {isLight ? (
+            <Moon className="h-4 w-4 lg:h-5 lg:w-5" />
+          ) : (
+            <Sun className="h-4 w-4 lg:h-5 lg:w-5 text-amber-400" />
+          )}
+        </button>
         {/* Cart badge — only in menu screen on phones (on desktop the order panel is always visible) */}
         {screen === "menu" && active !== null && currentOrder && currentOrder.items.length > 0 && (
           <button
@@ -558,7 +636,7 @@ export default function POS({ slug }: POSProps) {
             {/* ── Fixed tables grid ── */}
             <div>
               <p
-                className="text-[10px] lg:text-[11px] text-white/25 mb-2 lg:mb-3 px-0.5"
+                className={`text-[10px] lg:text-[11px] ${t.textFaint} mb-2 lg:mb-3 px-0.5`}
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
                 TAVOLINA
@@ -630,7 +708,7 @@ export default function POS({ slug }: POSProps) {
             <div>
               <div className="flex items-center justify-between mb-2 px-0.5">
                 <p
-                  className="text-[10px] text-white/25"
+                  className={`text-[10px] ${t.textFaint}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
                   PERSONAT
@@ -645,8 +723,8 @@ export default function POS({ slug }: POSProps) {
               </div>
 
               {personTabs.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 flex items-center justify-center py-6 lg:py-10">
-                  <p className="text-white/20 text-xs lg:text-sm">Nuk ka persona aktiv</p>
+                <div className={`rounded-2xl border border-dashed ${t.borderDashed} flex items-center justify-center py-6 lg:py-10`}>
+                  <p className={`${t.textFaint} text-xs lg:text-sm`}>Nuk ka persona aktiv</p>
                 </div>
               ) : (
                 <div className="space-y-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:space-y-0">
@@ -677,10 +755,10 @@ export default function POS({ slug }: POSProps) {
                         ) : (
                           <>
                             <div
-                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${occupied ? "bg-amber-500/20" : "bg-white/6"}`}
+                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${occupied ? "bg-amber-500/20" : t.surfaceSoft}`}
                             >
                               <User
-                                className={`h-4 w-4 ${occupied ? "text-amber-400" : "text-white/30"}`}
+                                className={`h-4 w-4 ${occupied ? "text-amber-400" : t.textDim}`}
                               />
                             </div>
                             <div className="flex-1 min-w-0 text-left">
@@ -694,13 +772,13 @@ export default function POS({ slug }: POSProps) {
                                 >
                                   {orderTotal(person)} DEN
                                   {person.startedAt && (
-                                    <span className="font-normal text-white/25 ml-2">
+                                    <span className={`font-normal ${t.textFaint} ml-2`}>
                                       {elapsed(person)}
                                     </span>
                                   )}
                                 </p>
                               ) : (
-                                <p className="text-xs text-white/20 mt-0.5">
+                                <p className={`text-xs ${t.textFaint} mt-0.5`}>
                                   Bosh
                                 </p>
                               )}
@@ -717,9 +795,9 @@ export default function POS({ slug }: POSProps) {
                             {!occupied && (
                               <button
                                 onClick={(e) => deletePersonTab(idx, e)}
-                                className="h-6 w-6 rounded-full bg-white/6 flex items-center justify-center flex-shrink-0 active:bg-red-500/20"
+                                className={`h-6 w-6 rounded-full ${t.surfaceSoft} flex items-center justify-center flex-shrink-0 active:bg-red-500/20`}
                               >
-                                <X className="h-3 w-3 text-white/30" />
+                                <X className={`h-3 w-3 ${t.textDim}`} />
                               </button>
                             )}
                           </>
@@ -734,14 +812,14 @@ export default function POS({ slug }: POSProps) {
             {/* Status legend */}
             <div className="flex items-center gap-4 px-1">
               {[
-                { dot: "bg-emerald-400", label: "< 15min" },
-                { dot: "bg-amber-400", label: "15–30min" },
-                { dot: "bg-red-400", label: "30min+" },
+                { dot: dotColors.fresh, label: "< 15min" },
+                { dot: dotColors.mid, label: "15–30min" },
+                { dot: dotColors.late, label: "30min+" },
               ].map(({ dot, label }) => (
                 <div key={label} className="flex items-center gap-1.5">
                   <div className={`h-2 w-2 rounded-full ${dot}`} />
                   <span
-                    className="text-[10px] text-white/30"
+                    className={`text-[10px] ${t.textDim}`}
                     style={{ fontFamily: "'DM Mono', monospace" }}
                   >
                     {label}
@@ -751,10 +829,10 @@ export default function POS({ slug }: POSProps) {
             </div>
 
             {/* Summary bar */}
-            <div className="p-4 lg:p-5 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-between">
+            <div className={`p-4 lg:p-5 rounded-2xl ${t.surface} border ${t.border} flex items-center justify-between`}>
               <div>
                 <p
-                  className="text-[10px] text-white/30"
+                  className={`text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
                   TOTAL OPEN
@@ -764,22 +842,22 @@ export default function POS({ slug }: POSProps) {
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
                   {allTotal}{" "}
-                  <span className="text-sm text-white/30">DEN</span>
+                  <span className={`text-sm ${t.textDim}`}>DEN</span>
                 </p>
               </div>
               <div className="text-right">
                 <p
-                  className="text-[10px] text-white/30"
+                  className={`text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
                   AKTIV
                 </p>
                 <p
-                  className="text-xl font-bold text-white"
+                  className={`text-xl font-bold ${t.text}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
                   {allActive}
-                  <span className="text-sm text-white/30">
+                  <span className={`text-sm ${t.textDim}`}>
                     /{TABLE_COUNT + personTabs.length}
                   </span>
                 </p>
@@ -805,7 +883,7 @@ export default function POS({ slug }: POSProps) {
               }`}
             >
               {/* Category tabs */}
-              <div className="flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b border-white/5">
+              <div className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b ${t.borderSoft}`}>
                 {categories.map((cat) => (
                   <button
                     key={cat}
@@ -813,7 +891,7 @@ export default function POS({ slug }: POSProps) {
                     className={`flex-shrink-0 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-semibold transition-all ${
                       activeCategory === cat
                         ? "bg-amber-500 text-black"
-                        : "bg-white/6 text-white/40 hover:bg-white/10 hover:text-white/60"
+                        : t.chipInactive
                     }`}
                   >
                     {cat}
@@ -844,7 +922,7 @@ export default function POS({ slug }: POSProps) {
                           className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all ${
                             inCart
                               ? "bg-amber-500/15 border-amber-500/50"
-                              : "bg-white/4 border-white/8 hover:bg-white/6 hover:border-white/15"
+                              : t.cartItemInactive
                           }`}
                         >
                           {inCart && (
@@ -854,7 +932,7 @@ export default function POS({ slug }: POSProps) {
                               </span>
                             </div>
                           )}
-                          <p className="text-xs lg:text-sm font-semibold text-white/85 leading-snug pr-6 line-clamp-2">
+                          <p className={`text-xs lg:text-sm font-semibold ${t.textSoft} leading-snug pr-6 line-clamp-2`}>
                             {item.name}
                           </p>
                           <p
@@ -862,7 +940,7 @@ export default function POS({ slug }: POSProps) {
                             style={{ fontFamily: "'DM Mono', monospace" }}
                           >
                             {parsePrice(item.price)}{" "}
-                            <span className="text-[9px] lg:text-[10px] text-white/25">DEN</span>
+                            <span className={`text-[9px] lg:text-[10px] ${t.textFaint}`}>DEN</span>
                           </p>
                         </motion.button>
                       );
@@ -874,18 +952,18 @@ export default function POS({ slug }: POSProps) {
 
             {/* ── ORDER PANEL ── */}
             <div
-              className={`flex-col overflow-hidden bg-[#0B0B0B] lg:border-l lg:border-white/8 lg:w-[380px] xl:w-[440px] ${
+              className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${
                 screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"
               }`}
             >
               {/* Order panel header (lg+ only) */}
-              <div className="hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b border-white/8">
+              <div className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}>
                 <ShoppingBag className="h-4 w-4 text-amber-400" />
                 <p className="text-sm font-bold">
                   Porosia · <span className="text-amber-400">{activeLabel}</span>
                 </p>
                 <span
-                  className="ml-auto text-[10px] text-white/30"
+                  className={`ml-auto text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
                   {orderCount(currentOrder)} ITEMS
@@ -895,9 +973,9 @@ export default function POS({ slug }: POSProps) {
               <div className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-2">
                 {currentOrder.items.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-12">
-                    <ShoppingBag className="h-8 w-8 text-white/15" />
-                    <p className="text-white/20 text-sm">Asnjë artikull</p>
-                    <p className="text-white/15 text-xs hidden lg:block">
+                    <ShoppingBag className={`h-8 w-8 ${t.textFaint}`} />
+                    <p className={`${t.textFaint} text-sm`}>Asnjë artikull</p>
+                    <p className={`${t.textFaint} text-xs hidden lg:block`}>
                       Klikoni një artikull nga menyja për ta shtuar
                     </p>
                   </div>
@@ -905,10 +983,10 @@ export default function POS({ slug }: POSProps) {
                   currentOrder.items.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-white/4 border border-white/8"
+                      className={`flex items-center gap-3 p-3 rounded-xl ${t.surface} border ${t.border}`}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white/85 truncate">
+                        <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
                           {item.name}
                         </p>
                         <p
@@ -918,10 +996,10 @@ export default function POS({ slug }: POSProps) {
                           {item.price} × {item.qty} = {item.price * item.qty} DEN
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 bg-white/6 rounded-xl px-2 py-1.5">
+                      <div className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}>
                         <button
                           onClick={() => updateQty(item.id, -1)}
-                          className="h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10 hover:bg-white/10"
+                          className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
                         >
                           <Minus className="h-3 w-3" />
                         </button>
@@ -933,7 +1011,7 @@ export default function POS({ slug }: POSProps) {
                         </span>
                         <button
                           onClick={() => updateQty(item.id, 1)}
-                          className="h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10 hover:bg-white/10"
+                          className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
                         >
                           <Plus className="h-3 w-3" />
                         </button>
@@ -946,29 +1024,29 @@ export default function POS({ slug }: POSProps) {
               {/* Total + Pay */}
               {currentOrder.items.length > 0 && (
                 <div
-                  className="flex-shrink-0 p-4 lg:p-5 border-t border-white/8 space-y-3"
+                  className={`flex-shrink-0 p-4 lg:p-5 border-t ${t.border} space-y-3`}
                   style={{
                     paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-white/40 text-xs">
+                    <div className={`flex items-center gap-2 ${t.textMuted} text-xs`}>
                       <Clock className="h-3.5 w-3.5" />
                       {currentOrder.startedAt ? elapsed(currentOrder) : "—"}
                     </div>
                     <div className="text-right">
                       <p
-                        className="text-[10px] text-white/30"
+                        className={`text-[10px] ${t.textDim}`}
                         style={{ fontFamily: "'DM Mono', monospace" }}
                       >
                         TOTAL
                       </p>
                       <p
-                        className="text-2xl lg:text-3xl font-bold text-white"
+                        className={`text-2xl lg:text-3xl font-bold ${t.text}`}
                         style={{ fontFamily: "'DM Mono', monospace" }}
                       >
                         {orderTotal(currentOrder)}{" "}
-                        <span className="text-sm text-white/30">DEN</span>
+                        <span className={`text-sm ${t.textDim}`}>DEN</span>
                       </p>
                     </div>
                   </div>
@@ -977,7 +1055,7 @@ export default function POS({ slug }: POSProps) {
                     <div className="flex gap-2">
                       <button
                         onClick={() => setPayConfirm(false)}
-                        className="flex-1 h-12 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold hover:bg-white/12"
+                        className={`flex-1 h-12 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold hover:bg-white/12`}
                       >
                         Anulo
                       </button>
@@ -1020,23 +1098,23 @@ export default function POS({ slug }: POSProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ duration: 0.18 }}
-              className="fixed left-4 right-4 bottom-1/3 z-50 bg-[#1A1A1A] rounded-3xl p-6 border border-white/10 shadow-2xl"
+              className={`fixed left-4 right-4 bottom-1/3 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.borderDashed} shadow-2xl`}
             >
               <p className="text-base font-bold text-white mb-1">Krijo Person</p>
-              <p className="text-xs text-white/30 mb-4">Shkruaj emrin e personit</p>
+              <p className={`text-xs ${t.textDim} mb-4`}>Shkruaj emrin e personit</p>
               <input
                 ref={nameInputRef}
                 value={newPersonName}
                 onChange={(e) => setNewPersonName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreatePerson(); }}
                 placeholder="p.sh. Besart, Mirem, Person1…"
-                className="w-full h-12 rounded-xl border border-white/12 px-4 text-sm outline-none focus:border-amber-500/50 mb-4"
-                style={{ background: "#2A2A2A", color: "#fff" }}
+                className={`w-full h-12 rounded-xl border ${t.inputBorder} px-4 text-sm outline-none focus:border-amber-500/50 mb-4`}
+                style={{ background: t.inputBgStyle, color: t.inputTextStyle }}
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => { setShowNewPerson(false); setNewPersonName(""); }}
-                  className="flex-1 h-11 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold"
+                  className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
                 >
                   Anulo
                 </button>
