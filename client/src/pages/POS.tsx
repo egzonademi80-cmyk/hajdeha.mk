@@ -444,29 +444,29 @@ export default function POS({ slug }: POSProps) {
 
       {/* ── Header ── */}
       <div
-        className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/8"
+        className="flex-shrink-0 flex items-center gap-3 px-4 lg:px-6 py-3 lg:py-4 border-b border-white/8"
         style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
       >
         {screen !== "tables" && (
           <button
             onClick={() => setScreen(screen === "order" ? "menu" : "tables")}
-            className="h-8 w-8 rounded-full bg-white/8 flex items-center justify-center flex-shrink-0"
+            className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-white/8 hover:bg-white/12 flex items-center justify-center flex-shrink-0"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
           </button>
         )}
-        <div className="h-7 w-7 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
-          <Coffee className="h-3.5 w-3.5 text-black" />
+        <div className="h-7 w-7 lg:h-9 lg:w-9 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
+          <Coffee className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-black" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold leading-none truncate">
+          <p className="text-sm lg:text-base font-semibold leading-none truncate">
             {restaurant?.name || "POS"}
             {activeLabel && (
               <span className="text-amber-400"> · {activeLabel}</span>
             )}
           </p>
           <p
-            className="text-[10px] text-white/30 mt-0.5"
+            className="text-[10px] lg:text-[11px] text-white/30 mt-0.5"
             style={{ fontFamily: "'DM Mono', monospace" }}
           >
             {screen === "tables"
@@ -476,11 +476,11 @@ export default function POS({ slug }: POSProps) {
                 : "ORDER"}
           </p>
         </div>
-        {/* Cart badge — only in menu screen */}
+        {/* Cart badge — only in menu screen on phones (on desktop the order panel is always visible) */}
         {screen === "menu" && active !== null && currentOrder && currentOrder.items.length > 0 && (
           <button
             onClick={() => setScreen("order")}
-            className="flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
+            className="lg:hidden flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
           >
             <ShoppingBag className="h-3.5 w-3.5 text-black" />
             <span
@@ -553,17 +553,17 @@ export default function POS({ slug }: POSProps) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.18 }}
-            className="flex-1 overflow-y-auto p-4 space-y-4"
+            className="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-8 space-y-4 lg:space-y-6 max-w-[1400px] w-full mx-auto"
           >
             {/* ── Fixed tables grid ── */}
             <div>
               <p
-                className="text-[10px] text-white/25 mb-2 px-0.5"
+                className="text-[10px] lg:text-[11px] text-white/25 mb-2 lg:mb-3 px-0.5"
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
                 TAVOLINA
               </p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 lg:gap-4">
                 {tables.map((table, idx) => {
                   const status = tableStatus(table);
                   const c = statusColors[status];
@@ -645,11 +645,11 @@ export default function POS({ slug }: POSProps) {
               </div>
 
               {personTabs.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 flex items-center justify-center py-6">
-                  <p className="text-white/20 text-xs">Nuk ka persona aktiv</p>
+                <div className="rounded-2xl border border-dashed border-white/10 flex items-center justify-center py-6 lg:py-10">
+                  <p className="text-white/20 text-xs lg:text-sm">Nuk ka persona aktiv</p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:space-y-0">
                   {personTabs.map((person, idx) => {
                     const status = tableStatus(person);
                     const c = statusColors[status];
@@ -751,7 +751,7 @@ export default function POS({ slug }: POSProps) {
             </div>
 
             {/* Summary bar */}
-            <div className="p-4 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-between">
+            <div className="p-4 lg:p-5 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-between">
               <div>
                 <p
                   className="text-[10px] text-white/30"
@@ -788,198 +788,218 @@ export default function POS({ slug }: POSProps) {
           </motion.div>
         )}
 
-        {/* ── SCREEN: MENU ── */}
-        {screen === "menu" && (
+        {/* ── SCREEN: MENU + ORDER (combined; side-by-side on lg+) ── */}
+        {(screen === "menu" || screen === "order") && active !== null && currentOrder && (
           <motion.div
-            key="menu"
+            key="menu-order"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.18 }}
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 flex overflow-hidden"
           >
-            {/* Category tabs */}
-            <div className="flex-shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto border-b border-white/5">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    activeCategory === cat
-                      ? "bg-amber-500 text-black"
-                      : "bg-white/6 text-white/40"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+            {/* ── MENU PANEL ── */}
+            <div
+              className={`flex-1 flex-col overflow-hidden ${
+                screen === "order" ? "hidden lg:flex" : "flex"
+              }`}
+            >
+              {/* Category tabs */}
+              <div className="flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b border-white/5">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`flex-shrink-0 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-semibold transition-all ${
+                      activeCategory === cat
+                        ? "bg-amber-500 text-black"
+                        : "bg-white/6 text-white/40 hover:bg-white/10 hover:text-white/60"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Items grid */}
+              <div className="flex-1 overflow-y-auto p-3 lg:p-5">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-40">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Coffee className="h-7 w-7 text-amber-500" />
+                    </motion.div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-3">
+                    {filteredItems.map((item) => {
+                      const inCart = currentOrder.items.find((i) => i.id === item.id);
+                      return (
+                        <motion.button
+                          key={item.id}
+                          onClick={() => addItem(item)}
+                          whileTap={{ scale: 0.95 }}
+                          className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all ${
+                            inCart
+                              ? "bg-amber-500/15 border-amber-500/50"
+                              : "bg-white/4 border-white/8 hover:bg-white/6 hover:border-white/15"
+                          }`}
+                        >
+                          {inCart && (
+                            <div className="absolute top-2 right-2 h-5 w-5 lg:h-6 lg:w-6 rounded-full bg-amber-500 flex items-center justify-center">
+                              <span className="text-[10px] lg:text-xs font-bold text-black">
+                                {inCart.qty}
+                              </span>
+                            </div>
+                          )}
+                          <p className="text-xs lg:text-sm font-semibold text-white/85 leading-snug pr-6 line-clamp-2">
+                            {item.name}
+                          </p>
+                          <p
+                            className="text-xs lg:text-sm font-bold text-amber-400 mt-1.5"
+                            style={{ fontFamily: "'DM Mono', monospace" }}
+                          >
+                            {parsePrice(item.price)}{" "}
+                            <span className="text-[9px] lg:text-[10px] text-white/25">DEN</span>
+                          </p>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Items grid */}
-            <div className="flex-1 overflow-y-auto p-3">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
-                    <Coffee className="h-7 w-7 text-amber-500" />
-                  </motion.div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {filteredItems.map((item) => {
-                    const inCart = currentOrder?.items.find((i) => i.id === item.id);
-                    return (
-                      <motion.button
-                        key={item.id}
-                        onClick={() => addItem(item)}
-                        whileTap={{ scale: 0.95 }}
-                        className={`relative p-3 rounded-xl text-left border transition-all ${
-                          inCart
-                            ? "bg-amber-500/15 border-amber-500/50"
-                            : "bg-white/4 border-white/8"
-                        }`}
-                      >
-                        {inCart && (
-                          <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-amber-500 flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-black">
-                              {inCart.qty}
-                            </span>
-                          </div>
-                        )}
-                        <p className="text-xs font-semibold text-white/85 leading-snug pr-6 line-clamp-2">
+            {/* ── ORDER PANEL ── */}
+            <div
+              className={`flex-col overflow-hidden bg-[#0B0B0B] lg:border-l lg:border-white/8 lg:w-[380px] xl:w-[440px] ${
+                screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"
+              }`}
+            >
+              {/* Order panel header (lg+ only) */}
+              <div className="hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b border-white/8">
+                <ShoppingBag className="h-4 w-4 text-amber-400" />
+                <p className="text-sm font-bold">
+                  Porosia · <span className="text-amber-400">{activeLabel}</span>
+                </p>
+                <span
+                  className="ml-auto text-[10px] text-white/30"
+                  style={{ fontFamily: "'DM Mono', monospace" }}
+                >
+                  {orderCount(currentOrder)} ITEMS
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-2">
+                {currentOrder.items.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-12">
+                    <ShoppingBag className="h-8 w-8 text-white/15" />
+                    <p className="text-white/20 text-sm">Asnjë artikull</p>
+                    <p className="text-white/15 text-xs hidden lg:block">
+                      Klikoni një artikull nga menyja për ta shtuar
+                    </p>
+                  </div>
+                ) : (
+                  currentOrder.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-white/4 border border-white/8"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white/85 truncate">
                           {item.name}
                         </p>
                         <p
-                          className="text-xs font-bold text-amber-400 mt-1.5"
+                          className="text-xs text-amber-400 mt-0.5"
                           style={{ fontFamily: "'DM Mono', monospace" }}
                         >
-                          {parsePrice(item.price)}{" "}
-                          <span className="text-[9px] text-white/25">DEN</span>
+                          {item.price} × {item.qty} = {item.price * item.qty} DEN
                         </p>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── SCREEN: ORDER ── */}
-        {screen === "order" && active !== null && currentOrder && (
-          <motion.div
-            key="order"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.18 }}
-            className="flex-1 flex flex-col overflow-hidden"
-          >
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {currentOrder.items.length === 0 ? (
-                <div className="flex items-center justify-center h-40">
-                  <p className="text-white/20 text-sm">Asnjë artikull</p>
-                </div>
-              ) : (
-                currentOrder.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white/4 border border-white/8"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white/85 truncate">
-                        {item.name}
-                      </p>
-                      <p
-                        className="text-xs text-amber-400 mt-0.5"
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        {item.price} × {item.qty} = {item.price * item.qty} DEN
-                      </p>
+                      </div>
+                      <div className="flex items-center gap-2 bg-white/6 rounded-xl px-2 py-1.5">
+                        <button
+                          onClick={() => updateQty(item.id, -1)}
+                          className="h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10 hover:bg-white/10"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span
+                          className="text-sm font-bold text-amber-400 w-5 text-center"
+                          style={{ fontFamily: "'DM Mono', monospace" }}
+                        >
+                          {item.qty}
+                        </span>
+                        <button
+                          onClick={() => updateQty(item.id, 1)}
+                          className="h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10 hover:bg-white/10"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/6 rounded-xl px-2 py-1.5">
-                      <button
-                        onClick={() => updateQty(item.id, -1)}
-                        className="h-6 w-6 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <span
-                        className="text-sm font-bold text-amber-400 w-5 text-center"
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        {item.qty}
-                      </span>
-                      <button
-                        onClick={() => updateQty(item.id, 1)}
-                        className="h-6 w-6 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Total + Pay */}
-            {currentOrder.items.length > 0 && (
-              <div
-                className="flex-shrink-0 p-4 border-t border-white/8 space-y-3"
-                style={{
-                  paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-white/40 text-xs">
-                    <Clock className="h-3.5 w-3.5" />
-                    {currentOrder.startedAt ? elapsed(currentOrder) : "—"}
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className="text-[10px] text-white/30"
-                      style={{ fontFamily: "'DM Mono', monospace" }}
-                    >
-                      TOTAL
-                    </p>
-                    <p
-                      className="text-2xl font-bold text-white"
-                      style={{ fontFamily: "'DM Mono', monospace" }}
-                    >
-                      {orderTotal(currentOrder)}{" "}
-                      <span className="text-sm text-white/30">DEN</span>
-                    </p>
-                  </div>
-                </div>
-
-                {payConfirm ? (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPayConfirm(false)}
-                      className="flex-1 h-12 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold"
-                    >
-                      Anulo
-                    </button>
-                    <button
-                      onClick={payOrder}
-                      className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white"
-                    >
-                      ✓ Paguar
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setPayConfirm(true)}
-                    className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    Paguaj {orderTotal(currentOrder)} DEN
-                  </button>
+                  ))
                 )}
               </div>
-            )}
+
+              {/* Total + Pay */}
+              {currentOrder.items.length > 0 && (
+                <div
+                  className="flex-shrink-0 p-4 lg:p-5 border-t border-white/8 space-y-3"
+                  style={{
+                    paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-white/40 text-xs">
+                      <Clock className="h-3.5 w-3.5" />
+                      {currentOrder.startedAt ? elapsed(currentOrder) : "—"}
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className="text-[10px] text-white/30"
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        TOTAL
+                      </p>
+                      <p
+                        className="text-2xl lg:text-3xl font-bold text-white"
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        {orderTotal(currentOrder)}{" "}
+                        <span className="text-sm text-white/30">DEN</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {payConfirm ? (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPayConfirm(false)}
+                        className="flex-1 h-12 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold hover:bg-white/12"
+                      >
+                        Anulo
+                      </button>
+                      <button
+                        onClick={payOrder}
+                        className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-400"
+                      >
+                        ✓ Paguar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setPayConfirm(true)}
+                      className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
+                    >
+                      <Receipt className="h-4 w-4" />
+                      Paguaj {orderTotal(currentOrder)} DEN
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
