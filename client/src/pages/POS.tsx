@@ -45,7 +45,11 @@ interface PersonTab {
   startedAt: Date | null;
 }
 
-const TABLE_COUNT = 6;
+interface Restaurant {
+  name: string;
+  menuItems: MenuItem[];
+  tableCount?: number;
+}
 
 const emptyTable = (): TableOrder => ({ items: [], startedAt: null });
 
@@ -76,16 +80,49 @@ export default function POS({ slug }: POSProps) {
   const TABLES_KEY = `pos-${slug}-tables-v2`;
   const PERSONS_KEY = `pos-${slug}-persons-v1`;
 
+  // Fetch restaurant data first to get table count
+  const { data: restaurant, isLoading } = useQuery({
+    queryKey: ["pos-restaurant"],
+    queryFn: async () => {
+      const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
+      if (!res.ok) throw new Error("Restaurant not found");
+      return res.json() as Promise<Restaurant>;
+    },
+    retry: false,
+  });
+
+  // Get table count from restaurant data, default to 6 if not set
+  const TABLE_COUNT = restaurant?.tableCount || 6;
+
   const [tables, setTables] = useState<TableOrder[]>(() => {
     try {
       const saved = localStorage.getItem(TABLES_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as TableOrder[];
+        // Only use saved data if it matches the current table count
         if (parsed.length === TABLE_COUNT) return parsed;
       }
     } catch {}
     return Array.from({ length: TABLE_COUNT }, emptyTable);
   });
+
+  // Update tables array when TABLE_COUNT changes
+  useEffect(() => {
+    setTables((prev) => {
+      if (prev.length === TABLE_COUNT) return prev;
+
+      // If we need more tables, add empty ones
+      if (prev.length < TABLE_COUNT) {
+        return [
+          ...prev,
+          ...Array.from({ length: TABLE_COUNT - prev.length }, emptyTable),
+        ];
+      }
+
+      // If we need fewer tables, truncate (keeping the first N)
+      return prev.slice(0, TABLE_COUNT);
+    });
+  }, [TABLE_COUNT]);
 
   const [personTabs, setPersonTabs] = useState<PersonTab[]>(() => {
     try {
@@ -95,7 +132,9 @@ export default function POS({ slug }: POSProps) {
     return [];
   });
 
-  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(null);
+  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(
+    null,
+  );
   const [tableFlash, setTableFlash] = useState<number | null>(null);
 
   // ── Theme (light/dark) ──
@@ -108,7 +147,9 @@ export default function POS({ slug }: POSProps) {
     return "dark";
   });
   useEffect(() => {
-    try { localStorage.setItem(THEME_KEY, theme); } catch {}
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {}
   }, [theme]);
   const isLight = theme === "light";
 
@@ -127,9 +168,11 @@ export default function POS({ slug }: POSProps) {
         surface: "bg-[#F4F2EF]",
         surfaceSoft: "bg-[#EDEAE5]",
         surfaceHover: "hover:bg-[#ECE9E5]",
-        chipInactive: "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
+        chipInactive:
+          "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
         cartItemActive: "bg-amber-100 border-amber-400",
-        cartItemInactive: "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
+        cartItemInactive:
+          "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
         backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
         modalBg: "bg-white",
         inputBgStyle: "#F4F2EF",
@@ -155,9 +198,11 @@ export default function POS({ slug }: POSProps) {
         surface: "bg-white/[0.04]",
         surfaceSoft: "bg-white/[0.08]",
         surfaceHover: "hover:bg-white/[0.06]",
-        chipInactive: "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
+        chipInactive:
+          "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
         cartItemActive: "bg-amber-500/15 border-amber-500/50",
-        cartItemInactive: "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
+        cartItemInactive:
+          "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
         backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
         modalBg: "bg-[#1A1A1A]",
         inputBgStyle: "#2A2A2A",
@@ -167,28 +212,81 @@ export default function POS({ slug }: POSProps) {
         deletePersonBtn: "bg-white/[0.06] hover:bg-red-500/20 text-white/30",
         personIconEmpty: "bg-white/[0.06] text-white/30",
         qtyControlBg: "bg-white/[0.06]",
-        qtyBtnText: "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
+        qtyBtnText:
+          "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
       };
 
   // Per-status colors (for table tiles + person rows)
   const statusColorsLight = {
-    empty: { bg: "bg-[#F4F2EF]", border: "border-[#E8E6E3]", dot: "", text: "text-[#A8A8A8]", time: "text-[#A8A8A8]" },
-    fresh: { bg: "bg-emerald-50", border: "border-emerald-300", dot: "bg-emerald-500", text: "text-[#1A1A1A]", time: "text-emerald-600" },
-    mid: { bg: "bg-amber-50", border: "border-amber-300", dot: "bg-amber-500", text: "text-[#1A1A1A]", time: "text-amber-600" },
-    late: { bg: "bg-red-50", border: "border-red-300", dot: "bg-red-500", text: "text-[#1A1A1A]", time: "text-red-600" },
+    empty: {
+      bg: "bg-[#F4F2EF]",
+      border: "border-[#E8E6E3]",
+      dot: "",
+      text: "text-[#A8A8A8]",
+      time: "text-[#A8A8A8]",
+    },
+    fresh: {
+      bg: "bg-emerald-50",
+      border: "border-emerald-300",
+      dot: "bg-emerald-500",
+      text: "text-[#1A1A1A]",
+      time: "text-emerald-600",
+    },
+    mid: {
+      bg: "bg-amber-50",
+      border: "border-amber-300",
+      dot: "bg-amber-500",
+      text: "text-[#1A1A1A]",
+      time: "text-amber-600",
+    },
+    late: {
+      bg: "bg-red-50",
+      border: "border-red-300",
+      dot: "bg-red-500",
+      text: "text-[#1A1A1A]",
+      time: "text-red-600",
+    },
   };
   const statusColorsDark = {
-    empty: { bg: "bg-white/[0.04]", border: "border-white/10", dot: "", text: "text-white/25", time: "text-white/20" },
-    fresh: { bg: "bg-emerald-500/12", border: "border-emerald-500/35", dot: "bg-emerald-400", text: "text-white", time: "text-emerald-400" },
-    mid: { bg: "bg-amber-500/15", border: "border-amber-400/45", dot: "bg-amber-400", text: "text-white", time: "text-amber-400" },
-    late: { bg: "bg-red-500/15", border: "border-red-400/50", dot: "bg-red-400", text: "text-white", time: "text-red-400" },
+    empty: {
+      bg: "bg-white/[0.04]",
+      border: "border-white/10",
+      dot: "",
+      text: "text-white/25",
+      time: "text-white/20",
+    },
+    fresh: {
+      bg: "bg-emerald-500/12",
+      border: "border-emerald-500/35",
+      dot: "bg-emerald-400",
+      text: "text-white",
+      time: "text-emerald-400",
+    },
+    mid: {
+      bg: "bg-amber-500/15",
+      border: "border-amber-400/45",
+      dot: "bg-amber-400",
+      text: "text-white",
+      time: "text-amber-400",
+    },
+    late: {
+      bg: "bg-red-500/15",
+      border: "border-red-400/50",
+      dot: "bg-red-400",
+      text: "text-white",
+      time: "text-red-400",
+    },
   };
   const dotColors = isLight
     ? { fresh: "bg-emerald-500", mid: "bg-amber-500", late: "bg-red-500" }
     : { fresh: "bg-emerald-400", mid: "bg-amber-400", late: "bg-red-400" };
   const dotTextColors = isLight
     ? { fresh: "text-emerald-700", mid: "text-amber-700", late: "text-red-700" }
-    : { fresh: "text-emerald-400", mid: "text-amber-400", late: "text-red-400" };
+    : {
+        fresh: "text-emerald-400",
+        mid: "text-amber-400",
+        late: "text-red-400",
+      };
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -199,16 +297,6 @@ export default function POS({ slug }: POSProps) {
   const [newPersonName, setNewPersonName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [, forceUpdate] = useState(0);
-
-  const { data: restaurant, isLoading } = useQuery({
-    queryKey: ["pos-restaurant"],
-    queryFn: async () => {
-      const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
-      if (!res.ok) throw new Error("Restaurant not found");
-      return res.json();
-    },
-    retry: false,
-  });
 
   const menuItems: MenuItem[] = useMemo(
     () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
@@ -290,7 +378,11 @@ export default function POS({ slug }: POSProps) {
       const items = order.items
         .map((i) => (i.id === itemId ? { ...i, qty: i.qty + delta } : i))
         .filter((i) => i.qty > 0);
-      return { ...order, items, startedAt: items.length ? order.startedAt : null };
+      return {
+        ...order,
+        items,
+        startedAt: items.length ? order.startedAt : null,
+      };
     };
     if (active.kind === "table") {
       setTables((prev) => {
@@ -358,9 +450,13 @@ export default function POS({ slug }: POSProps) {
 
   // PWA manifest override
   useEffect(() => {
-    const link = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
+    const link = document.querySelector(
+      'link[rel="manifest"]',
+    ) as HTMLLinkElement;
     if (link) link.href = "/pos-manifest.json";
-    return () => { if (link) link.href = "/manifest.json"; };
+    return () => {
+      if (link) link.href = "/manifest.json";
+    };
   }, []);
 
   // Tick every 30s so elapsed times update live
@@ -371,11 +467,15 @@ export default function POS({ slug }: POSProps) {
 
   // Persist to localStorage
   useEffect(() => {
-    try { localStorage.setItem(TABLES_KEY, JSON.stringify(tables)); } catch {}
-  }, [tables]);
+    try {
+      localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
+    } catch {}
+  }, [tables, TABLES_KEY]);
   useEffect(() => {
-    try { localStorage.setItem(PERSONS_KEY, JSON.stringify(personTabs)); } catch {}
-  }, [personTabs]);
+    try {
+      localStorage.setItem(PERSONS_KEY, JSON.stringify(personTabs));
+    } catch {}
+  }, [personTabs, PERSONS_KEY]);
 
   // Focus name input when modal opens
   useEffect(() => {
@@ -393,24 +493,26 @@ export default function POS({ slug }: POSProps) {
           (window as any).webkitAudioContext)();
         const o = ctx.createOscillator();
         const g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
+        o.connect(g);
+        g.connect(ctx.destination);
         o.frequency.setValueAtTime(880, ctx.currentTime);
         o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
         g.gain.setValueAtTime(0.0001, ctx.currentTime);
         g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
-        o.start(); o.stop(ctx.currentTime + 0.55);
+        o.start();
+        o.stop(ctx.currentTime + 0.55);
       } catch {}
     };
 
     const handleIncoming = (data: any) => {
       const cart: OrderItem[] = data.cart || [];
       const tableNumber = data.tableNumber;
-      // Strip prefix letters → leave just the digits to match T1..T6
+      // Strip prefix letters → leave just the digits to match T1..TN
       const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
       const tableIdx = tableDigits - 1;
 
-      // Auto-fill matching table if within fixed range (T1..T6)
+      // Auto-fill matching table if within dynamic range
       if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
         setTables((prev) => {
           const next = [...prev];
@@ -440,7 +542,10 @@ export default function POS({ slug }: POSProps) {
       playChime();
       if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
       setTimeout(
-        () => setIncomingBanner((b) => (b && b.tableNumber === tableNumber ? null : b)),
+        () =>
+          setIncomingBanner((b) =>
+            b && b.tableNumber === tableNumber ? null : b,
+          ),
         12000,
       );
     };
@@ -466,9 +571,11 @@ export default function POS({ slug }: POSProps) {
         pusher?.disconnect();
       } catch {}
     };
-  }, [RESTAURANT_SLUG]);
+  }, [RESTAURANT_SLUG, TABLE_COUNT]);
 
-  const tableStatus = (o: TableOrder | PersonTab): "empty" | "fresh" | "mid" | "late" => {
+  const tableStatus = (
+    o: TableOrder | PersonTab,
+  ): "empty" | "fresh" | "mid" | "late" => {
     if (!o.startedAt || o.items.length === 0) return "empty";
     const mins = Math.floor(
       (Date.now() - new Date(o.startedAt).getTime()) / 60000,
@@ -486,7 +593,7 @@ export default function POS({ slug }: POSProps) {
       ? null
       : active.kind === "table"
         ? `T${active.idx + 1}`
-        : personTabs[active.idx]?.name ?? "—";
+        : (personTabs[active.idx]?.name ?? "—");
 
   const allTotal =
     tables.reduce((s, t) => s + orderTotal(t), 0) +
@@ -555,20 +662,23 @@ export default function POS({ slug }: POSProps) {
           )}
         </button>
         {/* Cart badge — only in menu screen on phones (on desktop the order panel is always visible) */}
-        {screen === "menu" && active !== null && currentOrder && currentOrder.items.length > 0 && (
-          <button
-            onClick={() => setScreen("order")}
-            className="lg:hidden flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
-          >
-            <ShoppingBag className="h-3.5 w-3.5 text-black" />
-            <span
-              className="text-xs font-bold text-black"
-              style={{ fontFamily: "'DM Mono', monospace" }}
+        {screen === "menu" &&
+          active !== null &&
+          currentOrder &&
+          currentOrder.items.length > 0 && (
+            <button
+              onClick={() => setScreen("order")}
+              className="lg:hidden flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
             >
-              {orderCount(currentOrder)} · {orderTotal(currentOrder)} DEN
-            </span>
-          </button>
-        )}
+              <ShoppingBag className="h-3.5 w-3.5 text-black" />
+              <span
+                className="text-xs font-bold text-black"
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                {orderCount(currentOrder)} · {orderTotal(currentOrder)} DEN
+              </span>
+            </button>
+          )}
       </div>
 
       {/* ── Incoming order banner ── */}
@@ -609,7 +719,8 @@ export default function POS({ slug }: POSProps) {
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
                 {incomingBanner.cart.reduce((s, i) => s + i.qty, 0)} artikuj ·{" "}
-                {incomingBanner.cart.reduce((s, i) => s + i.price * i.qty, 0)} DEN
+                {incomingBanner.cart.reduce((s, i) => s + i.price * i.qty, 0)}{" "}
+                DEN
               </p>
             </div>
             <span
@@ -633,13 +744,13 @@ export default function POS({ slug }: POSProps) {
             transition={{ duration: 0.18 }}
             className="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-8 space-y-4 lg:space-y-6 max-w-[1400px] w-full mx-auto"
           >
-            {/* ── Fixed tables grid ── */}
+            {/* ── Dynamic tables grid ── */}
             <div>
               <p
                 className={`text-[10px] lg:text-[11px] ${t.textFaint} mb-2 lg:mb-3 px-0.5`}
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
-                TAVOLINA
+                TAVOLINA ({TABLE_COUNT})
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 lg:gap-4">
                 {tables.map((table, idx) => {
@@ -657,7 +768,10 @@ export default function POS({ slug }: POSProps) {
                           ? { scale: [1, 1.08, 1, 1.08, 1] }
                           : { scale: 1 }
                       }
-                      transition={{ duration: 1.6, repeat: tableFlash === idx ? 2 : 0 }}
+                      transition={{
+                        duration: 1.6,
+                        repeat: tableFlash === idx ? 2 : 0,
+                      }}
                       className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
                         wasJustPaid
                           ? "bg-emerald-500/20 border-emerald-500/40"
@@ -683,13 +797,17 @@ export default function POS({ slug }: POSProps) {
                                 {orderTotal(table)}
                               </span>
                               {table.startedAt && (
-                                <span className={`text-[9px] font-['DM_Mono'] ${c.time}`}>
+                                <span
+                                  className={`text-[9px] font-['DM_Mono'] ${c.time}`}
+                                >
                                   {elapsed(table)}
                                 </span>
                               )}
                               <motion.div
                                 animate={
-                                  status === "late" ? { scale: [1, 1.4, 1] } : {}
+                                  status === "late"
+                                    ? { scale: [1, 1.4, 1] }
+                                    : {}
                                 }
                                 transition={{ duration: 1.2, repeat: Infinity }}
                                 className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${c.dot}`}
@@ -723,8 +841,12 @@ export default function POS({ slug }: POSProps) {
               </div>
 
               {personTabs.length === 0 ? (
-                <div className={`rounded-2xl border border-dashed ${t.borderDashed} flex items-center justify-center py-6 lg:py-10`}>
-                  <p className={`${t.textFaint} text-xs lg:text-sm`}>Nuk ka persona aktiv</p>
+                <div
+                  className={`rounded-2xl border border-dashed ${t.borderDashed} flex items-center justify-center py-6 lg:py-10`}
+                >
+                  <p className={`${t.textFaint} text-xs lg:text-sm`}>
+                    Nuk ka persona aktiv
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:space-y-0">
@@ -762,7 +884,9 @@ export default function POS({ slug }: POSProps) {
                               />
                             </div>
                             <div className="flex-1 min-w-0 text-left">
-                              <p className={`text-sm font-semibold ${c.text} truncate`}>
+                              <p
+                                className={`text-sm font-semibold ${c.text} truncate`}
+                              >
                                 {person.name}
                               </p>
                               {occupied ? (
@@ -772,7 +896,9 @@ export default function POS({ slug }: POSProps) {
                                 >
                                   {orderTotal(person)} DEN
                                   {person.startedAt && (
-                                    <span className={`font-normal ${t.textFaint} ml-2`}>
+                                    <span
+                                      className={`font-normal ${t.textFaint} ml-2`}
+                                    >
                                       {elapsed(person)}
                                     </span>
                                   )}
@@ -786,7 +912,9 @@ export default function POS({ slug }: POSProps) {
                             {occupied && status !== "empty" && (
                               <motion.div
                                 animate={
-                                  status === "late" ? { scale: [1, 1.4, 1] } : {}
+                                  status === "late"
+                                    ? { scale: [1, 1.4, 1] }
+                                    : {}
                                 }
                                 transition={{ duration: 1.2, repeat: Infinity }}
                                 className={`h-2 w-2 rounded-full flex-shrink-0 ${c.dot}`}
@@ -829,7 +957,9 @@ export default function POS({ slug }: POSProps) {
             </div>
 
             {/* Summary bar */}
-            <div className={`p-4 lg:p-5 rounded-2xl ${t.surface} border ${t.border} flex items-center justify-between`}>
+            <div
+              className={`p-4 lg:p-5 rounded-2xl ${t.surface} border ${t.border} flex items-center justify-between`}
+            >
               <div>
                 <p
                   className={`text-[10px] ${t.textDim}`}
@@ -841,8 +971,7 @@ export default function POS({ slug }: POSProps) {
                   className="text-xl font-bold text-amber-400"
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  {allTotal}{" "}
-                  <span className={`text-sm ${t.textDim}`}>DEN</span>
+                  {allTotal} <span className={`text-sm ${t.textDim}`}>DEN</span>
                 </p>
               </div>
               <div className="text-right">
@@ -867,219 +996,248 @@ export default function POS({ slug }: POSProps) {
         )}
 
         {/* ── SCREEN: MENU + ORDER (combined; side-by-side on lg+) ── */}
-        {(screen === "menu" || screen === "order") && active !== null && currentOrder && (
-          <motion.div
-            key="menu-order"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.18 }}
-            className="flex-1 flex overflow-hidden"
-          >
-            {/* ── MENU PANEL ── */}
-            <div
-              className={`flex-1 flex-col overflow-hidden ${
-                screen === "order" ? "hidden lg:flex" : "flex"
-              }`}
+        {(screen === "menu" || screen === "order") &&
+          active !== null &&
+          currentOrder && (
+            <motion.div
+              key="menu-order"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.18 }}
+              className="flex-1 flex overflow-hidden"
             >
-              {/* Category tabs */}
-              <div className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b ${t.borderSoft}`}>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={`flex-shrink-0 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-semibold transition-all ${
-                      activeCategory === cat
-                        ? "bg-amber-500 text-black"
-                        : t.chipInactive
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+              {/* ── MENU PANEL ── */}
+              <div
+                className={`flex-1 flex-col overflow-hidden ${
+                  screen === "order" ? "hidden lg:flex" : "flex"
+                }`}
+              >
+                {/* Category tabs */}
+                <div
+                  className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b ${t.borderSoft}`}
+                >
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={`flex-shrink-0 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-semibold transition-all ${
+                        activeCategory === cat
+                          ? "bg-amber-500 text-black"
+                          : t.chipInactive
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Items grid */}
+                <div className="flex-1 overflow-y-auto p-3 lg:p-5">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-40">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                      >
+                        <Coffee className="h-7 w-7 text-amber-500" />
+                      </motion.div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-3">
+                      {filteredItems.map((item) => {
+                        const inCart = currentOrder.items.find(
+                          (i) => i.id === item.id,
+                        );
+                        return (
+                          <motion.button
+                            key={item.id}
+                            onClick={() => addItem(item)}
+                            whileTap={{ scale: 0.95 }}
+                            className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all ${
+                              inCart
+                                ? "bg-amber-500/15 border-amber-500/50"
+                                : t.cartItemInactive
+                            }`}
+                          >
+                            {inCart && (
+                              <div className="absolute top-2 right-2 h-5 w-5 lg:h-6 lg:w-6 rounded-full bg-amber-500 flex items-center justify-center">
+                                <span className="text-[10px] lg:text-xs font-bold text-black">
+                                  {inCart.qty}
+                                </span>
+                              </div>
+                            )}
+                            <p
+                              className={`text-xs lg:text-sm font-semibold ${t.textSoft} leading-snug pr-6 line-clamp-2`}
+                            >
+                              {item.name}
+                            </p>
+                            <p
+                              className="text-xs lg:text-sm font-bold text-amber-400 mt-1.5"
+                              style={{ fontFamily: "'DM Mono', monospace" }}
+                            >
+                              {parsePrice(item.price)}{" "}
+                              <span
+                                className={`text-[9px] lg:text-[10px] ${t.textFaint}`}
+                              >
+                                DEN
+                              </span>
+                            </p>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Items grid */}
-              <div className="flex-1 overflow-y-auto p-3 lg:p-5">
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-40">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    >
-                      <Coffee className="h-7 w-7 text-amber-500" />
-                    </motion.div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-3">
-                    {filteredItems.map((item) => {
-                      const inCart = currentOrder.items.find((i) => i.id === item.id);
-                      return (
-                        <motion.button
-                          key={item.id}
-                          onClick={() => addItem(item)}
-                          whileTap={{ scale: 0.95 }}
-                          className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all ${
-                            inCart
-                              ? "bg-amber-500/15 border-amber-500/50"
-                              : t.cartItemInactive
-                          }`}
-                        >
-                          {inCart && (
-                            <div className="absolute top-2 right-2 h-5 w-5 lg:h-6 lg:w-6 rounded-full bg-amber-500 flex items-center justify-center">
-                              <span className="text-[10px] lg:text-xs font-bold text-black">
-                                {inCart.qty}
-                              </span>
-                            </div>
-                          )}
-                          <p className={`text-xs lg:text-sm font-semibold ${t.textSoft} leading-snug pr-6 line-clamp-2`}>
+              {/* ── ORDER PANEL ── */}
+              <div
+                className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${
+                  screen === "menu"
+                    ? "hidden lg:flex"
+                    : "flex flex-1 lg:flex-none"
+                }`}
+              >
+                {/* Order panel header (lg+ only) */}
+                <div
+                  className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}
+                >
+                  <ShoppingBag className="h-4 w-4 text-amber-400" />
+                  <p className="text-sm font-bold">
+                    Porosia ·{" "}
+                    <span className="text-amber-400">{activeLabel}</span>
+                  </p>
+                  <span
+                    className={`ml-auto text-[10px] ${t.textDim}`}
+                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  >
+                    {orderCount(currentOrder)} ITEMS
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-2">
+                  {currentOrder.items.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-12">
+                      <ShoppingBag className={`h-8 w-8 ${t.textFaint}`} />
+                      <p className={`${t.textFaint} text-sm`}>Asnjë artikull</p>
+                      <p className={`${t.textFaint} text-xs hidden lg:block`}>
+                        Klikoni një artikull nga menyja për ta shtuar
+                      </p>
+                    </div>
+                  ) : (
+                    currentOrder.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl ${t.surface} border ${t.border}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`text-sm font-semibold ${t.textSoft} truncate`}
+                          >
                             {item.name}
                           </p>
                           <p
-                            className="text-xs lg:text-sm font-bold text-amber-400 mt-1.5"
+                            className="text-xs text-amber-400 mt-0.5"
                             style={{ fontFamily: "'DM Mono', monospace" }}
                           >
-                            {parsePrice(item.price)}{" "}
-                            <span className={`text-[9px] lg:text-[10px] ${t.textFaint}`}>DEN</span>
+                            {item.price} × {item.qty} = {item.price * item.qty}{" "}
+                            DEN
                           </p>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── ORDER PANEL ── */}
-            <div
-              className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${
-                screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"
-              }`}
-            >
-              {/* Order panel header (lg+ only) */}
-              <div className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}>
-                <ShoppingBag className="h-4 w-4 text-amber-400" />
-                <p className="text-sm font-bold">
-                  Porosia · <span className="text-amber-400">{activeLabel}</span>
-                </p>
-                <span
-                  className={`ml-auto text-[10px] ${t.textDim}`}
-                  style={{ fontFamily: "'DM Mono', monospace" }}
-                >
-                  {orderCount(currentOrder)} ITEMS
-                </span>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-2">
-                {currentOrder.items.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-12">
-                    <ShoppingBag className={`h-8 w-8 ${t.textFaint}`} />
-                    <p className={`${t.textFaint} text-sm`}>Asnjë artikull</p>
-                    <p className={`${t.textFaint} text-xs hidden lg:block`}>
-                      Klikoni një artikull nga menyja për ta shtuar
-                    </p>
-                  </div>
-                ) : (
-                  currentOrder.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 p-3 rounded-xl ${t.surface} border ${t.border}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
-                          {item.name}
-                        </p>
-                        <p
-                          className="text-xs text-amber-400 mt-0.5"
-                          style={{ fontFamily: "'DM Mono', monospace" }}
+                        </div>
+                        <div
+                          className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}
                         >
-                          {item.price} × {item.qty} = {item.price * item.qty} DEN
-                        </p>
+                          <button
+                            onClick={() => updateQty(item.id, -1)}
+                            className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span
+                            className="text-sm font-bold text-amber-400 w-5 text-center"
+                            style={{ fontFamily: "'DM Mono', monospace" }}
+                          >
+                            {item.qty}
+                          </span>
+                          <button
+                            onClick={() => updateQty(item.id, 1)}
+                            className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
-                      <div className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}>
-                        <button
-                          onClick={() => updateQty(item.id, -1)}
-                          className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span
-                          className="text-sm font-bold text-amber-400 w-5 text-center"
-                          style={{ fontFamily: "'DM Mono', monospace" }}
-                        >
-                          {item.qty}
-                        </span>
-                        <button
-                          onClick={() => updateQty(item.id, 1)}
-                          className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Total + Pay */}
-              {currentOrder.items.length > 0 && (
-                <div
-                  className={`flex-shrink-0 p-4 lg:p-5 border-t ${t.border} space-y-3`}
-                  style={{
-                    paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className={`flex items-center gap-2 ${t.textMuted} text-xs`}>
-                      <Clock className="h-3.5 w-3.5" />
-                      {currentOrder.startedAt ? elapsed(currentOrder) : "—"}
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-[10px] ${t.textDim}`}
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        TOTAL
-                      </p>
-                      <p
-                        className={`text-2xl lg:text-3xl font-bold ${t.text}`}
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        {orderTotal(currentOrder)}{" "}
-                        <span className={`text-sm ${t.textDim}`}>DEN</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {payConfirm ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setPayConfirm(false)}
-                        className={`flex-1 h-12 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold hover:bg-white/12`}
-                      >
-                        Anulo
-                      </button>
-                      <button
-                        onClick={payOrder}
-                        className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-400"
-                      >
-                        ✓ Paguar
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setPayConfirm(true)}
-                      className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
-                    >
-                      <Receipt className="h-4 w-4" />
-                      Paguaj {orderTotal(currentOrder)} DEN
-                    </button>
+                    ))
                   )}
                 </div>
-              )}
-            </div>
-          </motion.div>
-        )}
+
+                {/* Total + Pay */}
+                {currentOrder.items.length > 0 && (
+                  <div
+                    className={`flex-shrink-0 p-4 lg:p-5 border-t ${t.border} space-y-3`}
+                    style={{
+                      paddingBottom:
+                        "max(16px, env(safe-area-inset-bottom, 16px))",
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`flex items-center gap-2 ${t.textMuted} text-xs`}
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        {currentOrder.startedAt ? elapsed(currentOrder) : "—"}
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`text-[10px] ${t.textDim}`}
+                          style={{ fontFamily: "'DM Mono', monospace" }}
+                        >
+                          TOTAL
+                        </p>
+                        <p
+                          className={`text-2xl lg:text-3xl font-bold ${t.text}`}
+                          style={{ fontFamily: "'DM Mono', monospace" }}
+                        >
+                          {orderTotal(currentOrder)}{" "}
+                          <span className={`text-sm ${t.textDim}`}>DEN</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {payConfirm ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setPayConfirm(false)}
+                          className={`flex-1 h-12 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold hover:bg-white/12`}
+                        >
+                          Anulo
+                        </button>
+                        <button
+                          onClick={payOrder}
+                          className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-400"
+                        >
+                          ✓ Paguar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setPayConfirm(true)}
+                        className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
+                      >
+                        <Receipt className="h-4 w-4" />
+                        Paguaj {orderTotal(currentOrder)} DEN
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
       </AnimatePresence>
 
       {/* ── New Person Modal ── */}
@@ -1091,7 +1249,10 @@ export default function POS({ slug }: POSProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/70 z-40"
-              onClick={() => { setShowNewPerson(false); setNewPersonName(""); }}
+              onClick={() => {
+                setShowNewPerson(false);
+                setNewPersonName("");
+              }}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: 20 }}
@@ -1100,20 +1261,29 @@ export default function POS({ slug }: POSProps) {
               transition={{ duration: 0.18 }}
               className={`fixed left-4 right-4 bottom-1/3 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.borderDashed} shadow-2xl`}
             >
-              <p className="text-base font-bold text-white mb-1">Krijo Person</p>
-              <p className={`text-xs ${t.textDim} mb-4`}>Shkruaj emrin e personit</p>
+              <p className="text-base font-bold text-white mb-1">
+                Krijo Person
+              </p>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                Shkruaj emrin e personit
+              </p>
               <input
                 ref={nameInputRef}
                 value={newPersonName}
                 onChange={(e) => setNewPersonName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleCreatePerson(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreatePerson();
+                }}
                 placeholder="p.sh. Besart, Mirem, Person1…"
                 className={`w-full h-12 rounded-xl border ${t.inputBorder} px-4 text-sm outline-none focus:border-amber-500/50 mb-4`}
                 style={{ background: t.inputBgStyle, color: t.inputTextStyle }}
               />
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setShowNewPerson(false); setNewPersonName(""); }}
+                  onClick={() => {
+                    setShowNewPerson(false);
+                    setNewPersonName("");
+                  }}
                   className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
                 >
                   Anulo
