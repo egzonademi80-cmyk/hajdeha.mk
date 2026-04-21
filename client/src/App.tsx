@@ -41,7 +41,8 @@ function Router() {
         <Route path="/table/:restaurantSlug/:tableNumber" component={TablePage} />
 
         {/* Fallback */}
-        <Route path="/pos/bujar" component={POS} />
+        <Route path="/pos/bujar">{() => <POS slug="embeltoresport" />}</Route>
+        <Route path="/pos/:slug">{(params: any) => <POS slug={params.slug} />}</Route>
         <Route component={NotFound} />
       </Switch>
     </div>

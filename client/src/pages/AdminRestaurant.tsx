@@ -655,6 +655,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
     longitude: restaurant.longitude || "",
     tableCount: restaurant.tableCount || 0,
     wifiPassword: restaurant.wifiPassword || "",
+    orderMode: (restaurant as any).orderMode || "whatsapp",
   });
 
   useEffect(() => {
@@ -675,6 +676,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
       longitude: restaurant.longitude || "",
       tableCount: restaurant.tableCount || 0,
       wifiPassword: restaurant.wifiPassword || "",
+      orderMode: (restaurant as any).orderMode || "whatsapp",
     });
   }, [restaurant]);
 
@@ -820,6 +822,44 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
             }
             className="h-9 bg-background text-foreground border-border"
           />
+        </div>
+        <div className="sm:col-span-2">
+          <Label className="text-sm text-foreground">
+            How orders are received
+          </Label>
+          <div className="grid grid-cols-2 gap-2 mt-1.5">
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, orderMode: "whatsapp" }))
+              }
+              className={`h-12 rounded-lg border text-sm font-semibold transition-all ${
+                formData.orderMode === "whatsapp"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              💬 WhatsApp / Call
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, orderMode: "tablet" }))
+              }
+              className={`h-12 rounded-lg border text-sm font-semibold transition-all ${
+                formData.orderMode === "tablet"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              📲 Tablet POS (live)
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5">
+            {formData.orderMode === "tablet"
+              ? `Open /pos/${restaurant.slug} on your tablet to receive orders live.`
+              : "Customers' orders open WhatsApp on their phone."}
+          </p>
         </div>
         <div>
           <Label className="text-sm text-foreground">Opening</Label>

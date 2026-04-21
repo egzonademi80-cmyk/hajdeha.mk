@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import Pusher from "pusher-js";
 import {
   Plus,
   Minus,
@@ -13,6 +14,7 @@ import {
   UserPlus,
   X,
   User,
+  Bell,
 } from "lucide-react";
 
 interface MenuItem {
@@ -41,10 +43,7 @@ interface PersonTab {
   startedAt: Date | null;
 }
 
-const RESTAURANT_SLUG = "embeltoresport";
 const TABLE_COUNT = 6;
-const TABLES_KEY = "pos-bujar-tables-v2";
-const PERSONS_KEY = "pos-bujar-persons-v1";
 
 const emptyTable = (): TableOrder => ({ items: [], startedAt: null });
 
@@ -59,7 +58,22 @@ type ActiveSlot =
 
 type Screen = "tables" | "menu" | "order";
 
-export default function POS() {
+interface IncomingOrder {
+  id: string;
+  tableNumber: number | string;
+  cart: OrderItem[];
+  timestamp: number;
+}
+
+interface POSProps {
+  slug: string;
+}
+
+export default function POS({ slug }: POSProps) {
+  const RESTAURANT_SLUG = slug;
+  const TABLES_KEY = `pos-${slug}-tables-v2`;
+  const PERSONS_KEY = `pos-${slug}-persons-v1`;
+
   const [tables, setTables] = useState<TableOrder[]>(() => {
     try {
       const saved = localStorage.getItem(TABLES_KEY);
@@ -78,6 +92,9 @@ export default function POS() {
     } catch {}
     return [];
   });
+
+  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(null);
+  const [tableFlash, setTableFlash] = useState<number | null>(null);
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -271,6 +288,92 @@ export default function POS() {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
   }, [showNewPerson]);
 
+  // ── Live Pusher subscription for incoming orders from QR menu ──
+  useEffect(() => {
+    let pusher: Pusher | null = null;
+    let cancelled = false;
+
+    const playChime = () => {
+      try {
+        const ctx = new (window.AudioContext ||
+          (window as any).webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.setValueAtTime(880, ctx.currentTime);
+        o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+        o.start(); o.stop(ctx.currentTime + 0.55);
+      } catch {}
+    };
+
+    const handleIncoming = (data: any) => {
+      const cart: OrderItem[] = data.cart || [];
+      const tableNumber = data.tableNumber;
+      // Strip prefix letters → leave just the digits to match T1..T6
+      const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
+      const tableIdx = tableDigits - 1;
+
+      // Auto-fill matching table if within fixed range (T1..T6)
+      if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+        setTables((prev) => {
+          const next = [...prev];
+          const merged = [...next[tableIdx].items];
+          cart.forEach((it) => {
+            const ex = merged.find((m) => m.id === it.id);
+            if (ex) ex.qty += it.qty;
+            else merged.push({ ...it });
+          });
+          next[tableIdx] = {
+            items: merged,
+            startedAt: next[tableIdx].startedAt ?? new Date(),
+          };
+          return next;
+        });
+        setTableFlash(tableIdx);
+        setTimeout(() => setTableFlash(null), 4000);
+      }
+
+      // Always show the banner notification
+      setIncomingBanner({
+        id: `${Date.now()}-${Math.random()}`,
+        tableNumber,
+        cart,
+        timestamp: data.timestamp || Date.now(),
+      });
+      playChime();
+      if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
+      setTimeout(
+        () => setIncomingBanner((b) => (b && b.tableNumber === tableNumber ? null : b)),
+        12000,
+      );
+    };
+
+    (async () => {
+      try {
+        const res = await fetch("/api/config/pusher");
+        if (!res.ok) return;
+        const cfg = await res.json();
+        if (cancelled || !cfg.key || !cfg.cluster) return;
+        pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
+        const channel = pusher.subscribe(`pos-${RESTAURANT_SLUG}`);
+        channel.bind("incoming-order", handleIncoming);
+      } catch (e) {
+        console.error("Pusher subscribe failed:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        pusher?.unsubscribe(`pos-${RESTAURANT_SLUG}`);
+        pusher?.disconnect();
+      } catch {}
+    };
+  }, [RESTAURANT_SLUG]);
+
   const tableStatus = (o: TableOrder | PersonTab): "empty" | "fresh" | "mid" | "late" => {
     if (!o.startedAt || o.items.length === 0) return "empty";
     const mins = Math.floor(
@@ -390,6 +493,57 @@ export default function POS() {
         )}
       </div>
 
+      {/* ── Incoming order banner ── */}
+      <AnimatePresence>
+        {incomingBanner && (
+          <motion.button
+            key={incomingBanner.id}
+            onClick={() => {
+              const td = parseInt(
+                String(incomingBanner.tableNumber).replace(/\D/g, ""),
+                10,
+              );
+              const idx = td - 1;
+              if (idx >= 0 && idx < TABLE_COUNT) {
+                openSlot({ kind: "table", idx });
+              }
+              setIncomingBanner(null);
+            }}
+            initial={{ y: -80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+            className="absolute top-[60px] left-3 right-3 z-30 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl"
+            style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+          >
+            <motion.div
+              animate={{ scale: [1, 1.18, 1] }}
+              transition={{ duration: 0.9, repeat: Infinity }}
+            >
+              <Bell className="h-5 w-5" />
+            </motion.div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-bold leading-tight">
+                Porosi e re — Tavolina {incomingBanner.tableNumber}
+              </p>
+              <p
+                className="text-[11px] font-semibold opacity-80 truncate"
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                {incomingBanner.cart.reduce((s, i) => s + i.qty, 0)} artikuj ·{" "}
+                {incomingBanner.cart.reduce((s, i) => s + i.price * i.qty, 0)} DEN
+              </p>
+            </div>
+            <span
+              className="text-[10px] font-bold opacity-70"
+              style={{ fontFamily: "'DM Mono', monospace" }}
+            >
+              SHIH →
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* ── SCREEN: TABLES ── */}
       <AnimatePresence mode="wait">
         {screen === "tables" && (
@@ -420,10 +574,18 @@ export default function POS() {
                       key={idx}
                       onClick={() => openSlot({ kind: "table", idx })}
                       whileTap={{ scale: 0.92 }}
+                      animate={
+                        tableFlash === idx
+                          ? { scale: [1, 1.08, 1, 1.08, 1] }
+                          : { scale: 1 }
+                      }
+                      transition={{ duration: 1.6, repeat: tableFlash === idx ? 2 : 0 }}
                       className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
                         wasJustPaid
                           ? "bg-emerald-500/20 border-emerald-500/40"
-                          : `${c.bg} ${c.border}`
+                          : tableFlash === idx
+                            ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
+                            : `${c.bg} ${c.border}`
                       }`}
                     >
                       {wasJustPaid ? (

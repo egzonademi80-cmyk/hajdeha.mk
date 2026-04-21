@@ -70,6 +70,7 @@ async function handleUpdate(req: VercelRequest, res: VercelResponse, userId: num
     "name", "description", "descriptionAl", "descriptionMk", "slug",
     "photoUrl", "website", "phoneNumber", "location",
     "openingTime", "closingTime", "active", "latitude", "longitude", "tableCount",
+    "wifiPassword", "orderMode",
   ];
 
   const updateData: Record<string, unknown> = {};

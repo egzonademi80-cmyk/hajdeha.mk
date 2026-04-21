@@ -182,6 +182,13 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/config/pusher", (_req, res) => {
+    res.json({
+      key: process.env.PUSHER_KEY || "",
+      cluster: process.env.PUSHER_CLUSTER || "",
+    });
+  });
+
   app.get("/api/table/:pin/cart", (req, res) => {
     const room = tableRooms.get(req.params.pin);
     res.json({ cart: room?.cart || [] });
@@ -205,6 +212,25 @@ export async function registerRoutes(
         cart: safeCart,
         tableNumber,
       });
+
+      // ── Tablet POS live broadcast ──
+      // channel format: `table-{slug}-{tableNumber}` → extract slug, look up restaurant
+      try {
+        const m = String(channel).match(/^table-(.+)-([^-]+)$/);
+        if (m) {
+          const slug = m[1];
+          const restaurant = await storage.getRestaurantBySlug(slug);
+          if (restaurant && (restaurant as any).orderMode === "tablet") {
+            await pusherServer.trigger(`pos-${slug}`, "incoming-order", {
+              cart: safeCart,
+              tableNumber,
+              timestamp: Date.now(),
+            });
+          }
+        }
+      } catch (e) {
+        console.error("pos broadcast failed:", e);
+      }
 
       const room = tableRooms.get(channel) || { cart: [], sessionOrder: [] };
       const merged = [...room.sessionOrder];
