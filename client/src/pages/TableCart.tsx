@@ -2012,7 +2012,25 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     pusher.connection.bind("disconnected", () => setConnected(false));
     pusher.connection.bind("error", () => setConnected(false));
     channel.bind("cart-update", (data: { cart: CartItem[] }) => {
-      if (!isLocal.current) setCart(data.cart);
+      if (!isLocal.current) {
+        // Items without addedBy came from POS — treat as already-ordered session items
+        const posItems = data.cart.filter((i) => !i.addedBy);
+        const customerItems = data.cart.filter((i) => i.addedBy);
+        if (posItems.length > 0) {
+          setSessionOrder((prev) => {
+            const merged = [...prev];
+            posItems.forEach((item) => {
+              const existing = merged.find(
+                (i) => i.id === item.id && !i.addedBy,
+              );
+              if (existing) existing.qty = item.qty;
+              else merged.push({ ...item });
+            });
+            return merged;
+          });
+        }
+        setCart(customerItems);
+      }
     });
     channel.bind("order-snapshot", (data: { sessionOrder: CartItem[] }) => {
       setSessionOrder(data.sessionOrder);
