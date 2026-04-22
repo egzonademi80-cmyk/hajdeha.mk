@@ -1063,6 +1063,8 @@ function WaiterSheet({
   lang,
   receiptItems,
   restaurantName,
+  restaurantSlug,
+  onSignal,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1071,6 +1073,8 @@ function WaiterSheet({
   lang: Lang;
   receiptItems: CartItem[];
   restaurantName: string;
+  restaurantSlug: string;
+  onSignal: (type: "bill" | "help") => void;
 }) {
   const tr = t[lang];
   const [billPicker, setBillPicker] = useState(false);
@@ -1080,7 +1084,8 @@ function WaiterSheet({
     if (!open) setBillPicker(false);
   }, [open]);
 
-  const openWhatsApp = (message: string) => {
+  const openWhatsApp = (message: string, signalType?: "bill" | "help") => {
+    if (signalType) onSignal(signalType);
     const phone = (phoneNumber || "").replace(/\D/g, "");
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
@@ -1231,6 +1236,7 @@ function WaiterSheet({
                               "cash",
                             )
                           : tr.billTextCash(tableNumber),
+                        "bill",
                       )
                     }
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
@@ -1272,6 +1278,7 @@ function WaiterSheet({
                               "card",
                             )
                           : tr.billTextCard(tableNumber),
+                        "bill",
                       )
                     }
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
@@ -1322,7 +1329,9 @@ function WaiterSheet({
                         key={msg.label}
                         whileTap={{ scale: 0.97 }}
                         onClick={() =>
-                          isBill ? setBillPicker(true) : openWhatsApp(msg.text)
+                          isBill
+                            ? setBillPicker(true)
+                            : openWhatsApp(msg.text, "help")
                         }
                         className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
                       >
@@ -2008,6 +2017,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     channel.bind("order-snapshot", (data: { sessionOrder: CartItem[] }) => {
       setSessionOrder(data.sessionOrder);
     });
+    channel.bind("cart-cleared", () => {
+      setCart([]);
+      setSessionOrder([]);
+      localStorage.removeItem(`hajde-ts-${channelName}`);
+    });
     channel.bind("pusher:subscription_succeeded", () => setConnected(true));
 
     // Time-based table isolation:
@@ -2527,6 +2541,20 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         lang={lang}
         receiptItems={fullCart}
         restaurantName={restaurant.name}
+        restaurantSlug={restaurantSlug}
+        onSignal={async (type) => {
+          try {
+            await fetch("/api/table/waiter-signal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                restaurantSlug,
+                tableNumber: displayTable,
+                type,
+              }),
+            });
+          } catch {}
+        }}
       />
       <AIWaiterPanel
         open={aiOpen}

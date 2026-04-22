@@ -153,31 +153,51 @@ export async function registerRoutes(
 
   app.post("/api/table/cart-update", async (req, res) => {
     try {
-      const { channel, cart } = req.body;
-
-      console.log("cart-update hit:", { channel, cartLength: cart?.length });
-
+      const { channel, cart, clearSession } = req.body;
+      console.log("cart-update hit:", {
+        channel,
+        cartLength: cart?.length,
+        clearSession,
+      });
       if (!channel || !Array.isArray(cart)) {
         return res.status(400).json({ message: "Missing fields" });
       }
-
       const existing = tableRooms.get(channel);
       tableRooms.set(channel, {
         cart,
-        sessionOrder: existing?.sessionOrder || [],
+        sessionOrder: clearSession ? [] : existing?.sessionOrder || [],
       });
-
       try {
         console.log("triggering pusher on channel:", channel);
-        await pusherServer.trigger(channel, "cart-update", { cart });
-        console.log("pusher trigger succeeded");
+        if (clearSession) {
+          await pusherServer.trigger(channel, "cart-cleared", {});
+          console.log("pusher cart-cleared trigger succeeded");
+        } else {
+          await pusherServer.trigger(channel, "cart-update", { cart });
+          console.log("pusher trigger succeeded");
+        }
       } catch (e: any) {
         console.error("PUSHER FAIL:", e.message, e.status, e.stack);
       }
-
       res.json({ ok: true });
     } catch (err: any) {
       console.error("cart-update error:", err.message, err.stack);
+      res.status(500).json({ message: err.message });
+    }
+  });
+  app.post("/api/table/waiter-signal", async (req, res) => {
+    try {
+      const { restaurantSlug, tableNumber, type } = req.body;
+      if (!restaurantSlug || !tableNumber || !type) {
+        return res.status(400).json({ message: "Missing fields" });
+      }
+      await pusherServer.trigger(`pos-${restaurantSlug}`, "waiter-request", {
+        tableNumber,
+        type,
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("waiter-signal error:", err.message, err.stack);
       res.status(500).json({ message: err.message });
     }
   });

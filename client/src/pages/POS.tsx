@@ -136,6 +136,9 @@ export default function POS({ slug }: POSProps) {
     null,
   );
   const [tableFlash, setTableFlash] = useState<number | null>(null);
+  const [tableSignals, setTableSignals] = useState<
+    Record<number, "bill" | "help" | null>
+  >({});
 
   // ── Theme (light/dark) ──
   const THEME_KEY = `pos-${slug}-theme`;
@@ -398,7 +401,6 @@ export default function POS({ slug }: POSProps) {
       });
     }
   };
-
   const payOrder = () => {
     if (!active) return;
     const slot = active;
@@ -408,6 +410,16 @@ export default function POS({ slug }: POSProps) {
         next[slot.idx] = emptyTable();
         return next;
       });
+      setTableSignals((prev) => ({ ...prev, [slot.idx]: null }));
+      fetch("/api/table/cart-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
+          cart: [],
+          clearSession: true,
+        }),
+      }).catch(() => {});
     } else {
       setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
     }
@@ -422,8 +434,10 @@ export default function POS({ slug }: POSProps) {
     e.stopPropagation();
     setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
   };
-
   const openSlot = (slot: ActiveSlot) => {
+    if (slot.kind === "table") {
+      setTableSignals((prev) => ({ ...prev, [slot.idx]: null }));
+    }
     setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
@@ -559,6 +573,18 @@ export default function POS({ slug }: POSProps) {
         pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
         const channel = pusher.subscribe(`pos-${RESTAURANT_SLUG}`);
         channel.bind("incoming-order", handleIncoming);
+        channel.bind(
+          "waiter-request",
+          (data: { tableNumber: string | number; type: "bill" | "help" }) => {
+            const idx =
+              parseInt(String(data.tableNumber).replace(/\D/g, ""), 10) - 1;
+            if (idx >= 0 && idx < TABLE_COUNT) {
+              setTableSignals((prev) => ({ ...prev, [idx]: data.type }));
+              playChime();
+              if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
+            }
+          },
+        );
       } catch (e) {
         console.error("Pusher subscribe failed:", e);
       }
@@ -777,7 +803,11 @@ export default function POS({ slug }: POSProps) {
                           ? "bg-emerald-500/20 border-emerald-500/40"
                           : tableFlash === idx
                             ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
-                            : `${c.bg} ${c.border}`
+                            : tableSignals[idx] === "bill"
+                              ? "bg-amber-500/25 border-amber-400 ring-2 ring-amber-400/50 animate-pulse"
+                              : tableSignals[idx] === "help"
+                                ? "bg-blue-500/20 border-blue-400 ring-2 ring-blue-400/50 animate-pulse"
+                                : `${c.bg} ${c.border}`
                       }`}
                     >
                       {wasJustPaid ? (
