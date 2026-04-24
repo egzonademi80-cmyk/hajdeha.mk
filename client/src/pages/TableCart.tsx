@@ -2208,11 +2208,10 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
     // Snapshot the cart into sessionOrder before clearing AND sync to server
     // Use functional update to avoid sessionOrder in deps (prevents infinite loop)
+    const cartSnapshot = [...cart];
     setSessionOrder((prev) => {
-      // Deep copy to avoid mutating prev state
       const merged = prev.map((i) => ({ ...i }));
-      cart.forEach((item) => {
-        // Match by id AND addedBy so each person's items stay separate
+      cartSnapshot.forEach((item) => {
         const existing = merged.find(
           (i) => i.id === item.id && i.addedBy === item.addedBy,
         );
@@ -2469,7 +2468,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               <WifiOff className="h-4 w-4 flex-shrink-0" />
               <span>
                 {lang === "al"
-                  ? "Jeni offline — ndryshimet do të sinkronizohen"
+                  ? "Jeni offline — ndryshimet do ta� sinkronizohen"
                   : lang === "mk"
                     ? "Сте офлајн — промените ќе се синхронизираат"
                     : "You're offline — changes will sync when reconnected"}
