@@ -17,6 +17,10 @@ import {
   Bell,
   Sun,
   Moon,
+  ArrowRightLeft,
+  Merge,
+  LayoutGrid,
+  Divide,
 } from "lucide-react";
 
 interface MenuItem {
@@ -37,6 +41,7 @@ interface OrderItem {
 interface TableOrder {
   items: OrderItem[];
   startedAt: Date | null;
+  section?: string;
 }
 
 interface PersonTab {
@@ -49,7 +54,60 @@ interface Restaurant {
   name: string;
   menuItems: MenuItem[];
   tableCount?: number;
+  sections?: string[];
 }
+
+interface TableSection {
+  name: string;
+  tables: number[];
+}
+
+// ─── Split Bill Types ──────────────────────────────────────────────────────────
+interface SplitPerson {
+  name: string;
+  colorIdx: number;
+  paid: boolean;
+  payMethod: "cash" | "card" | null;
+}
+
+const SPLIT_COLORS = [
+  {
+    bg: "bg-blue-500/20",
+    border: "border-blue-500/50",
+    text: "text-blue-400",
+    dot: "bg-blue-500",
+  },
+  {
+    bg: "bg-rose-500/20",
+    border: "border-rose-500/50",
+    text: "text-rose-400",
+    dot: "bg-rose-500",
+  },
+  {
+    bg: "bg-emerald-500/20",
+    border: "border-emerald-500/50",
+    text: "text-emerald-400",
+    dot: "bg-emerald-500",
+  },
+  {
+    bg: "bg-purple-500/20",
+    border: "border-purple-500/50",
+    text: "text-purple-400",
+    dot: "bg-purple-500",
+  },
+  {
+    bg: "bg-amber-500/20",
+    border: "border-amber-500/50",
+    text: "text-amber-400",
+    dot: "bg-amber-500",
+  },
+  {
+    bg: "bg-pink-500/20",
+    border: "border-pink-500/50",
+    text: "text-pink-400",
+    dot: "bg-pink-500",
+  },
+];
 
 const emptyTable = (): TableOrder => ({ items: [], startedAt: null });
 
@@ -75,12 +133,18 @@ interface POSProps {
   slug: string;
 }
 
+const defaultSections: TableSection[] = [
+  { name: "Indoor", tables: [] },
+  { name: "Outdoor", tables: [] },
+  { name: "Bar", tables: [] },
+];
+
 export default function POS({ slug }: POSProps) {
   const RESTAURANT_SLUG = slug;
-  const TABLES_KEY = `pos-${slug}-tables-v2`;
+  const TABLES_KEY = `pos-${slug}-tables-v3`;
   const PERSONS_KEY = `pos-${slug}-persons-v1`;
+  const SECTIONS_KEY = `pos-${slug}-sections-v1`;
 
-  // Fetch restaurant data first to get table count
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["pos-restaurant"],
     queryFn: async () => {
@@ -91,35 +155,40 @@ export default function POS({ slug }: POSProps) {
     retry: false,
   });
 
-  // Get table count from restaurant data, default to 6 if not set
   const TABLE_COUNT = restaurant?.tableCount || 6;
+
+  const [sections, setSections] = useState<TableSection[]>(() => {
+    try {
+      const saved = localStorage.getItem(SECTIONS_KEY);
+      if (saved) return JSON.parse(saved) as TableSection[];
+    } catch {}
+    return defaultSections;
+  });
+
+  const [draftSections, setDraftSections] = useState<TableSection[]>([]);
+  const [activeDraftSection, setActiveDraftSection] =
+    useState<string>("Indoor");
 
   const [tables, setTables] = useState<TableOrder[]>(() => {
     try {
       const saved = localStorage.getItem(TABLES_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as TableOrder[];
-        // Only use saved data if it matches the current table count
-        if (parsed.length === TABLE_COUNT) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
     return Array.from({ length: TABLE_COUNT }, emptyTable);
   });
 
-  // Update tables array when TABLE_COUNT changes
   useEffect(() => {
     setTables((prev) => {
       if (prev.length === TABLE_COUNT) return prev;
-
-      // If we need more tables, add empty ones
       if (prev.length < TABLE_COUNT) {
         return [
           ...prev,
           ...Array.from({ length: TABLE_COUNT - prev.length }, emptyTable),
         ];
       }
-
-      // If we need fewer tables, truncate (keeping the first N)
       return prev.slice(0, TABLE_COUNT);
     });
   }, [TABLE_COUNT]);
@@ -136,11 +205,95 @@ export default function POS({ slug }: POSProps) {
     null,
   );
   const [tableFlash, setTableFlash] = useState<number | null>(null);
-  const [tableSignals, setTableSignals] = useState<
-    Record<number, "bill" | "help" | null>
-  >({});
 
-  // ── Theme (light/dark) ──
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showSectionsModal, setShowSectionsModal] = useState(false);
+  const [transferSource, setTransferSource] = useState<number | null>(null);
+  const [mergeSource, setMergeSource] = useState<number | null>(null);
+  const [selectedSection, setSelectedSection] = useState<string>("all");
+
+  // ─── Split Bill State ────────────────────────────────────────────────────────
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [splitTableIdx, setSplitTableIdx] = useState<number | null>(null);
+  const [splitPersons, setSplitPersons] = useState<SplitPerson[]>([]);
+  // itemAssignments[i] = person index (or null = unassigned)
+  const [itemAssignments, setItemAssignments] = useState<(number | null)[]>([]);
+
+  const openSplitBill = (tableIdx: number) => {
+    const order = tables[tableIdx];
+    setSplitTableIdx(tableIdx);
+    setSplitPersons([
+      { name: "Person 1", colorIdx: 0, paid: false, payMethod: null },
+      { name: "Person 2", colorIdx: 1, paid: false, payMethod: null },
+    ]);
+    setItemAssignments(order.items.map(() => null));
+    setShowSplitModal(true);
+  };
+
+  const addSplitPerson = () => {
+    setSplitPersons((prev) => [
+      ...prev,
+      {
+        name: `Person ${prev.length + 1}`,
+        colorIdx: prev.length % SPLIT_COLORS.length,
+        paid: false,
+        payMethod: null,
+      },
+    ]);
+  };
+
+  const assignItem = (itemIdx: number, personIdx: number | null) => {
+    setItemAssignments((prev) => {
+      const next = [...prev];
+      next[itemIdx] = personIdx;
+      return next;
+    });
+  };
+
+  const personTotal = (personIdx: number): number => {
+    if (splitTableIdx === null) return 0;
+    const order = tables[splitTableIdx];
+    return order.items.reduce((sum, item, i) => {
+      if (itemAssignments[i] === personIdx) return sum + item.price * item.qty;
+      return sum;
+    }, 0);
+  };
+
+  const unassignedItems = (): { item: OrderItem; idx: number }[] => {
+    if (splitTableIdx === null) return [];
+    return tables[splitTableIdx].items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ idx }) => itemAssignments[idx] === null);
+  };
+
+  const unassignedTotal = (): number =>
+    unassignedItems().reduce((s, { item }) => s + item.price * item.qty, 0);
+
+  const markPaid = (personIdx: number, method: "cash" | "card") => {
+    setSplitPersons((prev) => {
+      const next = prev.map((p, i) =>
+        i === personIdx ? { ...p, paid: true, payMethod: method } : p,
+      );
+      // If every person is now paid, clear the table and close
+      const allPaid = next.every((p) => p.paid);
+      if (allPaid && splitTableIdx !== null) {
+        setTables((t) => {
+          const updated = [...t];
+          updated[splitTableIdx] = emptyTable();
+          return updated;
+        });
+        setJustPaid({ kind: "table", idx: splitTableIdx });
+        setTimeout(() => setJustPaid(null), 2500);
+        setShowSplitModal(false);
+        setActive(null);
+        setScreen("tables");
+      }
+      return next;
+    });
+  };
+  // ───────────────────────────────────────────er�─────────────────────────────────
+
   const THEME_KEY = `pos-${slug}-theme`;
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     try {
@@ -178,6 +331,7 @@ export default function POS({ slug }: POSProps) {
           "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
         backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
         modalBg: "bg-white",
+        modalOverlay: "bg-black/50",
         inputBgStyle: "#F4F2EF",
         inputTextStyle: "#1A1A1A",
         inputBorder: "border-[#E0DDD8]",
@@ -186,6 +340,8 @@ export default function POS({ slug }: POSProps) {
         personIconEmpty: "bg-[#EDEAE5] text-[#A8A8A8]",
         qtyControlBg: "bg-[#EDEAE5]",
         qtyBtnText: "text-[#5A5A5A] hover:bg-[#D8D4CF]",
+        actionBtn: "bg-blue-50 text-blue-600 hover:bg-blue-100",
+        actionBtnAlt: "bg-purple-50 text-purple-600 hover:bg-purple-100",
       }
     : {
         appBg: "bg-[#0F0F0F]",
@@ -208,6 +364,7 @@ export default function POS({ slug }: POSProps) {
           "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
         backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
         modalBg: "bg-[#1A1A1A]",
+        modalOverlay: "bg-black/70",
         inputBgStyle: "#2A2A2A",
         inputTextStyle: "#FFFFFF",
         inputBorder: "border-white/12",
@@ -217,9 +374,10 @@ export default function POS({ slug }: POSProps) {
         qtyControlBg: "bg-white/[0.06]",
         qtyBtnText:
           "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
+        actionBtn: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30",
+        actionBtnAlt: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30",
       };
 
-  // Per-status colors (for table tiles + person rows)
   const statusColorsLight = {
     empty: {
       bg: "bg-[#F4F2EF]",
@@ -283,13 +441,6 @@ export default function POS({ slug }: POSProps) {
   const dotColors = isLight
     ? { fresh: "bg-emerald-500", mid: "bg-amber-500", late: "bg-red-500" }
     : { fresh: "bg-emerald-400", mid: "bg-amber-400", late: "bg-red-400" };
-  const dotTextColors = isLight
-    ? { fresh: "text-emerald-700", mid: "text-amber-700", late: "text-red-700" }
-    : {
-        fresh: "text-emerald-400",
-        mid: "text-amber-400",
-        late: "text-red-400",
-      };
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -319,7 +470,6 @@ export default function POS({ slug }: POSProps) {
     [menuItems, activeCategory],
   );
 
-  // Current order (either a table or a person tab)
   const currentOrder: TableOrder | PersonTab | null = useMemo(() => {
     if (!active) return null;
     if (active.kind === "table") return tables[active.idx] ?? null;
@@ -341,7 +491,68 @@ export default function POS({ slug }: POSProps) {
     return `${Math.floor(mins / 60)}h${mins % 60}m`;
   };
 
-  // ── Shared mutations ──
+  const handleTransfer = (sourceIdx: number, targetIdx: number) => {
+    if (sourceIdx === targetIdx) return;
+    setTables((prev) => {
+      const next = [...prev];
+      const source = next[sourceIdx];
+      const target = next[targetIdx];
+      next[targetIdx] = {
+        ...target,
+        items: [...target.items, ...source.items],
+        startedAt: target.startedAt || source.startedAt,
+      };
+      next[sourceIdx] = emptyTable();
+      return next;
+    });
+    setShowTransferModal(false);
+    setTransferSource(null);
+    setTableFlash(targetIdx);
+    setTimeout(() => setTableFlash(null), 2000);
+  };
+
+  const handleMerge = (sourceIdx: number, targetIdx: number) => {
+    if (sourceIdx === targetIdx) return;
+    setTables((prev) => {
+      const next = [...prev];
+      const source = next[sourceIdx];
+      const target = next[targetIdx];
+      const merged = [...target.items];
+      source.items.forEach((sourceItem) => {
+        const existing = merged.find((i) => i.id === sourceItem.id);
+        if (existing) {
+          existing.qty += sourceItem.qty;
+        } else {
+          merged.push({ ...sourceItem });
+        }
+      });
+      next[targetIdx] = {
+        ...target,
+        items: merged,
+        startedAt: target.startedAt || source.startedAt,
+      };
+      next[sourceIdx] = emptyTable();
+      return next;
+    });
+    setShowMergeModal(false);
+    setMergeSource(null);
+    setTableFlash(targetIdx);
+    setTimeout(() => setTableFlash(null), 2000);
+  };
+
+  const getTableSection = (tableIdx: number): string => {
+    const section = sections.find((s) => s.tables.includes(tableIdx));
+    return section?.name || "Other";
+  };
+
+  const visibleTables = useMemo(() => {
+    if (selectedSection === "all") {
+      return tables.map((_, idx) => idx);
+    }
+    const section = sections.find((s) => s.name === selectedSection);
+    return section?.tables || [];
+  }, [selectedSection, sections, tables]);
+
   const addItem = (item: MenuItem) => {
     if (!active) return;
     const add = (order: TableOrder | PersonTab): TableOrder | PersonTab => {
@@ -359,7 +570,6 @@ export default function POS({ slug }: POSProps) {
       }
       return { ...order, items, startedAt: order.startedAt ?? new Date() };
     };
-
     if (active.kind === "table") {
       setTables((prev) => {
         const next = [...prev];
@@ -401,6 +611,7 @@ export default function POS({ slug }: POSProps) {
       });
     }
   };
+
   const payOrder = () => {
     if (!active) return;
     const slot = active;
@@ -410,16 +621,6 @@ export default function POS({ slug }: POSProps) {
         next[slot.idx] = emptyTable();
         return next;
       });
-      setTableSignals((prev) => ({ ...prev, [slot.idx]: null }));
-      fetch("/api/table/cart-update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
-          cart: [],
-          clearSession: true,
-        }),
-      }).catch(() => {});
     } else {
       setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
     }
@@ -434,10 +635,8 @@ export default function POS({ slug }: POSProps) {
     e.stopPropagation();
     setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
   };
+
   const openSlot = (slot: ActiveSlot) => {
-    if (slot.kind === "table") {
-      setTableSignals((prev) => ({ ...prev, [slot.idx]: null }));
-    }
     setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
@@ -450,7 +649,6 @@ export default function POS({ slug }: POSProps) {
       const newIdx = prev.length;
       const newTab: PersonTab = { name: trimmed, items: [], startedAt: null };
       const next = [...prev, newTab];
-      // Open it after state settles
       setTimeout(() => {
         setActive({ kind: "person", idx: newIdx });
         setScreen("menu");
@@ -462,7 +660,6 @@ export default function POS({ slug }: POSProps) {
     setShowNewPerson(false);
   };
 
-  // PWA manifest override
   useEffect(() => {
     const link = document.querySelector(
       'link[rel="manifest"]',
@@ -473,13 +670,11 @@ export default function POS({ slug }: POSProps) {
     };
   }, []);
 
-  // Tick every 30s so elapsed times update live
   useEffect(() => {
     const id = setInterval(() => forceUpdate((n) => n + 1), 30000);
     return () => clearInterval(id);
   }, []);
 
-  // Persist to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
@@ -490,13 +685,16 @@ export default function POS({ slug }: POSProps) {
       localStorage.setItem(PERSONS_KEY, JSON.stringify(personTabs));
     } catch {}
   }, [personTabs, PERSONS_KEY]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
+    } catch {}
+  }, [sections, SECTIONS_KEY]);
 
-  // Focus name input when modal opens
   useEffect(() => {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
   }, [showNewPerson]);
 
-  // ── Live Pusher subscription for incoming orders from QR menu ──
   useEffect(() => {
     let pusher: Pusher | null = null;
     let cancelled = false;
@@ -522,11 +720,9 @@ export default function POS({ slug }: POSProps) {
     const handleIncoming = (data: any) => {
       const cart: OrderItem[] = data.cart || [];
       const tableNumber = data.tableNumber;
-      // Strip prefix letters → leave just the digits to match T1..TN
       const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
       const tableIdx = tableDigits - 1;
 
-      // Auto-fill matching table if within dynamic range
       if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
         setTables((prev) => {
           const next = [...prev];
@@ -546,7 +742,6 @@ export default function POS({ slug }: POSProps) {
         setTimeout(() => setTableFlash(null), 4000);
       }
 
-      // Always show the banner notification
       setIncomingBanner({
         id: `${Date.now()}-${Math.random()}`,
         tableNumber,
@@ -573,18 +768,6 @@ export default function POS({ slug }: POSProps) {
         pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
         const channel = pusher.subscribe(`pos-${RESTAURANT_SLUG}`);
         channel.bind("incoming-order", handleIncoming);
-        channel.bind(
-          "waiter-request",
-          (data: { tableNumber: string | number; type: "bill" | "help" }) => {
-            const idx =
-              parseInt(String(data.tableNumber).replace(/\D/g, ""), 10) - 1;
-            if (idx >= 0 && idx < TABLE_COUNT) {
-              setTableSignals((prev) => ({ ...prev, [idx]: data.type }));
-              playChime();
-              if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
-            }
-          },
-        );
       } catch (e) {
         console.error("Pusher subscribe failed:", e);
       }
@@ -613,7 +796,6 @@ export default function POS({ slug }: POSProps) {
 
   const statusColors = isLight ? statusColorsLight : statusColorsDark;
 
-  // Label shown in header
   const activeLabel =
     active === null
       ? null
@@ -640,7 +822,7 @@ export default function POS({ slug }: POSProps) {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div
         className={`flex-shrink-0 flex items-center gap-3 px-4 lg:px-6 py-3 lg:py-4 border-b ${t.border}`}
         style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
@@ -674,12 +856,9 @@ export default function POS({ slug }: POSProps) {
                 : "ORDER"}
           </p>
         </div>
-        {/* Theme toggle */}
         <button
           onClick={() => setTheme(isLight ? "dark" : "light")}
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
-          aria-label={isLight ? "Switch to dark mode" : "Switch to light mode"}
-          data-testid="button-toggle-theme"
         >
           {isLight ? (
             <Moon className="h-4 w-4 lg:h-5 lg:w-5" />
@@ -687,7 +866,6 @@ export default function POS({ slug }: POSProps) {
             <Sun className="h-4 w-4 lg:h-5 lg:w-5 text-amber-400" />
           )}
         </button>
-        {/* Cart badge — only in menu screen on phones (on desktop the order panel is always visible) */}
         {screen === "menu" &&
           active !== null &&
           currentOrder &&
@@ -707,7 +885,7 @@ export default function POS({ slug }: POSProps) {
           )}
       </div>
 
-      {/* ── Incoming order banner ── */}
+      {/* Incoming order banner */}
       <AnimatePresence>
         {incomingBanner && (
           <motion.button
@@ -759,7 +937,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* ── SCREEN: TABLES ── */}
+      {/* SCREEN: TABLES */}
       <AnimatePresence mode="wait">
         {screen === "tables" && (
           <motion.div
@@ -770,20 +948,80 @@ export default function POS({ slug }: POSProps) {
             transition={{ duration: 0.18 }}
             className="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-8 space-y-4 lg:space-y-6 max-w-[1400px] w-full mx-auto"
           >
-            {/* ── Dynamic tables grid ── */}
+            {/* Table Management Actions */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowTransferModal(true)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                Transfer Table
+              </button>
+              <button
+                onClick={() => setShowMergeModal(true)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
+              >
+                <Merge className="h-3.5 w-3.5" />
+                Merge Tables
+              </button>
+              <button
+                onClick={() => {
+                  setDraftSections(JSON.parse(JSON.stringify(sections)));
+                  setActiveDraftSection(sections[0]?.name || "Indoor");
+                  setShowSectionsModal(true);
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtnAlt} transition-colors`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Sections
+              </button>
+            </div>
+
+            {/* Section Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setSelectedSection("all")}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  selectedSection === "all"
+                    ? "bg-amber-500 text-black"
+                    : t.chipInactive
+                }`}
+              >
+                All Sections
+              </button>
+              {sections.map((section) => (
+                <button
+                  key={section.name}
+                  onClick={() => setSelectedSection(section.name)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    selectedSection === section.name
+                      ? "bg-amber-500 text-black"
+                      : t.chipInactive
+                  }`}
+                >
+                  {section.name} ({section.tables.length})
+                </button>
+              ))}
+            </div>
+
+            {/* Tables Grid */}
             <div>
               <p
                 className={`text-[10px] lg:text-[11px] ${t.textFaint} mb-2 lg:mb-3 px-0.5`}
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
-                TAVOLINA ({TABLE_COUNT})
+                {selectedSection === "all"
+                  ? `ALL TABLES (${TABLE_COUNT})`
+                  : selectedSection.toUpperCase()}
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 lg:gap-4">
-                {tables.map((table, idx) => {
+                {visibleTables.map((idx) => {
+                  const table = tables[idx];
                   const status = tableStatus(table);
                   const c = statusColors[status];
                   const wasJustPaid =
                     justPaid?.kind === "table" && justPaid.idx === idx;
+                  const sectionName = getTableSection(idx);
                   return (
                     <motion.button
                       key={idx}
@@ -803,11 +1041,7 @@ export default function POS({ slug }: POSProps) {
                           ? "bg-emerald-500/20 border-emerald-500/40"
                           : tableFlash === idx
                             ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
-                            : tableSignals[idx] === "bill"
-                              ? "bg-amber-500/25 border-amber-400 ring-2 ring-amber-400/50 animate-pulse"
-                              : tableSignals[idx] === "help"
-                                ? "bg-blue-500/20 border-blue-400 ring-2 ring-blue-400/50 animate-pulse"
-                                : `${c.bg} ${c.border}`
+                            : `${c.bg} ${c.border}`
                       }`}
                     >
                       {wasJustPaid ? (
@@ -819,6 +1053,13 @@ export default function POS({ slug }: POSProps) {
                           >
                             T{idx + 1}
                           </span>
+                          {selectedSection === "all" && (
+                            <span
+                              className={`text-[9px] font-['DM_Mono'] ${t.textFaint}`}
+                            >
+                              {sectionName}
+                            </span>
+                          )}
                           {table.items.length > 0 && (
                             <>
                               <span
@@ -852,7 +1093,7 @@ export default function POS({ slug }: POSProps) {
               </div>
             </div>
 
-            {/* ── Person tabs section ── */}
+            {/* Person tabs */}
             <div>
               <div className="flex items-center justify-between mb-2 px-0.5">
                 <p
@@ -907,10 +1148,14 @@ export default function POS({ slug }: POSProps) {
                         ) : (
                           <>
                             <div
-                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${occupied ? "bg-amber-500/20" : t.surfaceSoft}`}
+                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                occupied ? "bg-amber-500/20" : t.surfaceSoft
+                              }`}
                             >
                               <User
-                                className={`h-4 w-4 ${occupied ? "text-amber-400" : t.textDim}`}
+                                className={`h-4 w-4 ${
+                                  occupied ? "text-amber-400" : t.textDim
+                                }`}
                               />
                             </div>
                             <div className="flex-1 min-w-0 text-left">
@@ -1025,7 +1270,7 @@ export default function POS({ slug }: POSProps) {
           </motion.div>
         )}
 
-        {/* ── SCREEN: MENU + ORDER (combined; side-by-side on lg+) ── */}
+        {/* SCREEN: MENU + ORDER */}
         {(screen === "menu" || screen === "order") &&
           active !== null &&
           currentOrder && (
@@ -1037,13 +1282,12 @@ export default function POS({ slug }: POSProps) {
               transition={{ duration: 0.18 }}
               className="flex-1 flex overflow-hidden"
             >
-              {/* ── MENU PANEL ── */}
+              {/* MENU PANEL */}
               <div
                 className={`flex-1 flex-col overflow-hidden ${
                   screen === "order" ? "hidden lg:flex" : "flex"
                 }`}
               >
-                {/* Category tabs */}
                 <div
                   className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b ${t.borderSoft}`}
                 >
@@ -1062,7 +1306,6 @@ export default function POS({ slug }: POSProps) {
                   ))}
                 </div>
 
-                {/* Items grid */}
                 <div className="flex-1 overflow-y-auto p-3 lg:p-5">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-40">
@@ -1125,7 +1368,7 @@ export default function POS({ slug }: POSProps) {
                 </div>
               </div>
 
-              {/* ── ORDER PANEL ── */}
+              {/* ORDER PANEL */}
               <div
                 className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${
                   screen === "menu"
@@ -1133,7 +1376,6 @@ export default function POS({ slug }: POSProps) {
                     : "flex flex-1 lg:flex-none"
                 }`}
               >
-                {/* Order panel header (lg+ only) */}
                 <div
                   className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}
                 >
@@ -1206,7 +1448,6 @@ export default function POS({ slug }: POSProps) {
                   )}
                 </div>
 
-                {/* Total + Pay */}
                 {currentOrder.items.length > 0 && (
                   <div
                     className={`flex-shrink-0 p-4 lg:p-5 border-t ${t.border} space-y-3`}
@@ -1255,13 +1496,25 @@ export default function POS({ slug }: POSProps) {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setPayConfirm(true)}
-                        className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
-                      >
-                        <Receipt className="h-4 w-4" />
-                        Paguaj {orderTotal(currentOrder)} DEN
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        {/* Split Bill button — only for tables */}
+                        {active?.kind === "table" && (
+                          <button
+                            onClick={() => openSplitBill(active.idx)}
+                            className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-amber-500/40 transition-colors`}
+                          >
+                            <Divide className="h-4 w-4" />
+                            Split Bill
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setPayConfirm(true)}
+                          className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
+                        >
+                          <Receipt className="h-4 w-4" />
+                          Paguaj {orderTotal(currentOrder)} DEN
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
@@ -1270,7 +1523,634 @@ export default function POS({ slug }: POSProps) {
           )}
       </AnimatePresence>
 
-      {/* ── New Person Modal ── */}
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODALS
+      ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── Split Bill Modal ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSplitModal &&
+          splitTableIdx !== null &&
+          (() => {
+            const order = tables[splitTableIdx];
+            const allPersonsPaid =
+              splitPersons.length > 0 && splitPersons.every((p) => p.paid);
+            const unassigned = unassignedItems();
+            const totalUnassigned = unassignedTotal();
+
+            return (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className={`fixed inset-0 ${t.modalOverlay} z-40`}
+                  onClick={() => setShowSplitModal(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.94, y: 24 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.94, y: 24 }}
+                  transition={{ duration: 0.2 }}
+                  className={`fixed left-3 right-3 top-14 bottom-4 z-50 ${t.modalBg} rounded-3xl border ${t.border} shadow-2xl flex flex-col overflow-hidden`}
+                >
+                  {/* Header */}
+                  <div
+                    className={`flex-shrink-0 flex items-center justify-between px-5 py-4 border-b ${t.border}`}
+                  >
+                    <div>
+                      <p className="text-base font-bold flex items-center gap-2">
+                        <Divide className="h-4 w-4 text-amber-400" />
+                        Split Bill · T{splitTableIdx + 1}
+                      </p>
+                      <p
+                        className={`text-[10px] ${t.textDim} mt-0.5`}
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        {order.items.reduce((s, i) => s + i.qty, 0)} ITEMS ·{" "}
+                        {orderTotal(order)} DEN TOTAL
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={addSplitPerson}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Add Person
+                      </button>
+                      <button
+                        onClick={() => setShowSplitModal(false)}
+                        className={`h-8 w-8 rounded-full ${t.backBtn} flex items-center justify-center`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Body: two columns */}
+                  <div className="flex-1 flex overflow-hidden min-h-0">
+                    {/* LEFT — item list with person assignment */}
+                    <div
+                      className={`flex-1 overflow-y-auto p-4 space-y-2 border-r ${t.border}`}
+                    >
+                      <p
+                        className={`text-[10px] ${t.textFaint} mb-3`}
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        ASSIGN EACH ITEM TO A PERSON
+                      </p>
+                      {order.items.map((item, itemIdx) => {
+                        const assignedPerson = itemAssignments[itemIdx];
+                        const pc =
+                          assignedPerson !== null
+                            ? SPLIT_COLORS[
+                                splitPersons[assignedPerson]?.colorIdx %
+                                  SPLIT_COLORS.length
+                              ]
+                            : null;
+                        return (
+                          <div
+                            key={`${item.id}-${itemIdx}`}
+                            className={`rounded-xl border p-3 transition-all ${
+                              pc
+                                ? `${pc.bg} ${pc.border}`
+                                : `${t.surface} ${t.border}`
+                            }`}
+                          >
+                            {/* Item info row */}
+                            <div className="flex items-center justify-between mb-2.5">
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className={`text-sm font-semibold ${t.textSoft} truncate`}
+                                >
+                                  {item.name}
+                                </p>
+                                <p
+                                  className={`text-xs mt-0.5 ${pc ? pc.text : t.textFaint}`}
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {item.price} × {item.qty} ={" "}
+                                  <span className="font-bold">
+                                    {item.price * item.qty}
+                                  </span>{" "}
+                                  DEN
+                                </p>
+                              </div>
+                              {assignedPerson !== null && pc && (
+                                <div
+                                  className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ml-2 ${pc.dot}`}
+                                >
+                                  {assignedPerson + 1}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Person chip row */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {/* Unassign chip */}
+                              <button
+                                onClick={() => assignItem(itemIdx, null)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                                  assignedPerson === null
+                                    ? "bg-amber-500 text-black"
+                                    : `${t.surfaceSoft} ${t.textMuted} hover:${t.surfaceHover}`
+                                }`}
+                              >
+                                —
+                              </button>
+                              {splitPersons.map((person, pIdx) => {
+                                const pColor =
+                                  SPLIT_COLORS[
+                                    person.colorIdx % SPLIT_COLORS.length
+                                  ];
+                                const isSelected = assignedPerson === pIdx;
+                                return (
+                                  <button
+                                    key={pIdx}
+                                    onClick={() => assignItem(itemIdx, pIdx)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border ${
+                                      isSelected
+                                        ? `${pColor.bg} ${pColor.border} ${pColor.text}`
+                                        : `${t.surfaceSoft} ${t.border} ${t.textMuted}`
+                                    }`}
+                                  >
+                                    {person.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Unassigned total warning */}
+                      {totalUnassigned > 0 && (
+                        <div
+                          className={`rounded-xl border border-dashed ${t.borderDashed} p-3 text-center`}
+                        >
+                          <p className={`text-xs ${t.textFaint}`}>
+                            Unassigned:{" "}
+                            <span className="text-amber-400 font-bold">
+                              {totalUnassigned} DEN
+                            </span>{" "}
+                            ({unassigned.length} item
+                            {unassigned.length !== 1 ? "s" : ""})
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* RIGHT — persons + pay */}
+                    <div className="w-48 lg:w-56 flex-shrink-0 overflow-y-auto p-3 space-y-2">
+                      <p
+                        className={`text-[10px] ${t.textFaint} mb-3`}
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        CHECKOUT
+                      </p>
+
+                      {splitPersons.map((person, pIdx) => {
+                        const pc =
+                          SPLIT_COLORS[person.colorIdx % SPLIT_COLORS.length];
+                        const total = personTotal(pIdx);
+                        return (
+                          <div
+                            key={pIdx}
+                            className={`rounded-xl border p-3 transition-all ${
+                              person.paid
+                                ? "bg-emerald-500/15 border-emerald-500/40"
+                                : `${pc.bg} ${pc.border}`
+                            }`}
+                          >
+                            {/* Person label */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div
+                                className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${pc.dot}`}
+                              >
+                                {pIdx + 1}
+                              </div>
+                              <p
+                                className={`text-xs font-semibold ${t.textSoft} flex-1 truncate`}
+                              >
+                                {person.name}
+                              </p>
+                            </div>
+
+                            {/* Amount */}
+                            <p
+                              className={`text-lg font-bold mb-2 ${
+                                person.paid ? "text-emerald-400" : t.text
+                              }`}
+                              style={{ fontFamily: "'DM Mono', monospace" }}
+                            >
+                              {total}{" "}
+                              <span
+                                className={`text-xs ${t.textDim} font-normal`}
+                              >
+                                DEN
+                              </span>
+                            </p>
+
+                            {/* Pay buttons or paid state */}
+                            {person.paid ? (
+                              <div className="flex items-center gap-1.5 text-emerald-400">
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                <span className="text-xs font-semibold">
+                                  {person.payMethod === "cash"
+                                    ? "Cash ✓"
+                                    : "Card ✓"}
+                                </span>
+                              </div>
+                            ) : total > 0 ? (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => markPaid(pIdx, "cash")}
+                                  className="flex-1 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/30 transition-colors"
+                                >
+                                  CASH
+                                </button>
+                                <button
+                                  onClick={() => markPaid(pIdx, "card")}
+                                  className="flex-1 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 text-[10px] font-bold hover:bg-blue-500/30 transition-colors"
+                                >
+                                  CARD
+                                </button>
+                              </div>
+                            ) : (
+                              <p className={`text-[10px] ${t.textFaint}`}>
+                                Nothing assigned
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* All paid banner */}
+                      {allPersonsPaid && (
+                        <div className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 p-3 text-center">
+                          <CheckCircle className="h-5 w-5 text-emerald-400 mx-auto mb-1" />
+                          <p className="text-xs font-bold text-emerald-400">
+                            All Paid!
+                          </p>
+                          <p className={`text-[10px] ${t.textFaint} mt-0.5`}>
+                            Table cleared
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            );
+          })()}
+      </AnimatePresence>
+
+      {/* ── Transfer Modal ───────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showTransferModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => {
+                setShowTransferModal(false);
+                setTransferSource(null);
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 top-1/4 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.border} shadow-2xl max-h-[60vh] overflow-y-auto`}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <ArrowRightLeft className="h-5 w-5 text-blue-400" />
+                <p className="text-base font-bold">Transfer Table</p>
+              </div>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                {transferSource === null
+                  ? "Select source table (table to move FROM)"
+                  : `Select destination table (move T${transferSource + 1} TO...)`}
+              </p>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {tables.map((table, idx) => {
+                  const hasItems = table.items.length > 0;
+                  const isSource = transferSource === idx;
+                  const canSelect =
+                    transferSource === null ? hasItems : transferSource !== idx;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={!canSelect}
+                      onClick={() => {
+                        if (transferSource === null) {
+                          setTransferSource(idx);
+                        } else {
+                          handleTransfer(transferSource, idx);
+                        }
+                      }}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${
+                        isSource
+                          ? "bg-blue-500/20 border-blue-500/50"
+                          : !canSelect
+                            ? `${t.surface} ${t.border} opacity-30`
+                            : `${t.surface} ${t.border} hover:bg-blue-500/10`
+                      }`}
+                    >
+                      <span className="text-sm font-bold">T{idx + 1}</span>
+                      {hasItems && (
+                        <span className="text-[10px] text-amber-400">
+                          {orderTotal(table)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setTransferSource(null);
+                }}
+                className={`w-full h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Merge Modal ──────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showMergeModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => {
+                setShowMergeModal(false);
+                setMergeSource(null);
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 top-1/4 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.border} shadow-2xl max-h-[60vh] overflow-y-auto`}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Merge className="h-5 w-5 text-blue-400" />
+                <p className="text-base font-bold">Merge Tables</p>
+              </div>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                {mergeSource === null
+                  ? "Select first table to merge"
+                  : `Select second table to merge T${mergeSource + 1} with...`}
+              </p>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {tables.map((table, idx) => {
+                  const hasItems = table.items.length > 0;
+                  const isSource = mergeSource === idx;
+                  const canSelect =
+                    mergeSource === null ? hasItems : mergeSource !== idx;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={!canSelect}
+                      onClick={() => {
+                        if (mergeSource === null) {
+                          setMergeSource(idx);
+                        } else {
+                          handleMerge(mergeSource, idx);
+                        }
+                      }}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${
+                        isSource
+                          ? "bg-purple-500/20 border-purple-500/50"
+                          : !canSelect
+                            ? `${t.surface} ${t.border} opacity-30`
+                            : `${t.surface} ${t.border} hover:bg-purple-500/10`
+                      }`}
+                    >
+                      <span className="text-sm font-bold">T{idx + 1}</span>
+                      {hasItems && (
+                        <span className="text-[10px] text-amber-400">
+                          {orderTotal(table)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => {
+                  setShowMergeModal(false);
+                  setMergeSource(null);
+                }}
+                className={`w-full h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Sections Manager Modal ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSectionsModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => setShowSectionsModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 top-16 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.border} shadow-2xl max-h-[75vh] overflow-y-auto`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <LayoutGrid className="h-5 w-5 text-purple-400" />
+                <p className="text-base font-bold">Table Sections</p>
+              </div>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                Select a section, then tap tables to assign them
+              </p>
+
+              {/* Section tabs */}
+              <div className="flex gap-2 mb-4">
+                {draftSections.map((section) => (
+                  <button
+                    key={section.name}
+                    onClick={() => setActiveDraftSection(section.name)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                      activeDraftSection === section.name
+                        ? section.name === "Indoor"
+                          ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                          : section.name === "Outdoor"
+                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                            : "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                        : `${t.surface} ${t.border} ${t.textMuted}`
+                    }`}
+                  >
+                    {section.name}
+                    <span className="ml-1 opacity-60">
+                      ({section.tables.length})
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Table grid */}
+              <div className="grid grid-cols-5 gap-2 mb-5">
+                {Array.from({ length: TABLE_COUNT }, (_, idx) => {
+                  const ownerSection = draftSections.find((s) =>
+                    s.tables.includes(idx),
+                  );
+                  const isAssignedHere =
+                    ownerSection?.name === activeDraftSection;
+                  const isAssignedElsewhere =
+                    ownerSection && ownerSection.name !== activeDraftSection;
+
+                  const sectionColor =
+                    activeDraftSection === "Indoor"
+                      ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                      : activeDraftSection === "Outdoor"
+                        ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                        : "bg-purple-500/20 border-purple-500/50 text-purple-400";
+
+                  const elseColor =
+                    ownerSection?.name === "Indoor"
+                      ? "border-blue-500/30 text-blue-400/50"
+                      : ownerSection?.name === "Outdoor"
+                        ? "border-emerald-500/30 text-emerald-400/50"
+                        : "border-purple-500/30 text-purple-400/50";
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setDraftSections((prev) =>
+                          prev.map((s) => {
+                            if (s.name === activeDraftSection) {
+                              return isAssignedHere
+                                ? {
+                                    ...s,
+                                    tables: s.tables.filter(
+                                      (tableId) => tableId !== idx,
+                                    ),
+                                  }
+                                : {
+                                    ...s,
+                                    tables: [...s.tables, idx].sort(
+                                      (a, b) => a - b,
+                                    ),
+                                  };
+                            }
+                            return {
+                              ...s,
+                              tables: s.tables.filter(
+                                (tableId) => tableId !== idx,
+                              ),
+                            };
+                          }),
+                        );
+                      }}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center border transition-all text-xs font-bold ${
+                        isAssignedHere
+                          ? sectionColor
+                          : isAssignedElsewhere
+                            ? `${t.surface} ${elseColor} opacity-50`
+                            : `${t.surface} ${t.border} ${t.textMuted}`
+                      }`}
+                    >
+                      T{idx + 1}
+                      {isAssignedElsewhere && (
+                        <span className="text-[9px] font-normal mt-0.5 opacity-70">
+                          {ownerSection.name.slice(0, 3)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex gap-3 mb-5 flex-wrap">
+                {draftSections.map((s) => (
+                  <div key={s.name} className="flex items-center gap-1.5">
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        s.name === "Indoor"
+                          ? "bg-blue-400"
+                          : s.name === "Outdoor"
+                            ? "bg-emerald-400"
+                            : "bg-purple-400"
+                      }`}
+                    />
+                    <span
+                      className={`text-[10px] ${t.textDim}`}
+                      style={{ fontFamily: "'DM Mono', monospace" }}
+                    >
+                      {s.name.toUpperCase()} · {s.tables.length}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <div
+                    className={`h-2 w-2 rounded-full ${t.surfaceSoft} border ${t.border}`}
+                  />
+                  <span
+                    className={`text-[10px] ${t.textDim}`}
+                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  >
+                    UNASSIGNED ·{" "}
+                    {TABLE_COUNT -
+                      draftSections.reduce(
+                        (sum, s) => sum + s.tables.length,
+                        0,
+                      )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSectionsModal(false)}
+                  className={`flex-1 h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setSections(draftSections);
+                    setShowSectionsModal(false);
+                  }}
+                  className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black"
+                >
+                  Save sections
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── New Person Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showNewPerson && (
           <>
@@ -1278,7 +2158,7 @@ export default function POS({ slug }: POSProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 z-40"
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
               onClick={() => {
                 setShowNewPerson(false);
                 setNewPersonName("");
@@ -1291,7 +2171,7 @@ export default function POS({ slug }: POSProps) {
               transition={{ duration: 0.18 }}
               className={`fixed left-4 right-4 bottom-1/3 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.borderDashed} shadow-2xl`}
             >
-              <p className="text-base font-bold text-white mb-1">
+              <p className={`text-base font-bold ${t.text} mb-1`}>
                 Krijo Person
               </p>
               <p className={`text-xs ${t.textDim} mb-4`}>
