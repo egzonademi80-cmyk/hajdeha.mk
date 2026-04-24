@@ -2013,13 +2013,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     pusher.connection.bind("error", () => setConnected(false));
     channel.bind("cart-update", (data: { cart: CartItem[] }) => {
       if (!isLocal.current) {
-        // If POS sends a fully empty cart, treat it as a full clear
-        if (data.cart.length === 0) {
-          setCart([]);
-          setSessionOrder([]);
-          localStorage.removeItem(`hajde-ts-${channelName}`);
-          return;
-        }
         // Items without addedBy came from POS — treat as already-ordered session items
         const posItems = data.cart.filter((i) => !i.addedBy);
         const customerItems = data.cart.filter((i) => i.addedBy);
@@ -2208,10 +2201,11 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
 
     // Snapshot the cart into sessionOrder before clearing AND sync to server
     // Use functional update to avoid sessionOrder in deps (prevents infinite loop)
-    const cartSnapshot = [...cart];
     setSessionOrder((prev) => {
+      // Deep copy to avoid mutating prev state
       const merged = prev.map((i) => ({ ...i }));
-      cartSnapshot.forEach((item) => {
+      cart.forEach((item) => {
+        // Match by id AND addedBy so each person's items stay separate
         const existing = merged.find(
           (i) => i.id === item.id && i.addedBy === item.addedBy,
         );
@@ -2221,20 +2215,15 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       return merged;
     });
 
-    setCart([]);
-    syncCart([]);
-    setOrderConfirmedDone(false);
-    setOrderConfirming(false);
-    orderProcessedRef.current = false;
-    localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
-
-    const timer = setTimeout(
-      () => {
-        setSessionOrder([]);
-        localStorage.removeItem(`hajde-ts-${channelName}`);
-      },
-      10 * 60 * 1000,
-    );
+    const timer = setTimeout(() => {
+      setCart([]);
+      syncCart([]);
+      setOrderConfirmedDone(false);
+      setOrderConfirming(false);
+      orderProcessedRef.current = false; // Reset for next order
+      // Keep the timestamp alive so follow-up orders stay in the same session
+      localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
+    }, 4000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderConfirmedDone, syncCart, channelName]);
@@ -2468,7 +2457,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               <WifiOff className="h-4 w-4 flex-shrink-0" />
               <span>
                 {lang === "al"
-                  ? "Jeni offline — ndryshimet do ta� sinkronizohen"
+                  ? "Jeni offline — ndryshimet do të sinkronizohen"
                   : lang === "mk"
                     ? "Сте офлајн — промените ќе се синхронизираат"
                     : "You're offline — changes will sync when reconnected"}
