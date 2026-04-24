@@ -275,7 +275,6 @@ export default function POS({ slug }: POSProps) {
       const next = prev.map((p, i) =>
         i === personIdx ? { ...p, paid: true, payMethod: method } : p,
       );
-      // If every person is now paid, clear the table and close
       const allPaid = next.every((p) => p.paid);
       if (allPaid && splitTableIdx !== null) {
         setTables((t) => {
@@ -283,6 +282,14 @@ export default function POS({ slug }: POSProps) {
           updated[splitTableIdx] = emptyTable();
           return updated;
         });
+        // ADD THIS:
+        fetch("/api/table/cart-cleared", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
+          }),
+        }).catch(() => {});
         setJustPaid({ kind: "table", idx: splitTableIdx });
         setTimeout(() => setJustPaid(null), 2500);
         setShowSplitModal(false);
@@ -621,6 +628,14 @@ export default function POS({ slug }: POSProps) {
         next[slot.idx] = emptyTable();
         return next;
       });
+      // ADD THIS:
+      fetch("/api/table/cart-cleared", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
+        }),
+      }).catch(() => {});
     } else {
       setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
     }

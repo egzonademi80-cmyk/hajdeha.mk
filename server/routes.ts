@@ -185,6 +185,20 @@ export async function registerRoutes(
       res.status(500).json({ message: err.message });
     }
   });
+  app.post("/api/table/cart-cleared", async (req, res) => {
+    try {
+      const { channel } = req.body;
+      if (!channel) return res.status(400).json({ message: "Missing channel" });
+
+      tableRooms.delete(channel); // wipe server-side room too
+      await pusherServer.trigger(channel, "cart-cleared", {});
+
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("cart-cleared error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
   app.post("/api/table/waiter-signal", async (req, res) => {
     try {
       const { restaurantSlug, tableNumber, type } = req.body;
