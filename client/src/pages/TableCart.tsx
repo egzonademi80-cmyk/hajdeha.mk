@@ -2222,15 +2222,20 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       return merged;
     });
 
-    const timer = setTimeout(() => {
-      setCart([]);
-      syncCart([]);
-      setOrderConfirmedDone(false);
-      setOrderConfirming(false);
-      orderProcessedRef.current = false; // Reset for next order
-      // Keep the timestamp alive so follow-up orders stay in the same session
-      localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
-    }, 4000);
+    setCart([]);
+    syncCart([]);
+    setOrderConfirmedDone(false);
+    setOrderConfirming(false);
+    orderProcessedRef.current = false;
+    localStorage.setItem(`hajde-ts-${channelName}`, Date.now().toString());
+
+    const timer = setTimeout(
+      () => {
+        setSessionOrder([]);
+        localStorage.removeItem(`hajde-ts-${channelName}`);
+      },
+      10 * 60 * 1000,
+    );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderConfirmedDone, syncCart, channelName]);
