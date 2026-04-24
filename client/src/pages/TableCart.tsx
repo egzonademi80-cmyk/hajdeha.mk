@@ -2013,6 +2013,13 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     pusher.connection.bind("error", () => setConnected(false));
     channel.bind("cart-update", (data: { cart: CartItem[] }) => {
       if (!isLocal.current) {
+        // If POS sends a fully empty cart, treat it as a full clear
+        if (data.cart.length === 0) {
+          setCart([]);
+          setSessionOrder([]);
+          localStorage.removeItem(`hajde-ts-${channelName}`);
+          return;
+        }
         // Items without addedBy came from POS — treat as already-ordered session items
         const posItems = data.cart.filter((i) => !i.addedBy);
         const customerItems = data.cart.filter((i) => i.addedBy);
@@ -2039,6 +2046,9 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       setCart([]);
       setSessionOrder([]);
       localStorage.removeItem(`hajde-ts-${channelName}`);
+      orderProcessedRef.current = false;
+      dessertTimerStarted.current = false;
+      if (dessertTimerRef.current) clearTimeout(dessertTimerRef.current);
     });
     channel.bind("pusher:subscription_succeeded", () => setConnected(true));
 
