@@ -2046,9 +2046,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       setCart([]);
       setSessionOrder([]);
       localStorage.removeItem(`hajde-ts-${channelName}`);
-      orderProcessedRef.current = false;
-      dessertTimerStarted.current = false;
-      if (dessertTimerRef.current) clearTimeout(dessertTimerRef.current);
     });
     channel.bind("pusher:subscription_succeeded", () => setConnected(true));
 
