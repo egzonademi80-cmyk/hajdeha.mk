@@ -425,6 +425,10 @@ export default function AdminRestaurant() {
     }
   }, [restaurant?.menuItems]);
 
+  const visibleItems = useMemo(() => {
+    return orderedItems;
+  }, [orderedItems]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, {
@@ -463,10 +467,10 @@ export default function AdminRestaurant() {
 
   const groupedItems = useMemo(() => {
     return CATEGORIES.map((category) => {
-      const items = orderedItems.filter((item) => item.category === category);
+      const items = visibleItems.filter((item) => item.category === category);
       return items.length > 0 ? { category, items } : null;
     }).filter(Boolean);
-  }, [orderedItems]);
+  }, [visibleItems]);
 
   if (isLoading)
     return (
@@ -943,6 +947,7 @@ function MenuItemDialog({
       toast({ title: initialData ? "Updated" : "Added" });
       onOpenChange(false);
       form.reset();
+      queryClient.invalidateQueries({ queryKey: [api.restaurants.get.path] });
     };
     if (initialData) {
       update({ id: initialData.id, ...data }, { onSuccess });
