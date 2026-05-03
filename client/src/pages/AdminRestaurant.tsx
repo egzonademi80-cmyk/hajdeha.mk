@@ -960,6 +960,7 @@ function MenuItemDialog({
   const { mutate: create, isPending: isCreating } = useCreateMenuItem();
   const { mutate: update, isPending: isUpdating } = useUpdateMenuItem();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const form = useForm<InsertMenuItem>({
     resolver: zodResolver(insertMenuItemSchema),
