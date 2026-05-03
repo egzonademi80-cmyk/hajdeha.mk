@@ -661,6 +661,9 @@ export default function AdminRestaurant() {
         onOpenChange={setIsItemModalOpen}
         restaurantId={restaurant.id}
         initialData={editingItem}
+        categoryOptions={Array.from(
+          new Set(restaurant.menuItems.map((item: MenuItem) => item.category).filter(Boolean)),
+        )}
       />
     </div>
   );
@@ -946,11 +949,13 @@ function MenuItemDialog({
   onOpenChange,
   restaurantId,
   initialData,
+  categoryOptions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   restaurantId: number;
   initialData: MenuItem | null;
+  categoryOptions: string[];
 }) {
   const { mutate: create, isPending: isCreating } = useCreateMenuItem();
   const { mutate: update, isPending: isUpdating } = useUpdateMenuItem();
@@ -1034,7 +1039,7 @@ function MenuItemDialog({
                   {Array.from(
                     new Set([
                       ...CATEGORIES,
-                      ...visibleItems.map((item) => item.category).filter(Boolean),
+                      ...categoryOptions,
                     ]),
                   ).map((cat) => (
                     <SelectItem
