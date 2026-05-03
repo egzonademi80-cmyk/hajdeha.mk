@@ -961,6 +961,41 @@ function MenuItemDialog({
   const { mutate: update, isPending: isUpdating } = useUpdateMenuItem();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const languageItems = useMemo(() => {
+    return [
+      {
+        key: "name",
+        label: "Name",
+        placeholder: "Chicken Burger",
+      },
+      {
+        key: "nameAl",
+        label: "Name (AL)",
+        placeholder: "Burger pule",
+      },
+      {
+        key: "nameMk",
+        label: "Name (MK)",
+        placeholder: "Пилешки бургер",
+      },
+    ] as const;
+  }, []);
+  const languageDescriptions = useMemo(() => {
+    return [
+      {
+        key: "description",
+        label: "Description",
+      },
+      {
+        key: "descriptionAl",
+        label: "Description (AL)",
+      },
+      {
+        key: "descriptionMk",
+        label: "Description (MK)",
+      },
+    ] as const;
+  }, []);
 
   const form = useForm<InsertMenuItem>({
     resolver: zodResolver(insertMenuItemSchema),
@@ -1004,20 +1039,25 @@ function MenuItemDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          <div>
-            <Label className="text-sm text-foreground">Name</Label>
-            <Input
-              {...form.register("name")}
-              className="h-9 bg-background text-foreground border-border"
-            />
-          </div>
-          <div>
-            <Label className="text-sm text-foreground">Description</Label>
-            <Textarea
-              {...form.register("description")}
-              className="h-20 resize-none bg-background text-foreground border-border"
-            />
-          </div>
+          {languageItems.map((field) => (
+            <div key={field.key}>
+              <Label className="text-sm text-foreground">{field.label}</Label>
+              <Input
+                {...form.register(field.key as keyof InsertMenuItem)}
+                placeholder={field.placeholder}
+                className="h-9 bg-background text-foreground border-border"
+              />
+            </div>
+          ))}
+          {languageDescriptions.map((field) => (
+            <div key={field.key}>
+              <Label className="text-sm text-foreground">{field.label}</Label>
+              <Textarea
+                {...form.register(field.key as keyof InsertMenuItem)}
+                className="h-20 resize-none bg-background text-foreground border-border"
+              />
+            </div>
+          ))}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-sm text-foreground">Price</Label>
