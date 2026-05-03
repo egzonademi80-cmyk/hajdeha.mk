@@ -84,13 +84,35 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 const CATEGORIES = [
+  "Appetizers",
   "Starters",
+  "Breakfast",
+  "Breakfasts",
   "Mains",
+  "Main",
+  "Main Course",
+  "Pizza",
+  "Pizzas",
+  "Pasta",
+  "Burgers",
+  "Burger",
+  "Salads",
   "Sides",
+  "Soups",
+  "Soup",
+  "Grill",
+  "Grills",
+  "Sandwiches",
+  "Wraps",
+  "Tacos",
   "Desserts",
+  "Dessert",
   "Drinks",
   "Hot Drinks",
 ];
+
+const normalizeCategory = (value: string) =>
+  value.trim().toLowerCase().replace(/\s+/g, " ");
 
 // ── Image Upload ──────────────────────────────────────────────────────────────
 const ImageUpload = memo(function ImageUpload({
@@ -466,10 +488,21 @@ export default function AdminRestaurant() {
   }, [orderedItems, queryClient]);
 
   const groupedItems = useMemo(() => {
-    return CATEGORIES.map((category) => {
-      const items = visibleItems.filter((item) => item.category === category);
-      return items.length > 0 ? { category, items } : null;
-    }).filter(Boolean);
+    const categories = Array.from(
+      new Set([
+        ...CATEGORIES,
+        ...visibleItems.map((item) => item.category).filter(Boolean),
+      ]),
+    );
+
+    return categories
+      .map((category) => {
+        const items = visibleItems.filter(
+          (item) => normalizeCategory(item.category) === normalizeCategory(category),
+        );
+        return items.length > 0 ? { category, items } : null;
+      })
+      .filter(Boolean);
   }, [visibleItems]);
 
   if (isLoading)
@@ -998,7 +1031,12 @@ function MenuItemDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background border-border">
-                  {CATEGORIES.map((cat) => (
+                  {Array.from(
+                    new Set([
+                      ...CATEGORIES,
+                      ...visibleItems.map((item) => item.category).filter(Boolean),
+                    ]),
+                  ).map((cat) => (
                     <SelectItem
                       key={cat}
                       value={cat}
