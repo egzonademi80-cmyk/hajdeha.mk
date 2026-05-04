@@ -352,6 +352,38 @@ function printReceiptWindow({
   }, 350);
 }
 
+function playWaiterChime(type: WaiterSignal["type"]) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.55, ctx.currentTime);
+    master.connect(ctx.destination);
+
+    const notes: [number, number, number][] =
+      type === "help"
+        ? [[880, 0, 0.18], [660, 0.2, 0.28], [660, 0.42, 0.28]]
+        : type === "bill-cash"
+          ? [[660, 0, 0.16], [880, 0.18, 0.16], [1108, 0.36, 0.28]]
+          : [[660, 0, 0.16], [990, 0.18, 0.16], [1320, 0.36, 0.28]];
+
+    notes.forEach(([freq, start, dur]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      gain.gain.setValueAtTime(0, ctx.currentTime + start);
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur + 0.05);
+    });
+
+    setTimeout(() => ctx.close(), 1500);
+  } catch {}
+}
+
 export default function POS({ slug }: POSProps) {
   const RESTAURANT_SLUG = slug;
   const TABLES_KEY = `pos-${slug}-tables-v3`;
@@ -1084,6 +1116,7 @@ export default function POS({ slug }: POSProps) {
           setTimeout(() => {
             setWaiterSignals((prev) => prev.filter((s) => s.id !== signal.id));
           }, 30000);
+          playWaiterChime(data.type as WaiterSignal["type"]);
         });
       } catch (e) {
         console.error("Pusher subscribe failed:", e);
