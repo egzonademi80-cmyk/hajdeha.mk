@@ -139,6 +139,111 @@ const defaultSections: TableSection[] = [
   { name: "Bar", tables: [] },
 ];
 
+function printReceipt({
+  restaurantName,
+  tableLabel,
+  items,
+  payMethod,
+}: {
+  restaurantName: string;
+  tableLabel: string;
+  items: OrderItem[];
+  payMethod?: "cash" | "card";
+}) {
+  const win = window.open(
+    "",
+    "_blank",
+    "width=340,height=700,toolbar=0,scrollbars=0,status=0,menubar=0",
+  );
+  if (!win) return;
+
+  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("sq-MK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("sq-MK", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const methodLabel =
+    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
+
+  const rows = items
+    .map(
+      (item) =>
+        `<tr>
+          <td style="padding:3px 0">${item.qty}x ${item.name}</td>
+          <td style="text-align:right;padding:3px 0;white-space:nowrap">${(item.price * item.qty).toFixed(0)} DEN</td>
+        </tr>`,
+    )
+    .join("");
+
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    width: 80mm;
+    padding: 10px 8px 20px;
+    color: #000;
+    background: #fff;
+  }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .name { font-size: 17px; font-weight: bold; letter-spacing: 1px; }
+  .dash { border: none; border-top: 1px dashed #000; margin: 7px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; }
+  .meta { display: flex; justify-content: space-between; font-size: 11px; color: #333; }
+  .total-row td { font-weight: bold; font-size: 15px; padding-top: 5px; border-top: 1px solid #000; }
+  .method { font-size: 11px; color: #444; padding-top: 2px; }
+  .footer { margin-top: 12px; font-size: 11px; text-align: center; color: #555; }
+  @page { margin: 0; size: 80mm auto; }
+  @media print { body { width: 80mm; } }
+</style>
+</head>
+<body>
+  <div class="center name">${restaurantName}</div>
+  <div class="dash"></div>
+  <div class="meta">
+    <span>${dateStr} &nbsp; ${timeStr}</span>
+    <span>${tableLabel}</span>
+  </div>
+  <div class="dash"></div>
+  <table>
+    ${rows}
+  </table>
+  <div class="dash"></div>
+  <table>
+    <tr class="total-row">
+      <td>TOTAL</td>
+      <td style="text-align:right">${total.toFixed(0)} DEN</td>
+    </tr>
+    <tr>
+      <td class="method" colspan="2">${methodLabel}</td>
+    </tr>
+  </table>
+  <div class="dash"></div>
+  <div class="footer">Faleminderit! &nbsp;•&nbsp; Hvala! &nbsp;•&nbsp; Thank you!</div>
+</body>
+</html>`);
+
+  win.document.close();
+  win.focus();
+  setTimeout(() => {
+    win.print();
+    win.onafterprint = () => win.close();
+    setTimeout(() => win.close(), 4000);
+  }, 350);
+}
+
 export default function POS({ slug }: POSProps) {
   const RESTAURANT_SLUG = slug;
   const TABLES_KEY = `pos-${slug}-tables-v3`;
@@ -271,6 +376,20 @@ export default function POS({ slug }: POSProps) {
     unassignedItems().reduce((s, { item }) => s + item.price * item.qty, 0);
 
   const markPaid = (personIdx: number, method: "cash" | "card") => {
+    if (splitTableIdx !== null) {
+      const personItems = tables[splitTableIdx].items.filter(
+        (_, i) => itemAssignments[i] === personIdx,
+      );
+      const person = splitPersons[personIdx];
+      if (personItems.length > 0) {
+        printReceipt({
+          restaurantName: restaurant?.name ?? "Restaurant",
+          tableLabel: `Tavolina ${splitTableIdx + 1} — ${person.name}`,
+          items: personItems,
+          payMethod: method,
+        });
+      }
+    }
     setSplitPersons((prev) => {
       const next = prev.map((p, i) =>
         i === personIdx ? { ...p, paid: true, payMethod: method } : p,
@@ -622,6 +741,21 @@ export default function POS({ slug }: POSProps) {
   const payOrder = () => {
     if (!active) return;
     const slot = active;
+    const receiptItems =
+      slot.kind === "table"
+        ? tables[slot.idx].items
+        : personTabs[slot.idx].items;
+    const tableLabel =
+      slot.kind === "table"
+        ? `Tavolina ${slot.idx + 1}`
+        : (personTabs[slot.idx]?.name ?? "Tab");
+    if (receiptItems.length > 0) {
+      printReceipt({
+        restaurantName: restaurant?.name ?? "Restaurant",
+        tableLabel,
+        items: receiptItems,
+      });
+    }
     if (slot.kind === "table") {
       setTables((prev) => {
         const next = [...prev];
