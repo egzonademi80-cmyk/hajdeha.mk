@@ -39,8 +39,14 @@ interface OrderItem {
   qty: number;
 }
 
+interface OrderRound {
+  items: OrderItem[];
+  sentAt: number;
+}
+
 interface TableOrder {
   items: OrderItem[];
+  rounds: OrderRound[];
   startedAt: Date | null;
   section?: string;
 }
@@ -110,7 +116,7 @@ const SPLIT_COLORS = [
   },
 ];
 
-const emptyTable = (): TableOrder => ({ items: [], startedAt: null });
+const emptyTable = (): TableOrder => ({ items: [], rounds: [], startedAt: null });
 
 function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
@@ -128,6 +134,7 @@ interface IncomingOrder {
   tableNumber: number | string;
   cart: OrderItem[];
   timestamp: number;
+  roundNumber: number;
 }
 
 interface WaiterSignal {
@@ -424,6 +431,8 @@ export default function POS({ slug }: POSProps) {
     } catch {}
     return Array.from({ length: TABLE_COUNT }, emptyTable);
   });
+  const tablesRef = useRef(tables);
+  useEffect(() => { tablesRef.current = tables; }, [tables]);
 
   useEffect(() => {
     setTables((prev) => {
@@ -1060,6 +1069,11 @@ export default function POS({ slug }: POSProps) {
       const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
       const tableIdx = tableDigits - 1;
 
+      const existingRounds = (tableIdx >= 0 && tableIdx < TABLE_COUNT)
+        ? (tablesRef.current[tableIdx]?.rounds ?? [])
+        : [];
+      const roundNumber = existingRounds.length + 1;
+
       if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
         setTables((prev) => {
           const next = [...prev];
@@ -1069,9 +1083,12 @@ export default function POS({ slug }: POSProps) {
             if (ex) ex.qty += it.qty;
             else merged.push({ ...it });
           });
+          const prevRounds = next[tableIdx].rounds ?? [];
           next[tableIdx] = {
             items: merged,
+            rounds: [...prevRounds, { items: cart, sentAt: Date.now() }],
             startedAt: next[tableIdx].startedAt ?? new Date(),
+            section: next[tableIdx].section,
           };
           return next;
         });
@@ -1084,6 +1101,7 @@ export default function POS({ slug }: POSProps) {
         tableNumber,
         cart,
         timestamp: data.timestamp || Date.now(),
+        roundNumber,
       });
       playChime();
       if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
@@ -1318,7 +1336,9 @@ export default function POS({ slug }: POSProps) {
             </motion.div>
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-bold leading-tight">
-                Porosi e re — Tavolina {incomingBanner.tableNumber}
+                {incomingBanner.roundNumber > 1
+                  ? `⚡ Porosi ${incomingBanner.roundNumber} — Tavolina ${incomingBanner.tableNumber}`
+                  : `Porosi e re — Tavolina ${incomingBanner.tableNumber}`}
               </p>
               <p
                 className="text-[11px] font-semibold opacity-80 truncate"
@@ -1794,7 +1814,7 @@ export default function POS({ slug }: POSProps) {
                   </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 lg:p-5 space-y-2">
+                <div className="flex-1 overflow-y-auto p-4 lg:p-5">
                   {currentOrder.items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-12">
                       <ShoppingBag className={`h-8 w-8 ${t.textFaint}`} />
@@ -1803,29 +1823,33 @@ export default function POS({ slug }: POSProps) {
                         Klikoni një artikull nga menyja për ta shtuar
                       </p>
                     </div>
-                  ) : (
-                    currentOrder.items.map((item) => (
+                  ) : (() => {
+                    const rounds: OrderRound[] = (currentOrder as TableOrder).rounds ?? [];
+
+                    const itemCard = (item: OrderItem, isNew: boolean) => (
                       <div
                         key={item.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl ${t.surface} border ${t.border}`}
+                        className={`flex items-center gap-3 p-3 rounded-xl border mb-2 transition-colors ${
+                          isNew
+                            ? "bg-amber-500/5 border-amber-500/25"
+                            : `${t.surface} ${t.border}`
+                        }`}
                       >
+                        {isNew && (
+                          <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
+                        )}
                         <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-sm font-semibold ${t.textSoft} truncate`}
-                          >
+                          <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
                             {item.name}
                           </p>
                           <p
                             className="text-xs text-amber-400 mt-0.5"
                             style={{ fontFamily: "'DM Mono', monospace" }}
                           >
-                            {item.price} × {item.qty} = {item.price * item.qty}{" "}
-                            DEN
+                            {item.price} × {item.qty} = {item.price * item.qty} DEN
                           </p>
                         </div>
-                        <div
-                          className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}
-                        >
+                        <div className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}>
                           <button
                             onClick={() => updateQty(item.id, -1)}
                             className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
@@ -1846,8 +1870,76 @@ export default function POS({ slug }: POSProps) {
                           </button>
                         </div>
                       </div>
-                    ))
-                  )}
+                    );
+
+                    if (rounds.length <= 1) {
+                      return <>{currentOrder.items.map((item) => itemCard(item, false))}</>;
+                    }
+
+                    // Group merged items by the first round they appear in
+                    const itemFirstRound = (id: number): number => {
+                      for (let i = 0; i < rounds.length; i++) {
+                        if (rounds[i].items.some((ri) => ri.id === id)) return i;
+                      }
+                      return -1; // manually added via POS
+                    };
+
+                    const groups = new Map<number, OrderItem[]>();
+                    for (const item of currentOrder.items) {
+                      const r = itemFirstRound(item.id);
+                      const arr = groups.get(r) ?? [];
+                      arr.push(item);
+                      groups.set(r, arr);
+                    }
+
+                    return (
+                      <>
+                        {/* Items added manually by staff (not from any customer round) */}
+                        {(groups.get(-1) ?? []).map((item) => itemCard(item, false))}
+
+                        {rounds.map((round, rIdx) => {
+                          const items = groups.get(rIdx) ?? [];
+                          if (items.length === 0) return null;
+                          const isNew = rIdx > 0;
+                          const roundTime = new Date(round.sentAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                          return (
+                            <div key={rIdx}>
+                              {/* Round divider */}
+                              <div className="flex items-center gap-2 py-2 px-0.5 mb-1">
+                                <div className={`h-px flex-1 ${t.borderSoft}`} />
+                                <span
+                                  className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                                    isNew
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : `${t.surfaceSoft} ${t.textDim}`
+                                  }`}
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {isNew && (
+                                    <motion.span
+                                      animate={{ opacity: [1, 0.4, 1] }}
+                                      transition={{ duration: 1.4, repeat: Infinity }}
+                                    >
+                                      ⚡
+                                    </motion.span>
+                                  )}
+                                  {isNew ? `POROSI ${rIdx + 1}` : `POROSI 1`}
+                                  <span className="font-normal opacity-60 ml-1">{roundTime}</span>
+                                </span>
+                                <div className={`h-px flex-1 ${t.borderSoft}`} />
+                              </div>
+
+                              {/* Items for this round */}
+                              {items.map((item) => itemCard(item, isNew))}
+                            </div>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {currentOrder.items.length > 0 && (
