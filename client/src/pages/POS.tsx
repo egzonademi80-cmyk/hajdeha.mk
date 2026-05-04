@@ -21,6 +21,7 @@ import {
   Merge,
   LayoutGrid,
   Divide,
+  Printer,
 } from "lucide-react";
 
 interface MenuItem {
@@ -139,7 +140,107 @@ const defaultSections: TableSection[] = [
   { name: "Bar", tables: [] },
 ];
 
-function printReceipt({
+function buildEscPosBytes({
+  restaurantName,
+  tableLabel,
+  items,
+  payMethod,
+}: {
+  restaurantName: string;
+  tableLabel: string;
+  items: OrderItem[];
+  payMethod?: "cash" | "card";
+}): Uint8Array {
+  const COL = 42;
+  const enc = new TextEncoder();
+  const bytes: number[] = [];
+
+  const push = (...vals: number[]) => bytes.push(...vals);
+  const text = (s: string) => bytes.push(...enc.encode(s));
+  const lf = () => bytes.push(0x0a);
+  const dashes = () => { text("-".repeat(COL)); lf(); };
+  const center = (s: string) => {
+    const pad = Math.max(0, Math.floor((COL - s.length) / 2));
+    text(" ".repeat(pad) + s); lf();
+  };
+  const cols = (left: string, right: string) => {
+    const max = COL - right.length - 1;
+    const l = left.length > max ? left.slice(0, max - 1) + "…" : left;
+    text(l + " ".repeat(COL - l.length - right.length) + right); lf();
+  };
+
+  // Init
+  push(0x1b, 0x40);
+  // Align center
+  push(0x1b, 0x61, 0x01);
+  // Bold + double height/width for restaurant name
+  push(0x1b, 0x45, 0x01);
+  push(0x1d, 0x21, 0x01);
+  text(restaurantName); lf();
+  // Reset size + bold off
+  push(0x1d, 0x21, 0x00);
+  push(0x1b, 0x45, 0x00);
+  // Align left
+  push(0x1b, 0x61, 0x00);
+  lf();
+  dashes();
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("sq-MK", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("sq-MK", { hour: "2-digit", minute: "2-digit" });
+  cols(`${dateStr}  ${timeStr}`, tableLabel);
+  dashes();
+
+  // Items
+  for (const item of items) {
+    const price = `${(item.price * item.qty).toFixed(0)} DEN`;
+    cols(`${item.qty}x ${item.name}`, price);
+  }
+  dashes();
+
+  // Total — bold
+  push(0x1b, 0x45, 0x01);
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+  cols("TOTAL", `${total.toFixed(0)} DEN`);
+  push(0x1b, 0x45, 0x00);
+
+  const methodLabel = payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Karte" : "Paguar";
+  text(methodLabel); lf();
+  dashes();
+
+  // Footer centered
+  push(0x1b, 0x61, 0x01);
+  text("Faleminderit! Hvala! Thank you!"); lf();
+  lf(); lf(); lf();
+
+  // Partial cut
+  push(0x1d, 0x56, 0x42, 0x03);
+
+  return new Uint8Array(bytes);
+}
+
+async function sendToUsbPrinter(device: USBDevice, data: Uint8Array): Promise<void> {
+  try { await device.open(); } catch { /* already open */ }
+  if (device.configuration === null) await device.selectConfiguration(1);
+
+  let interfaceNum = -1;
+  let endpointNum = -1;
+  for (const iface of device.configuration!.interfaces) {
+    for (const ep of iface.alternate.endpoints) {
+      if (ep.type === "bulk" && ep.direction === "out") {
+        interfaceNum = iface.interfaceNumber;
+        endpointNum = ep.endpointNumber;
+        break;
+      }
+    }
+    if (interfaceNum !== -1) break;
+  }
+  if (interfaceNum === -1) throw new Error("No bulk OUT endpoint found");
+  try { await device.claimInterface(interfaceNum); } catch { /* already claimed */ }
+  await device.transferOut(endpointNum, data);
+}
+
+function printReceiptWindow({
   restaurantName,
   tableLabel,
   items,
@@ -382,7 +483,7 @@ export default function POS({ slug }: POSProps) {
       );
       const person = splitPersons[personIdx];
       if (personItems.length > 0) {
-        printReceipt({
+        handlePrint({
           restaurantName: restaurant?.name ?? "Restaurant",
           tableLabel: `Tavolina ${splitTableIdx + 1} — ${person.name}`,
           items: personItems,
@@ -434,6 +535,48 @@ export default function POS({ slug }: POSProps) {
     } catch {}
   }, [theme]);
   const isLight = theme === "light";
+
+  const [usbDevice, setUsbDevice] = useState<USBDevice | null>(null);
+  const [printerStatus, setPrinterStatus] = useState<"idle" | "printing" | "error">("idle");
+
+  const connectPrinter = async () => {
+    if (!("usb" in navigator)) {
+      alert("WebUSB not supported in this browser. Use Chrome or Edge.");
+      return;
+    }
+    try {
+      const device = await (navigator as any).usb.requestDevice({ filters: [] });
+      setUsbDevice(device);
+    } catch (err: any) {
+      if (err.name !== "NotFoundError") {
+        alert("Could not connect to printer. Try again.");
+      }
+    }
+  };
+
+  const handlePrint = async (data: {
+    restaurantName: string;
+    tableLabel: string;
+    items: OrderItem[];
+    payMethod?: "cash" | "card";
+  }) => {
+    if (data.items.length === 0) return;
+    if (usbDevice) {
+      try {
+        setPrinterStatus("printing");
+        const bytes = buildEscPosBytes(data);
+        await sendToUsbPrinter(usbDevice, bytes);
+        setPrinterStatus("idle");
+        return;
+      } catch (err) {
+        console.error("USB print failed, falling back:", err);
+        setUsbDevice(null);
+        setPrinterStatus("error");
+        setTimeout(() => setPrinterStatus("idle"), 3000);
+      }
+    }
+    printReceiptWindow(data);
+  };
 
   const t = isLight
     ? {
@@ -750,7 +893,7 @@ export default function POS({ slug }: POSProps) {
         ? `Tavolina ${slot.idx + 1}`
         : (personTabs[slot.idx]?.name ?? "Tab");
     if (receiptItems.length > 0) {
-      printReceipt({
+      handlePrint({
         restaurantName: restaurant?.name ?? "Restaurant",
         tableLabel,
         items: receiptItems,
@@ -1005,6 +1148,19 @@ export default function POS({ slug }: POSProps) {
                 : "ORDER"}
           </p>
         </div>
+        <button
+          onClick={usbDevice ? () => setUsbDevice(null) : connectPrinter}
+          title={usbDevice ? "Printer connected — click to disconnect" : "Connect thermal printer"}
+          className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors relative ${t.backBtn}`}
+        >
+          <Printer className={`h-4 w-4 lg:h-5 lg:w-5 ${printerStatus === "error" ? "text-red-400" : usbDevice ? "text-emerald-400" : t.textMuted.replace("text-","text-")}`} />
+          {usbDevice && printerStatus === "idle" && (
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />
+          )}
+          {printerStatus === "printing" && (
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          )}
+        </button>
         <button
           onClick={() => setTheme(isLight ? "dark" : "light")}
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
