@@ -539,6 +539,13 @@ export default function POS({ slug }: POSProps) {
   const [usbDevice, setUsbDevice] = useState<USBDevice | null>(null);
   const [printerStatus, setPrinterStatus] = useState<"idle" | "printing" | "error">("idle");
 
+  useEffect(() => {
+    if (!("usb" in navigator)) return;
+    (navigator as any).usb.getDevices().then((devices: USBDevice[]) => {
+      if (devices.length > 0) setUsbDevice(devices[0]);
+    }).catch(() => {});
+  }, []);
+
   const connectPrinter = async () => {
     if (!("usb" in navigator)) {
       alert("WebUSB not supported in this browser. Use Chrome or Edge.");
