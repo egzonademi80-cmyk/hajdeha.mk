@@ -130,6 +130,13 @@ interface IncomingOrder {
   timestamp: number;
 }
 
+interface WaiterSignal {
+  id: string;
+  tableNumber: number | string;
+  type: "help" | "bill-cash" | "bill-card";
+  timestamp: number;
+}
+
 interface POSProps {
   slug: string;
 }
@@ -407,9 +414,8 @@ export default function POS({ slug }: POSProps) {
     return [];
   });
 
-  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(
-    null,
-  );
+  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(null);
+  const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
 
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -1067,6 +1073,18 @@ export default function POS({ slug }: POSProps) {
         pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
         const channel = pusher.subscribe(`pos-${RESTAURANT_SLUG}`);
         channel.bind("incoming-order", handleIncoming);
+        channel.bind("waiter-request", (data: { tableNumber: number | string; type: string }) => {
+          const signal: WaiterSignal = {
+            id: `${Date.now()}-${Math.random()}`,
+            tableNumber: data.tableNumber,
+            type: data.type as WaiterSignal["type"],
+            timestamp: Date.now(),
+          };
+          setWaiterSignals((prev) => [...prev, signal]);
+          setTimeout(() => {
+            setWaiterSignals((prev) => prev.filter((s) => s.id !== signal.id));
+          }, 30000);
+        });
       } catch (e) {
         console.error("Pusher subscribe failed:", e);
       }
@@ -1196,6 +1214,45 @@ export default function POS({ slug }: POSProps) {
             </button>
           )}
       </div>
+
+      {/* Waiter signal banners */}
+      <AnimatePresence>
+        {waiterSignals.length > 0 && (
+          <div className="absolute left-3 right-3 z-30 flex flex-col gap-2" style={{ top: 64 }}>
+            {waiterSignals.map((signal, i) => {
+              const cfg =
+                signal.type === "bill-cash"
+                  ? { grad: "from-emerald-600 to-emerald-500", icon: "💵", label: `Fatura Kesh — Tavolina ${signal.tableNumber}` }
+                  : signal.type === "bill-card"
+                    ? { grad: "from-blue-600 to-blue-500", icon: "💳", label: `Fatura Kartë — Tavolina ${signal.tableNumber}` }
+                    : { grad: "from-amber-500 to-amber-400", icon: "🔔", label: `Keni nevojë — Tavolina ${signal.tableNumber}` };
+              return (
+                <motion.button
+                  key={signal.id}
+                  initial={{ y: -60, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -60, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 380, damping: 28, delay: i * 0.05 }}
+                  onClick={() => setWaiterSignals((prev) => prev.filter((s) => s.id !== signal.id))}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r ${cfg.grad} text-white shadow-2xl`}
+                >
+                  <motion.span
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 0.9, repeat: Infinity }}
+                    className="text-xl flex-shrink-0"
+                  >
+                    {cfg.icon}
+                  </motion.span>
+                  <p className="flex-1 text-sm font-bold text-left leading-tight">{cfg.label}</p>
+                  <span className="text-[10px] font-bold opacity-70 flex-shrink-0" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    TAP ✕
+                  </span>
+                </motion.button>
+              );
+            })}
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Incoming order banner */}
       <AnimatePresence>

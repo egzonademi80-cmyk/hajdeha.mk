@@ -1074,24 +1074,20 @@ function WaiterSheet({
   receiptItems: CartItem[];
   restaurantName: string;
   restaurantSlug: string;
-  onSignal: (type: "bill" | "help") => void;
+  onSignal: (type: "help" | "bill-cash" | "bill-card") => void;
 }) {
   const tr = t[lang];
   const [billPicker, setBillPicker] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
 
-  // Reset sub-step when sheet closes
   useEffect(() => {
-    if (!open) setBillPicker(false);
+    if (!open) { setBillPicker(false); setSent(null); }
   }, [open]);
 
-  const openWhatsApp = (message: string, signalType?: "bill" | "help") => {
-    if (signalType) onSignal(signalType);
-    const phone = (phoneNumber || "").replace(/\D/g, "");
-    const url = phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
-    onClose();
+  const sendSignal = (type: "help" | "bill-cash" | "bill-card") => {
+    onSignal(type);
+    setSent(type);
+    setTimeout(() => { onClose(); setSent(null); }, 1800);
   };
 
   const WaIcon = () => (
@@ -1222,23 +1218,24 @@ function WaiterSheet({
                       );
                     })()}
 
+                  {sent ? (
+                    <div className="flex flex-col items-center justify-center py-8 gap-3">
+                      <div className="h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                        <CheckCircle className="h-8 w-8 text-emerald-500" />
+                      </div>
+                      <p className="text-base font-bold text-foreground">
+                        {lang === "al" ? "Kamarieri vjen!" : lang === "mk" ? "Келнерот доаѓа!" : "Waiter is coming!"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {lang === "al" ? "Kërkesa juaj u dërgua." : lang === "mk" ? "Барањето е испратено." : "Your request was sent."}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
                   {/* Cash button */}
                   <motion.button
                     whileTap={{ scale: 0.985 }}
-                    onClick={() =>
-                      openWhatsApp(
-                        receiptItems.length > 0
-                          ? buildReceipt(
-                              lang,
-                              restaurantName,
-                              tableNumber,
-                              receiptItems,
-                              "cash",
-                            )
-                          : tr.billTextCash(tableNumber),
-                        "bill",
-                      )
-                    }
+                    onClick={() => sendSignal("bill-cash")}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
                   >
                     <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-200 dark:shadow-emerald-900/40">
@@ -1252,35 +1249,16 @@ function WaiterSheet({
                         {tr.cash}
                       </p>
                       <p className="text-[12px] text-muted-foreground mt-0.5">
-                        {lang === "al"
-                          ? "Dërgon faturën e plotë me WhatsApp"
-                          : lang === "mk"
-                            ? "Испраќа целосна сметка на WhatsApp"
-                            : "Sends full itemized receipt via WhatsApp"}
+                        {lang === "al" ? "Njofton kamarieren direkt" : lang === "mk" ? "Го известува келнерот директно" : "Notifies the waiter directly"}
                       </p>
                     </div>
-                    <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
-                      <WaIcon />
-                    </div>
+                    <CheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0 opacity-0 group-active:opacity-100 transition-opacity" />
                   </motion.button>
 
                   {/* Card button */}
                   <motion.button
                     whileTap={{ scale: 0.985 }}
-                    onClick={() =>
-                      openWhatsApp(
-                        receiptItems.length > 0
-                          ? buildReceipt(
-                              lang,
-                              restaurantName,
-                              tableNumber,
-                              receiptItems,
-                              "card",
-                            )
-                          : tr.billTextCard(tableNumber),
-                        "bill",
-                      )
-                    }
+                    onClick={() => sendSignal("bill-card")}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
                   >
                     <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200 dark:shadow-blue-900/40">
@@ -1294,23 +1272,13 @@ function WaiterSheet({
                         {tr.card}
                       </p>
                       <p className="text-[12px] text-muted-foreground mt-0.5">
-                        {lang === "al"
-                          ? "Dërgon faturën e plotë me WhatsApp"
-                          : lang === "mk"
-                            ? "Испраќа целосна сметка на WhatsApp"
-                            : "Sends full itemized receipt via WhatsApp"}
+                        {lang === "al" ? "Njofton kamarieren direkt" : lang === "mk" ? "Го известува келнерот директно" : "Notifies the waiter directly"}
                       </p>
                     </div>
-                    <div className="flex-shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-[#25D366]/10">
-                      <WaIcon />
-                    </div>
+                    <CheckCircle className="h-5 w-5 text-blue-500 flex-shrink-0 opacity-0 group-active:opacity-100 transition-opacity" />
                   </motion.button>
-
-                  {/* Footer hint */}
-                  <p className="text-center text-[11px] text-muted-foreground pt-2 flex items-center justify-center gap-1.5">
-                    <WaIcon />
-                    <span>Sends via WhatsApp</span>
-                  </p>
+                    </>
+                  )}
                 </motion.div>
               ) : (
                 /* ── Normal message list ── */
@@ -1322,7 +1290,19 @@ function WaiterSheet({
                   transition={{ duration: 0.18 }}
                   className="p-4 space-y-2.5 pb-6"
                 >
-                  {tr.waiterMessages(tableNumber).map((msg) => {
+                  {sent ? (
+                    <div className="flex flex-col items-center justify-center py-8 gap-3">
+                      <div className="h-16 w-16 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+                        <CheckCircle className="h-8 w-8 text-amber-500" />
+                      </div>
+                      <p className="text-base font-bold text-foreground">
+                        {lang === "al" ? "Kamarieri vjen!" : lang === "mk" ? "Келнерот доаѓа!" : "Waiter is coming!"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {lang === "al" ? "Kërkesa juaj u dërgua." : lang === "mk" ? "Барањето е испратено." : "Your request was sent."}
+                      </p>
+                    </div>
+                  ) : tr.waiterMessages(tableNumber).map((msg) => {
                     const isBill = msg.icon === "🧾";
                     return (
                       <motion.button
@@ -1331,7 +1311,7 @@ function WaiterSheet({
                         onClick={() =>
                           isBill
                             ? setBillPicker(true)
-                            : openWhatsApp(msg.text, "help")
+                            : sendSignal("help")
                         }
                         className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
                       >
@@ -2560,7 +2540,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
         receiptItems={fullCart}
         restaurantName={restaurant.name}
         restaurantSlug={restaurantSlug}
-        onSignal={async (type) => {
+        onSignal={async (type: "help" | "bill-cash" | "bill-card") => {
           try {
             await fetch("/api/table/waiter-signal", {
               method: "POST",
