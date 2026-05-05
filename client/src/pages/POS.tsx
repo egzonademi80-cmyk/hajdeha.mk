@@ -22,6 +22,8 @@ import {
   LayoutGrid,
   Divide,
   Printer,
+  ClipboardList,
+  KeyRound,
 } from "lucide-react";
 
 interface MenuItem {
@@ -58,6 +60,7 @@ interface PersonTab {
 }
 
 interface Restaurant {
+  id: number;
   name: string;
   menuItems: MenuItem[];
   tableCount?: number;
@@ -458,6 +461,28 @@ export default function POS({ slug }: POSProps) {
   const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(null);
   const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
+
+  // ─── Orders Panel ─────────────────────────────────────────────────────────────
+  const [showOrdersPanel, setShowOrdersPanel] = useState(false);
+  const [claimTarget, setClaimTarget] = useState<number | null>(null);
+  const [pinDigits, setPinDigits] = useState("");
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimError, setClaimError] = useState("");
+
+  const restaurantId = restaurant?.id;
+  const { data: dbOrders = [], refetch: refetchOrders } = useQuery({
+    queryKey: ["/api/orders", restaurantId],
+    queryFn: async () => {
+      if (!restaurantId) return [];
+      const res = await fetch(`/api/orders?restaurantId=${restaurantId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!restaurantId,
+    refetchInterval: 8000,
+  });
+
+  const pendingCount = dbOrders.filter((o: any) => o.status === "pending").length;
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -1066,6 +1091,16 @@ export default function POS({ slug }: POSProps) {
     const handleIncoming = (data: any) => {
       const cart: OrderItem[] = data.cart || [];
       const tableNumber = data.tableNumber;
+
+      // Persist to DB for waiter claiming
+      const rid = restaurant?.id;
+      if (rid && Array.isArray(cart) && cart.length > 0) {
+        fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restaurantId: rid, tableNumber: parseInt(String(tableNumber)) || 0, cart }),
+        }).catch(() => {});;
+      }
       const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
       const tableIdx = tableDigits - 1;
 
@@ -1245,6 +1280,18 @@ export default function POS({ slug }: POSProps) {
             <Moon className="h-4 w-4 lg:h-5 lg:w-5" />
           ) : (
             <Sun className="h-4 w-4 lg:h-5 lg:w-5 text-amber-400" />
+          )}
+        </button>
+        <button
+          onClick={() => setShowOrdersPanel(true)}
+          className={`relative h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
+          data-testid="button-orders-panel"
+        >
+          <ClipboardList className="h-4 w-4 lg:h-5 lg:w-5" />
+          {pendingCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-amber-500 text-black text-[9px] font-bold flex items-center justify-center">
+              {pendingCount}
+            </span>
           )}
         </button>
         {screen === "menu" &&
@@ -2699,6 +2746,158 @@ export default function POS({ slug }: POSProps) {
                 >
                   Krijo
                 </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Orders Panel ───────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showOrdersPanel && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-black/60"
+              onClick={() => { setShowOrdersPanel(false); setClaimTarget(null); setPinDigits(""); setClaimError(""); }}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 32 }}
+              className="absolute inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col"
+              style={{ background: isLight ? "#fff" : "#1c1917" }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: isLight ? "#e5e7eb" : "#292524" }}>
+                <div>
+                  <h2 className={`text-base font-bold ${t.text}`}>Porositë</h2>
+                  <p className={`text-xs ${t.textMuted}`}>{dbOrders.filter((o: any) => o.status !== "completed").length} aktive</p>
+                </div>
+                <button onClick={() => { setShowOrdersPanel(false); setClaimTarget(null); setPinDigits(""); setClaimError(""); }} className={`h-8 w-8 rounded-full flex items-center justify-center ${t.backBtn}`}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {dbOrders.length === 0 && (
+                  <div className={`text-center py-12 ${t.textMuted} text-sm`}>Nuk ka porosi ende</div>
+                )}
+                {[...dbOrders].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((order: any) => {
+                  const total = order.cart.reduce((s: number, i: any) => s + i.price * i.qty, 0);
+                  const statusCfg =
+                    order.status === "pending"
+                      ? { label: "Pret", color: "bg-amber-500/20 text-amber-500" }
+                      : order.status === "claimed"
+                        ? { label: "Marrë", color: "bg-blue-500/20 text-blue-400" }
+                        : { label: "Kryer", color: "bg-emerald-500/20 text-emerald-400" };
+
+                  return (
+                    <div key={order.id} className={`rounded-2xl border p-4 space-y-3 ${isLight ? "border-gray-200 bg-gray-50" : "border-stone-700 bg-stone-800/60"}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className={`font-bold text-sm ${t.text}`}>Tavolina {order.tableNumber}</p>
+                          <p className={`text-xs ${t.textMuted}`}>{new Date(order.createdAt).toLocaleTimeString("sq", { hour: "2-digit", minute: "2-digit" })}</p>
+                          {order.waiterName && (
+                            <p className={`text-xs mt-0.5 ${t.textMuted}`}>👤 {order.waiterName}</p>
+                          )}
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusCfg.color}`}>{statusCfg.label}</span>
+                      </div>
+
+                      <div className="space-y-1">
+                        {order.cart.map((item: any, idx: number) => (
+                          <div key={idx} className="flex justify-between text-xs">
+                            <span className={t.textMuted}>{item.qty}× {item.name}</span>
+                            <span className={`font-semibold ${t.text}`}>{item.price * item.qty} DEN</span>
+                          </div>
+                        ))}
+                        <div className={`flex justify-between text-xs font-bold pt-1 border-t ${isLight ? "border-gray-200" : "border-stone-700"}`}>
+                          <span className={t.text}>Total</span>
+                          <span className="text-amber-500">{total} DEN</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      {order.status === "pending" && (
+                        claimTarget === order.id ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <KeyRound className={`h-4 w-4 flex-shrink-0 ${t.textMuted}`} />
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                maxLength={3}
+                                placeholder="PIN 3-shifror"
+                                value={pinDigits}
+                                onChange={(e) => { setPinDigits(e.target.value.slice(0, 3)); setClaimError(""); }}
+                                className={`flex-1 h-9 rounded-xl border px-3 text-sm outline-none focus:border-amber-500/60 ${isLight ? "border-gray-300 bg-white text-gray-900" : "border-stone-600 bg-stone-900 text-white"}`}
+                                autoFocus
+                                data-testid="input-pin"
+                              />
+                            </div>
+                            {claimError && <p className="text-xs text-red-400">{claimError}</p>}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => { setClaimTarget(null); setPinDigits(""); setClaimError(""); }}
+                                className={`flex-1 h-9 rounded-xl text-xs font-semibold ${t.surfaceSoft} ${t.textMuted}`}
+                              >Anulo</button>
+                              <button
+                                disabled={pinDigits.length !== 3 || claimLoading}
+                                onClick={async () => {
+                                  setClaimLoading(true);
+                                  setClaimError("");
+                                  try {
+                                    const res = await fetch(`/api/orders/${order.id}/claim`, {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ pinCode: pinDigits, restaurantId }),
+                                    });
+                                    if (res.ok) {
+                                      setClaimTarget(null);
+                                      setPinDigits("");
+                                      refetchOrders();
+                                    } else {
+                                      const d = await res.json();
+                                      setClaimError(d.message || "Gabim");
+                                    }
+                                  } catch {
+                                    setClaimError("Gabim rrjeti");
+                                  } finally {
+                                    setClaimLoading(false);
+                                  }
+                                }}
+                                className="flex-1 h-9 rounded-xl bg-amber-500 text-black text-xs font-bold disabled:opacity-40"
+                                data-testid="button-confirm-claim"
+                              >{claimLoading ? "…" : "Konfirmo"}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setClaimTarget(order.id); setPinDigits(""); setClaimError(""); }}
+                            className="w-full h-9 rounded-xl bg-amber-500 text-black text-xs font-bold"
+                            data-testid={`button-take-order-${order.id}`}
+                          >Merr Porosinë</button>
+                        )
+                      )}
+
+                      {order.status === "claimed" && (
+                        <button
+                          onClick={async () => {
+                            await fetch(`/api/orders/${order.id}/complete`, { method: "POST" });
+                            refetchOrders();
+                          }}
+                          className="w-full h-9 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                          data-testid={`button-complete-order-${order.id}`}
+                        >✓ Shëno si të kryer</button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </motion.div>
           </>

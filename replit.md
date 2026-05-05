@@ -2,7 +2,7 @@
 
 ## Overview
 
-HAJDE HA is a full-stack web application serving as a multi-restaurant QR digital menu platform for Tetovë. The platform is designed exclusively for displaying restaurant menus - there is no online ordering, payments, or customer accounts. Customers scan QR codes at restaurant tables to view menus, or access them directly from the website. Only restaurant owners can log in to manage their venues and menu items.
+HAJDE HA is a full-stack web application serving as a multi-restaurant QR digital menu platform for Tetovë. Customers scan QR codes at restaurant tables to view menus and place orders (Pusher real-time). Waiters claim orders via a 3-digit PIN system on the POS screen. Only restaurant owners can log in to manage their venues, menus, and waiter accounts.
 
 ## User Preferences
 

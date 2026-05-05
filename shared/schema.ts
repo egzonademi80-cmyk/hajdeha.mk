@@ -92,6 +92,27 @@ export const pageViews = pgTable(
   }),
 );
 
+export const waiters = pgTable("waiters", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurant_id")
+    .notNull()
+    .references(() => restaurants.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  pinCode: text("pin_code").notNull(),
+});
+
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  restaurantId: integer("restaurant_id")
+    .notNull()
+    .references(() => restaurants.id, { onDelete: "cascade" }),
+  tableNumber: integer("table_number").notNull(),
+  cart: text("cart").notNull(),
+  status: text("status").notNull().default("pending"),
+  waiterId: integer("waiter_id").references(() => waiters.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   restaurants: many(restaurants),
@@ -101,6 +122,27 @@ export const restaurantsRelations = relations(restaurants, ({ one, many }) => ({
   user: one(users, { fields: [restaurants.userId], references: [users.id] }),
   menuItems: many(menuItems),
   pageViews: many(pageViews),
+  waiters: many(waiters),
+  orders: many(orders),
+}));
+
+export const waitersRelations = relations(waiters, ({ one, many }) => ({
+  restaurant: one(restaurants, {
+    fields: [waiters.restaurantId],
+    references: [restaurants.id],
+  }),
+  orders: many(orders),
+}));
+
+export const ordersRelations = relations(orders, ({ one }) => ({
+  restaurant: one(restaurants, {
+    fields: [orders.restaurantId],
+    references: [restaurants.id],
+  }),
+  waiter: one(waiters, {
+    fields: [orders.waiterId],
+    references: [waiters.id],
+  }),
 }));
 
 export const menuItemsRelations = relations(menuItems, ({ one }) => ({
@@ -142,6 +184,16 @@ export const insertPageViewSchema = createInsertSchema(pageViews).omit({
   id: true,
 });
 
+export const insertWaiterSchema = createInsertSchema(waiters, {
+  name: z.string().min(1),
+  pinCode: z.string().length(3).regex(/^\d{3}$/, "PIN must be 3 digits"),
+}).omit({ id: true });
+
+export const insertOrderSchema = createInsertSchema(orders).omit({
+  id: true,
+  createdAt: true,
+});
+
 // === EXPLICIT TYPES ===
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -151,3 +203,7 @@ export type MenuItem = typeof menuItems.$inferSelect;
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type PageView = typeof pageViews.$inferSelect;
 export type InsertPageView = z.infer<typeof insertPageViewSchema>;
+export type Waiter = typeof waiters.$inferSelect;
+export type InsertWaiter = z.infer<typeof insertWaiterSchema>;
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = z.infer<typeof insertOrderSchema>;

@@ -52,6 +52,9 @@ import {
   Download,
   Table2,
   Wifi,
+  Users,
+  PencilLine,
+  ShieldCheck,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,7 +65,7 @@ import {
 } from "@shared/schema";
 import { api } from "@shared/routes";
 import { apiRequest } from "@/lib/queryClient";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ── dnd-kit ───────────────────────────────────────────────────────────────────
 import {
@@ -652,6 +655,9 @@ export default function AdminRestaurant() {
           )}
         </section>
 
+        {/* ── Waiters Section ── */}
+        <WaitersSection restaurantId={restaurant.id} />
+
         {/* ── QR Codes Section ── */}
         <TableQRSection restaurant={restaurant} />
       </main>
@@ -1149,6 +1155,158 @@ function MenuItemDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Waiters Section ──────────────────────────────────────────────────────────
+function WaitersSection({ restaurantId }: { restaurantId: number }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [name, setName] = useState("");
+  const [pin, setPin] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const { data: waiters = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/waiters", restaurantId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/waiters?action=list&restaurantId=${restaurantId}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const resetForm = () => { setShowAdd(false); setEditId(null); setName(""); setPin(""); };
+
+  const saveWaiter = async () => {
+    if (!name.trim() || pin.length !== 3) {
+      toast({ title: "Gabim", description: "Emri dhe PIN 3-shifror janë të detyrueshëm.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const isEdit = editId !== null;
+      const url = isEdit
+        ? `/api/admin/waiters?action=update&id=${editId}`
+        : `/api/admin/waiters?action=create`;
+      const res = await fetch(url, {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ restaurantId, name: name.trim(), pinCode: pin }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Gabim");
+      toast({ title: isEdit ? "Kamarieri u përditësua" : "Kamarieri u shtua" });
+      qc.invalidateQueries({ queryKey: ["/api/admin/waiters", restaurantId] });
+      resetForm();
+    } catch (err: any) {
+      toast({ title: "Gabim", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteWaiter = async (id: number) => {
+    await fetch(`/api/admin/waiters?action=delete&id=${id}`, { method: "DELETE", credentials: "include" });
+    qc.invalidateQueries({ queryKey: ["/api/admin/waiters", restaurantId] });
+    toast({ title: "Kamarieri u fshi" });
+  };
+
+  return (
+    <section className="bg-card rounded-2xl border border-border p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Users className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground">Kamarierët</h2>
+            <p className="text-xs text-muted-foreground">PIN 3-shifror për marrjen e porosive</p>
+          </div>
+        </div>
+        <Button size="sm" onClick={() => { setShowAdd(true); setEditId(null); setName(""); setPin(""); }} className="gap-1.5" data-testid="button-add-waiter">
+          <Plus className="h-4 w-4" /> Shto
+        </Button>
+      </div>
+
+      {isLoading && <p className="text-sm text-muted-foreground">Duke ngarkuar…</p>}
+
+      {!isLoading && waiters.length === 0 && !showAdd && (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center">
+          <ShieldCheck className="h-7 w-7 text-muted-foreground/40 mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">Nuk ka kamarierë. Shtoni të parin.</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {waiters.map((w: any) => (
+          <div key={w.id} className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 gap-3" data-testid={`row-waiter-${w.id}`}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Users className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{w.name}</p>
+                <p className="text-xs text-muted-foreground font-mono">PIN: •••</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => { setEditId(w.id); setName(w.name); setPin(w.pinCode); setShowAdd(true); }}
+                className="h-8 w-8 rounded-lg border border-border bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors"
+                data-testid={`button-edit-waiter-${w.id}`}
+              >
+                <PencilLine className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              <button
+                onClick={() => deleteWaiter(w.id)}
+                className="h-8 w-8 rounded-lg border border-destructive/30 bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                data-testid={`button-delete-waiter-${w.id}`}
+              >
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {showAdd && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+          <p className="text-sm font-semibold text-foreground">{editId ? "Ndrysho kamarierin" : "Kamarier i ri"}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Emri</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Besart"
+                data-testid="input-waiter-name"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">PIN (3 shifra)</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                maxLength={3}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.slice(0, 3))}
+                placeholder="123"
+                data-testid="input-waiter-pin"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={resetForm} className="flex-1">Anulo</Button>
+            <Button size="sm" onClick={saveWaiter} disabled={saving} className="flex-1" data-testid="button-save-waiter">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ruaj"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

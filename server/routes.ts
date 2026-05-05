@@ -10,6 +10,7 @@ import {
   restaurants as restaurantsTable,
   menuItems as menuItemsTable,
   pageViews,
+  insertWaiterSchema,
 } from "../shared/schema.js";
 import { eq, sql, gte, and } from "drizzle-orm";
 
@@ -567,6 +568,147 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("Admin menu error:", err);
       res.status(500).json({ message: err.message || "Internal server error" });
+    }
+  });
+
+  // === ADMIN WAITERS — /api/admin/waiters?action=list|create|update|delete ===
+  app.all("/api/admin/waiters", async (req, res) => {
+    if (!requireAuth(req, res)) return;
+    const user = req.user as any;
+    const action = req.query.action as string;
+
+    try {
+      if (action === "list") {
+        const restaurantId = parseInt(req.query.restaurantId as string);
+        if (isNaN(restaurantId)) return res.status(400).json({ message: "restaurantId required" });
+        const restaurant = await storage.getRestaurant(restaurantId);
+        if (!restaurant || restaurant.userId !== user.id)
+          return res.status(403).json({ message: "Forbidden" });
+        const list = await storage.getWaiters(restaurantId);
+        return res.json(list);
+      }
+
+      if (action === "create") {
+        const result = insertWaiterSchema.safeParse(req.body);
+        if (!result.success)
+          return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
+        const restaurant = await storage.getRestaurant(result.data.restaurantId);
+        if (!restaurant || restaurant.userId !== user.id)
+          return res.status(403).json({ message: "Forbidden" });
+        const existing = await storage.getWaiterByPin(result.data.restaurantId, result.data.pinCode);
+        if (existing) return res.status(409).json({ message: "PIN already in use" });
+        const waiter = await storage.createWaiter(result.data);
+        return res.status(201).json(waiter);
+      }
+
+      if (action === "update") {
+        const id = parseInt(req.query.id as string);
+        if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+        const waiter = await storage.getWaiter(id);
+        if (!waiter) return res.status(404).json({ message: "Not found" });
+        const restaurant = await storage.getRestaurant(waiter.restaurantId);
+        if (!restaurant || restaurant.userId !== user.id)
+          return res.status(403).json({ message: "Forbidden" });
+        if (req.body.pinCode) {
+          const existing = await storage.getWaiterByPin(waiter.restaurantId, req.body.pinCode);
+          if (existing && existing.id !== id) return res.status(409).json({ message: "PIN already in use" });
+        }
+        const updated = await storage.updateWaiter(id, req.body);
+        return res.json(updated);
+      }
+
+      if (action === "delete") {
+        const id = parseInt(req.query.id as string);
+        if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+        const waiter = await storage.getWaiter(id);
+        if (!waiter) return res.status(404).json({ message: "Not found" });
+        const restaurant = await storage.getRestaurant(waiter.restaurantId);
+        if (!restaurant || restaurant.userId !== user.id)
+          return res.status(403).json({ message: "Forbidden" });
+        await storage.deleteWaiter(id);
+        return res.sendStatus(204);
+      }
+
+      return res.status(400).json({ message: "Invalid action" });
+    } catch (err: any) {
+      console.error("Admin waiters error:", err);
+      res.status(500).json({ message: err.message || "Internal server error" });
+    }
+  });
+
+  // === ORDERS ===
+  app.post("/api/orders", async (req, res) => {
+    try {
+      const { restaurantId, tableNumber, cart } = req.body;
+      if (!restaurantId || !tableNumber || !Array.isArray(cart))
+        return res.status(400).json({ message: "Missing fields" });
+      const order = await storage.createOrder({
+        restaurantId,
+        tableNumber,
+        cart: JSON.stringify(cart),
+        status: "pending",
+        waiterId: null,
+      });
+      return res.status(201).json(order);
+    } catch (err: any) {
+      console.error("Create order error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/orders", async (req, res) => {
+    try {
+      const restaurantId = parseInt(req.query.restaurantId as string);
+      if (isNaN(restaurantId)) return res.status(400).json({ message: "restaurantId required" });
+      const status = req.query.status as string | undefined;
+      const list = await storage.getOrders(restaurantId, status);
+      const waiters = await storage.getWaiters(restaurantId);
+      const waiterMap = new Map(waiters.map((w) => [w.id, w.name]));
+      const enriched = list.map((o) => ({
+        ...o,
+        cart: JSON.parse(o.cart),
+        waiterName: o.waiterId ? waiterMap.get(o.waiterId) ?? null : null,
+      }));
+      return res.json(enriched);
+    } catch (err: any) {
+      console.error("Get orders error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/orders/:id/claim", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { pinCode, restaurantId } = req.body;
+      if (!pinCode || !restaurantId) return res.status(400).json({ message: "Missing fields" });
+
+      const order = await storage.getOrder(id);
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.status !== "pending") return res.status(409).json({ message: "Order already taken" });
+
+      const waiter = await storage.getWaiterByPin(restaurantId, pinCode);
+      if (!waiter) return res.status(401).json({ message: "Invalid PIN" });
+
+      const updated = await storage.claimOrder(id, waiter.id);
+      if (!updated) return res.status(409).json({ message: "Order already taken" });
+
+      return res.json({ ...updated, cart: JSON.parse(updated.cart), waiterName: waiter.name });
+    } catch (err: any) {
+      console.error("Claim order error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/orders/:id/complete", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const order = await storage.getOrder(id);
+      if (!order) return res.status(404).json({ message: "Order not found" });
+      const updated = await storage.completeOrder(id);
+      return res.json({ ...updated, cart: JSON.parse(updated.cart) });
+    } catch (err: any) {
+      console.error("Complete order error:", err);
+      res.status(500).json({ message: err.message });
     }
   });
 
