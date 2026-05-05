@@ -97,7 +97,7 @@ const translations: Record<string, any> = {
       "Visit the restaurant or call them directly to place your order with confidence.",
   },
   al: {
-    hero: "Platforma e Menusë Dixhitale e Tetovës.",
+    hero: "Platforma e Menusë Digjitale e Tetovës.",
     subHero:
       "Shfletoni menutë dhe llogaritni faturën tuaj para se të porosisni.",
     searchPlaceholder: "Kërko për restorante ose pjata (p.sh. Pica, Burger)...",
@@ -111,7 +111,7 @@ const translations: Record<string, any> = {
     whyUs: "Pse të zgjidhni HAJDE HA?",
     whyUsSub:
       "Mënyra moderne për të përjetuar ngrënien në Tetovë. E thjeshtë, efikase dhe pa kontakt.",
-    digitalMenus: "Menu Dixhitale",
+    digitalMenus: "Menu Digjitale",
     digitalMenusDesc:
       "Qasuni menjëherë në menu cilësore nga çdo smartphone. Nuk ka nevojë për menu fizike.",
     billCalc: "Llogaritësi i Faturës",
@@ -119,16 +119,16 @@ const translations: Record<string, any> = {
       "Dini saktësisht se sa do të kushtojë vakti juaj para se të porosisni. Llogaritni shumat në Denarë menjëherë.",
     eco: "Ekologjike",
     ecoDesc:
-      "Reduktoni mbetjet e letrës duke kaluar në menu dixhitale. Përditësoni menunë tuaj në çdo kohë pa riprintim.",
+      "Reduktoni mbetjet e letrës duke kaluar në menu digjitale. Përditësoni menunë tuaj në çdo kohë pa riprintim.",
     listRestaurant: "Dëshironi të listoni restorantin tuaj?",
     noRestaurantsOpen: "Asnjë restorant nuk është i hapur tani.",
     joinPlatform:
-      "Bashkohuni me platformën e menusë dixhitale me rritjen më të shpejtë në Tetovë.",
+      "Bashkohuni me platformën e menusë digjitale me rritjen më të shpejtë në Tetovë.",
     emailUs: "Na dërgoni email",
     callSupport: "Telefoni Mbështetjen",
     contactTitle: "Vendosni Restorantin tuaj Online",
     contactSubtitle:
-      "Bashkohuni me revolucionin e menusë dixhitale në Tetovë. Plotësoni formularin dhe ne do t'ju kontaktojmë brenda 24 orëve.",
+      "Bashkohuni me revolucionin e menusë digjitale në Tetovë. Plotësoni formularin dhe ne do t'ju kontaktojmë brenda 24 orëve.",
     fullName: "Emri i plotë",
     emailAddr: "Adresa e Email-it",
     restaurantName: "Emri i Restorantit",
@@ -403,7 +403,37 @@ export default function Home() {
         );
       }
       const isOpen = IsOpen(r.openingTime, r.closingTime);
-      return { ...r, distance, isOpen };
+
+      // Calculate dish match score for better sorting
+      let dishMatchScore = 0;
+      if (searchTerm && r.menuItems?.length > 0) {
+        const searchLower = searchTerm.toLowerCase().trim();
+        r.menuItems.forEach((item: any) => {
+          const itemName = (item.name || "").toLowerCase();
+          const itemDesc = (item.description || "").toLowerCase();
+
+          // Exact match gets highest score
+          if (itemName === searchLower || itemDesc === searchLower) {
+            dishMatchScore += 10;
+          }
+          // Starts with search term gets medium score
+          else if (
+            itemName.startsWith(searchLower) ||
+            itemDesc.startsWith(searchLower)
+          ) {
+            dishMatchScore += 5;
+          }
+          // Contains search term gets lowest score
+          else if (
+            itemName.includes(searchLower) ||
+            itemDesc.includes(searchLower)
+          ) {
+            dishMatchScore += 1;
+          }
+        });
+      }
+
+      return { ...r, distance, isOpen, dishMatchScore };
     });
 
     if (showOpenOnly) {
@@ -411,19 +441,36 @@ export default function Home() {
     }
 
     if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
+      const searchLower = searchTerm.toLowerCase().trim();
+
       result = result.filter((restaurant: any) => {
-        const nameMatch = restaurant.name.toLowerCase().includes(searchLower);
-        const menuMatch = restaurant.menuItems?.some(
-          (item: any) =>
-            item.name.toLowerCase().includes(searchLower) ||
-            item.description.toLowerCase().includes(searchLower),
-        );
+        const nameMatch = (restaurant.name || "")
+          .toLowerCase()
+          .includes(searchLower);
+
+        const menuMatch = restaurant.dishMatchScore > 0;
+
         return nameMatch || menuMatch;
       });
-    }
 
-    if (userLocation) {
+      // Sort by dish match score, then by distance
+      result.sort((a, b) => {
+        // First, sort by dish match score (higher is better)
+        if (a.dishMatchScore !== b.dishMatchScore) {
+          return b.dishMatchScore - a.dishMatchScore;
+        }
+
+        // Then by distance if available
+        if (userLocation) {
+          if (a.distance === null) return 1;
+          if (b.distance === null) return -1;
+          return a.distance - b.distance;
+        }
+
+        return 0;
+      });
+    } else if (userLocation) {
+      // Only sort by distance if no search term
       result.sort((a, b) => {
         if (a.distance === null) return 1;
         if (b.distance === null) return -1;
@@ -442,6 +489,20 @@ export default function Home() {
     }
     return arr;
   }
+  const [typed, setTyped] = useState("");
+
+  useEffect(() => {
+    let i = 0;
+
+    const interval = setInterval(() => {
+      setTyped(t.hero.slice(0, i + 1));
+      i++;
+
+      if (i === t.hero.length) clearInterval(interval);
+    }, 70);
+
+    return () => clearInterval(interval);
+  }, [t.hero]);
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
@@ -450,13 +511,16 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative min-h-[80vh] flex flex-col bg-primary text-primary-foreground overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10 dark:opacity-5 bg-[url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80')] bg-cover bg-center" />
+        {/* Background Pattern with Gradient Overlay */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 opacity-10 dark:opacity-5 bg-[url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80')] bg-cover bg-center" />
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/40 via-primary/60 to-primary" />
+        </div>
 
         {/* Top Bar */}
         <div className="relative z-20 flex items-center justify-between p-4 safe-area-inset-top">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 dark:border-white/30">
+            <div className="w-10 h-10 bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 dark:border-white/30 shadow-lg">
               <Utensils className="w-5 h-5" />
             </div>
             <span className="font-bold text-lg tracking-tight">HAJDE HA</span>
@@ -464,15 +528,15 @@ export default function Home() {
 
           <div className="flex items-center gap-2">
             {/* Language Selector */}
-            <div className="bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-xl border border-white/20 dark:border-white/30 p-1 flex">
+            <div className="bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-xl border border-white/20 dark:border-white/30 p-1 flex shadow-lg">
               {(["en", "al", "mk"] as const).map((l) => (
                 <button
                   key={l}
                   onClick={() => handleLangChange(l)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${
                     lang === l
-                      ? "bg-white dark:bg-white/90 text-primary shadow-sm"
-                      : "text-white/80 hover:text-white"
+                      ? "bg-white dark:bg-white/90 text-primary shadow-md scale-105"
+                      : "text-white/80 hover:text-white hover:bg-white/5"
                   }`}
                 >
                   {l.toUpperCase()}
@@ -483,7 +547,7 @@ export default function Home() {
             {/* Admin Login */}
             <Link href="/auth/login">
               <button
-                className="w-10 h-10 bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 dark:border-white/30 hover:bg-white/20 dark:hover:bg-white/30 transition-colors"
+                className="w-10 h-10 bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 dark:border-white/30 hover:bg-white/20 dark:hover:bg-white/30 hover:scale-105 transition-all duration-300 shadow-lg"
                 title={t.ownerLogin}
               >
                 <User className="w-5 h-5" />
@@ -495,29 +559,41 @@ export default function Home() {
         {/* Hero Content */}
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8 relative z-10">
           <div className="text-center max-w-md mx-auto">
-            <div className="inline-flex items-center gap-2 bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-full px-4 py-2 mb-6 border border-white/20 dark:border-white/30">
+            <div className="inline-flex items-center gap-2 bg-white/10 dark:bg-white/20 backdrop-blur-md rounded-full px-4 py-2 mb-6 border border-white/20 dark:border-white/30 shadow-lg">
               <ForkKnife className="w-4 h-4" />
               <span className="text-sm font-medium">Hajde Ha</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 text-balance">
-              {t.hero}
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4 text-balance drop-shadow-lg text-white">
+              {typed}
             </h1>
 
-            <p className="text-base sm:text-lg opacity-80 mb-8 text-pretty">
+            <p className="text-base sm:text-lg opacity-90 mb-8 text-pretty drop-shadow-md">
               {t.subHero}
             </p>
 
             {/* Search Bar */}
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground color-primary" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-stone-400 pointer-events-none z-10" />
               <Input
                 placeholder={t.searchPlaceholder}
-                className="pl-12 h-14 bg-white dark:bg-stone-800 text-foreground dark:text-stone-100 rounded-2xl border-0 shadow-2xl focus-visible:ring-2 focus-visible:ring-white/50 dark:focus-visible:ring-primary text-base"
+                className="pl-12 h-14 bg-white dark:bg-stone-800 text-foreground dark:text-stone-100 rounded-2xl border-0 shadow-2xl focus-visible:ring-2 focus-visible:ring-primary/50 dark:focus-visible:ring-primary focus-visible:shadow-2xl focus-visible:scale-[1.02] transition-all duration-300 text-base placeholder:text-stone-400"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 data-testid="input-search-restaurants"
               />
+            </div>
+          </div>
+          <div
+            onClick={() =>
+              window.scrollTo({ top: window.innerHeight, behavior: "smooth" })
+            }
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center animate-bounce cursor-pointer"
+          >
+            <span className="text-[10px] text-white/70 mb-1">Scroll</span>
+
+            <div className="w-4 h-7 border border-white/60 rounded-full flex items-start justify-center p-[2px]">
+              <div className="w-[2px] h-[4px] bg-white rounded-full animate-pulse" />
             </div>
           </div>
         </div>
@@ -542,7 +618,7 @@ export default function Home() {
               <Button
                 variant={userLocation ? "default" : "outline"}
                 size="sm"
-                className="rounded-full gap-2"
+                className={`rounded-full gap-2 transition-all duration-300 ${userLocation ? "shadow-md" : ""}`}
                 onClick={handleGetLocation}
                 disabled={isGettingLocation}
               >
@@ -563,7 +639,7 @@ export default function Home() {
               <Button
                 variant={showOpenOnly ? "default" : "outline"}
                 size="sm"
-                className="rounded-full gap-2"
+                className={`rounded-full gap-2 transition-all duration-300 ${showOpenOnly ? "shadow-md" : ""}`}
                 onClick={() => setShowOpenOnly(!showOpenOnly)}
               >
                 <Clock className="h-4 w-4" />
@@ -595,7 +671,7 @@ export default function Home() {
                       href={`/restaurant/${restaurant.slug}`}
                       className="contents"
                     >
-                      <Card className="hover-elevate cursor-pointer h-full border-0 shadow-lg dark:shadow-stone-900/50 overflow-hidden group rounded-2xl flex flex-col relative bg-white dark:bg-stone-800">
+                      <Card className="hover-elevate cursor-pointer h-full border-2 border-stone-200 dark:border-stone-700 hover:border-primary dark:hover:border-primary shadow-lg hover:shadow-2xl dark:shadow-stone-900/50 overflow-hidden group rounded-2xl flex flex-col relative bg-white dark:bg-stone-800 active:border-primary dark:active:border-primary transition-all duration-300">
                         {/* Open/Closed Badge */}
                         <div
                           className={`absolute top-4 left-4 z-20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border ${
@@ -686,45 +762,78 @@ export default function Home() {
         )}
 
         {/* Empty State */}
-        {filteredRestaurants.filter((r: any) =>
-          showOpenOnly ? r.isOpen : true,
-        ).length === 0 &&
-          !isLoading && (
-            <div className="text-center py-20 bg-muted/30 dark:bg-stone-800/30 rounded-3xl">
-              <Utensils className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-              <p className="text-muted-foreground text-lg">
-                {showOpenOnly
-                  ? t.noRestaurantsOpen
-                  : searchTerm
-                    ? t.noResults
-                    : t.noRestaurants}
+        {filteredRestaurants.length === 0 && !isLoading && (
+          <div className="text-center py-20 px-4">
+            <div className="max-w-md mx-auto">
+              <div className="w-20 h-20 mx-auto mb-6 bg-stone-100 dark:bg-stone-800 rounded-full flex items-center justify-center">
+                <Utensils className="h-10 w-10 text-stone-400" />
+              </div>
+              <h3 className="text-2xl font-bold mb-3 text-stone-900 dark:text-stone-100">
+                {searchTerm
+                  ? lang === "en"
+                    ? "No results found"
+                    : lang === "al"
+                      ? "Nuk u gjet asgjë"
+                      : "Ништо не е најдено"
+                  : lang === "en"
+                    ? "No restaurants yet"
+                    : lang === "al"
+                      ? "Ende pa restorante"
+                      : "Сè уште нема ресторани"}
+              </h3>
+              <p className="text-stone-600 dark:text-stone-400 mb-6">
+                {searchTerm
+                  ? lang === "en"
+                    ? "Try searching for something else"
+                    : lang === "al"
+                      ? "Provo të kërkosh diçka tjetër"
+                      : "Обидете се да побарате нешто друго"
+                  : lang === "en"
+                    ? "Check back soon for new restaurants"
+                    : lang === "al"
+                      ? "Kontrollo së shpejti për restorante të reja"
+                      : "Проверете наскоро за нови ресторани"}
               </p>
+              {searchTerm && (
+                <Button
+                  onClick={() => setSearchTerm("")}
+                  variant="outline"
+                  className="rounded-full"
+                >
+                  {lang === "en"
+                    ? "Clear search"
+                    : lang === "al"
+                      ? "Pastro kërkimin"
+                      : "Исчисти пребарување"}
+                </Button>
+              )}
             </div>
-          )}
+          </div>
+        )}
       </main>
 
       {/* How to Use Section */}
-      <section className="py-20 px-4 bg-gradient-to-b from-white to-orange-50 dark:from-stone-900 dark:to-stone-800/50 transition-colors duration-300">
+      <section className="py-16 sm:py-20 lg:py-24 px-4 bg-gradient-to-b from-white to-orange-50 dark:from-stone-900 dark:to-stone-800/50 transition-colors duration-300">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-display font-bold mb-4 text-stone-800 dark:text-stone-100 transition-colors duration-300">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl font-display font-bold mb-4 text-stone-800 dark:text-stone-100 transition-colors duration-300">
               {t.howToUse}
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8">
             {[1, 2, 3, 4].map((num) => (
               <div
                 key={num}
-                className="bg-white dark:bg-stone-900 p-8 rounded-2xl border border-orange-100 dark:border-orange-700 shadow-lg hover:shadow-xl transition-shadow space-y-4"
+                className="bg-white dark:bg-stone-900 p-6 sm:p-7 lg:p-8 rounded-2xl border-2 border-stone-200 dark:border-stone-700 hover:border-primary dark:hover:border-primary active:border-primary dark:active:border-primary shadow-lg hover:shadow-xl transition-all duration-300 space-y-4 hover:-translate-y-1 cursor-pointer"
               >
-                <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-full flex items-center justify-center font-bold text-xl shadow-md">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-full flex items-center justify-center font-bold text-lg sm:text-xl shadow-md">
                   {num}
                 </div>
-                <h3 className="text-xl font-bold font-display text-stone-800 dark:text-stone-100 transition-colors duration-300">
+                <h3 className="text-lg sm:text-xl font-bold font-display text-stone-800 dark:text-stone-100 transition-colors duration-300">
                   {t[`step${num}` as keyof typeof t]}
                 </h3>
-                <p className="text-stone-600 dark:text-stone-300 text-sm leading-relaxed transition-colors duration-300">
+                <p className="text-sm sm:text-base text-stone-600 dark:text-stone-300 leading-relaxed transition-colors duration-300">
                   {t[`step${num}Desc` as keyof typeof t]}
                 </p>
               </div>
@@ -732,7 +841,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
       {/* Why Us Section */}
       <section className="py-24 px-4 bg-gradient-to-b from-white to-orange-50 dark:from-stone-900 dark:to-stone-800/50 transition-colors duration-300">
         <div className="max-w-6xl mx-auto">

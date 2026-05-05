@@ -84,13 +84,35 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 const CATEGORIES = [
+  "Appetizers",
   "Starters",
+  "Breakfast",
+  "Breakfasts",
   "Mains",
+  "Main",
+  "Main Course",
+  "Pizza",
+  "Pizzas",
+  "Pasta",
+  "Burgers",
+  "Burger",
+  "Salads",
   "Sides",
+  "Soups",
+  "Soup",
+  "Grill",
+  "Grills",
+  "Sandwiches",
+  "Wraps",
+  "Tacos",
   "Desserts",
+  "Dessert",
   "Drinks",
   "Hot Drinks",
 ];
+
+const normalizeCategory = (value: string) =>
+  value.trim().toLowerCase().replace(/\s+/g, " ");
 
 // ── Image Upload ──────────────────────────────────────────────────────────────
 const ImageUpload = memo(function ImageUpload({
@@ -425,6 +447,10 @@ export default function AdminRestaurant() {
     }
   }, [restaurant?.menuItems]);
 
+  const visibleItems = useMemo(() => {
+    return orderedItems;
+  }, [orderedItems]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, {
@@ -462,11 +488,22 @@ export default function AdminRestaurant() {
   }, [orderedItems, queryClient]);
 
   const groupedItems = useMemo(() => {
-    return CATEGORIES.map((category) => {
-      const items = orderedItems.filter((item) => item.category === category);
-      return items.length > 0 ? { category, items } : null;
-    }).filter(Boolean);
-  }, [orderedItems]);
+    const categories = Array.from(
+      new Set([
+        ...CATEGORIES,
+        ...visibleItems.map((item) => item.category).filter(Boolean),
+      ]),
+    );
+
+    return categories
+      .map((category) => {
+        const items = visibleItems.filter(
+          (item) => normalizeCategory(item.category) === normalizeCategory(category),
+        );
+        return items.length > 0 ? { category, items } : null;
+      })
+      .filter(Boolean);
+  }, [visibleItems]);
 
   if (isLoading)
     return (
@@ -624,6 +661,9 @@ export default function AdminRestaurant() {
         onOpenChange={setIsItemModalOpen}
         restaurantId={restaurant.id}
         initialData={editingItem}
+        categoryOptions={Array.from(
+          new Set(restaurant.menuItems.map((item: MenuItem) => item.category).filter(Boolean)),
+        )}
       />
     </div>
   );
@@ -655,6 +695,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
     longitude: restaurant.longitude || "",
     tableCount: restaurant.tableCount || 0,
     wifiPassword: restaurant.wifiPassword || "",
+    orderMode: (restaurant as any).orderMode || "whatsapp",
   });
 
   useEffect(() => {
@@ -675,6 +716,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
       longitude: restaurant.longitude || "",
       tableCount: restaurant.tableCount || 0,
       wifiPassword: restaurant.wifiPassword || "",
+      orderMode: (restaurant as any).orderMode || "whatsapp",
     });
   }, [restaurant]);
 
@@ -821,6 +863,44 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
             className="h-9 bg-background text-foreground border-border"
           />
         </div>
+        <div className="sm:col-span-2">
+          <Label className="text-sm text-foreground">
+            How orders are received
+          </Label>
+          <div className="grid grid-cols-2 gap-2 mt-1.5">
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, orderMode: "whatsapp" }))
+              }
+              className={`h-12 rounded-lg border text-sm font-semibold transition-all ${
+                formData.orderMode === "whatsapp"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              💬 WhatsApp / Call
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, orderMode: "tablet" }))
+              }
+              className={`h-12 rounded-lg border text-sm font-semibold transition-all ${
+                formData.orderMode === "tablet"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              📲 Tablet POS (live)
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5">
+            {formData.orderMode === "tablet"
+              ? `Open /pos/${restaurant.slug} on your tablet to receive orders live.`
+              : "Customers' orders open WhatsApp on their phone."}
+          </p>
+        </div>
         <div>
           <Label className="text-sm text-foreground">Opening</Label>
           <Input
@@ -869,15 +949,53 @@ function MenuItemDialog({
   onOpenChange,
   restaurantId,
   initialData,
+  categoryOptions,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   restaurantId: number;
   initialData: MenuItem | null;
+  categoryOptions: string[];
 }) {
   const { mutate: create, isPending: isCreating } = useCreateMenuItem();
   const { mutate: update, isPending: isUpdating } = useUpdateMenuItem();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const languageItems = useMemo(() => {
+    return [
+      {
+        key: "name",
+        label: "Name",
+        placeholder: "Chicken Burger",
+      },
+      {
+        key: "nameAl",
+        label: "Name (AL)",
+        placeholder: "Burger pule",
+      },
+      {
+        key: "nameMk",
+        label: "Name (MK)",
+        placeholder: "Пилешки бургер",
+      },
+    ] as const;
+  }, []);
+  const languageDescriptions = useMemo(() => {
+    return [
+      {
+        key: "description",
+        label: "Description",
+      },
+      {
+        key: "descriptionAl",
+        label: "Description (AL)",
+      },
+      {
+        key: "descriptionMk",
+        label: "Description (MK)",
+      },
+    ] as const;
+  }, []);
 
   const form = useForm<InsertMenuItem>({
     resolver: zodResolver(insertMenuItemSchema),
@@ -903,6 +1021,7 @@ function MenuItemDialog({
       toast({ title: initialData ? "Updated" : "Added" });
       onOpenChange(false);
       form.reset();
+      queryClient.invalidateQueries({ queryKey: [api.restaurants.get.path] });
     };
     if (initialData) {
       update({ id: initialData.id, ...data }, { onSuccess });
@@ -920,20 +1039,25 @@ function MenuItemDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          <div>
-            <Label className="text-sm text-foreground">Name</Label>
-            <Input
-              {...form.register("name")}
-              className="h-9 bg-background text-foreground border-border"
-            />
-          </div>
-          <div>
-            <Label className="text-sm text-foreground">Description</Label>
-            <Textarea
-              {...form.register("description")}
-              className="h-20 resize-none bg-background text-foreground border-border"
-            />
-          </div>
+          {languageItems.map((field) => (
+            <div key={field.key}>
+              <Label className="text-sm text-foreground">{field.label}</Label>
+              <Input
+                {...form.register(field.key as keyof InsertMenuItem)}
+                placeholder={field.placeholder}
+                className="h-9 bg-background text-foreground border-border"
+              />
+            </div>
+          ))}
+          {languageDescriptions.map((field) => (
+            <div key={field.key}>
+              <Label className="text-sm text-foreground">{field.label}</Label>
+              <Textarea
+                {...form.register(field.key as keyof InsertMenuItem)}
+                className="h-20 resize-none bg-background text-foreground border-border"
+              />
+            </div>
+          ))}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-sm text-foreground">Price</Label>
@@ -953,7 +1077,12 @@ function MenuItemDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background border-border">
-                  {CATEGORIES.map((cat) => (
+                  {Array.from(
+                    new Set([
+                      ...CATEGORIES,
+                      ...categoryOptions,
+                    ]),
+                  ).map((cat) => (
                     <SelectItem
                       key={cat}
                       value={cat}

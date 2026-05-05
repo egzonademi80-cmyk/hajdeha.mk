@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import Pusher from "pusher-js";
 import {
   Plus,
   Minus,
@@ -10,6 +11,17 @@ import {
   Receipt,
   ChevronLeft,
   ShoppingBag,
+  UserPlus,
+  X,
+  User,
+  Bell,
+  Sun,
+  Moon,
+  ArrowRightLeft,
+  Merge,
+  LayoutGrid,
+  Divide,
+  Printer,
 } from "lucide-react";
 
 interface MenuItem {
@@ -27,189 +39,702 @@ interface OrderItem {
   qty: number;
 }
 
+interface OrderRound {
+  items: OrderItem[];
+  sentAt: number;
+}
+
 interface TableOrder {
+  items: OrderItem[];
+  rounds: OrderRound[];
+  startedAt: Date | null;
+  section?: string;
+}
+
+interface PersonTab {
+  name: string;
   items: OrderItem[];
   startedAt: Date | null;
 }
 
-const RESTAURANT_SLUG = "embeltoresport";
-const TABLE_COUNT = 16;
+interface Restaurant {
+  name: string;
+  menuItems: MenuItem[];
+  tableCount?: number;
+  sections?: string[];
+}
 
-const emptyTable = (): TableOrder => ({ items: [], startedAt: null });
+interface TableSection {
+  name: string;
+  tables: number[];
+}
+
+// ─── Split Bill Types ──────────────────────────────────────────────────────────
+interface SplitPerson {
+  name: string;
+  colorIdx: number;
+  paid: boolean;
+  payMethod: "cash" | "card" | null;
+}
+
+const SPLIT_COLORS = [
+  {
+    bg: "bg-blue-500/20",
+    border: "border-blue-500/50",
+    text: "text-blue-400",
+    dot: "bg-blue-500",
+  },
+  {
+    bg: "bg-rose-500/20",
+    border: "border-rose-500/50",
+    text: "text-rose-400",
+    dot: "bg-rose-500",
+  },
+  {
+    bg: "bg-emerald-500/20",
+    border: "border-emerald-500/50",
+    text: "text-emerald-400",
+    dot: "bg-emerald-500",
+  },
+  {
+    bg: "bg-purple-500/20",
+    border: "border-purple-500/50",
+    text: "text-purple-400",
+    dot: "bg-purple-500",
+  },
+  {
+    bg: "bg-amber-500/20",
+    border: "border-amber-500/50",
+    text: "text-amber-400",
+    dot: "bg-amber-500",
+  },
+  {
+    bg: "bg-pink-500/20",
+    border: "border-pink-500/50",
+    text: "text-pink-400",
+    dot: "bg-pink-500",
+  },
+];
+
+const emptyTable = (): TableOrder => ({ items: [], rounds: [], startedAt: null });
 
 function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
 }
 
+type ActiveSlot =
+  | { kind: "table"; idx: number }
+  | { kind: "person"; idx: number }
+  | null;
+
 type Screen = "tables" | "menu" | "order";
 
-export default function POS() {
-  const [tables, setTables] = useState<TableOrder[]>(() => {
-    try {
-      const saved = localStorage.getItem("pos-tables-v1");
-      if (saved) {
-        const parsed = JSON.parse(saved) as TableOrder[];
-        // Ensure correct length
-        if (parsed.length === TABLE_COUNT) return parsed;
+interface IncomingOrder {
+  id: string;
+  tableNumber: number | string;
+  cart: OrderItem[];
+  timestamp: number;
+  roundNumber: number;
+}
+
+interface WaiterSignal {
+  id: string;
+  tableNumber: number | string;
+  type: "help" | "bill-cash" | "bill-card";
+  timestamp: number;
+}
+
+interface POSProps {
+  slug: string;
+}
+
+const defaultSections: TableSection[] = [
+  { name: "Indoor", tables: [] },
+  { name: "Outdoor", tables: [] },
+  { name: "Bar", tables: [] },
+];
+
+function buildEscPosBytes({
+  restaurantName,
+  tableLabel,
+  items,
+  payMethod,
+}: {
+  restaurantName: string;
+  tableLabel: string;
+  items: OrderItem[];
+  payMethod?: "cash" | "card";
+}): Uint8Array {
+  const COL = 42;
+  const enc = new TextEncoder();
+  const bytes: number[] = [];
+
+  const push = (...vals: number[]) => bytes.push(...vals);
+  const text = (s: string) => bytes.push(...enc.encode(s));
+  const lf = () => bytes.push(0x0a);
+  const dashes = () => { text("-".repeat(COL)); lf(); };
+  const center = (s: string) => {
+    const pad = Math.max(0, Math.floor((COL - s.length) / 2));
+    text(" ".repeat(pad) + s); lf();
+  };
+  const cols = (left: string, right: string) => {
+    const max = COL - right.length - 1;
+    const l = left.length > max ? left.slice(0, max - 1) + "…" : left;
+    text(l + " ".repeat(COL - l.length - right.length) + right); lf();
+  };
+
+  // Init
+  push(0x1b, 0x40);
+  // Align center
+  push(0x1b, 0x61, 0x01);
+  // Bold + double height/width for restaurant name
+  push(0x1b, 0x45, 0x01);
+  push(0x1d, 0x21, 0x01);
+  text(restaurantName); lf();
+  // Reset size + bold off
+  push(0x1d, 0x21, 0x00);
+  push(0x1b, 0x45, 0x00);
+  // Align left
+  push(0x1b, 0x61, 0x00);
+  lf();
+  dashes();
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("sq-MK", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("sq-MK", { hour: "2-digit", minute: "2-digit" });
+  cols(`${dateStr}  ${timeStr}`, tableLabel);
+  dashes();
+
+  // Items
+  for (const item of items) {
+    const price = `${(item.price * item.qty).toFixed(0)} DEN`;
+    cols(`${item.qty}x ${item.name}`, price);
+  }
+  dashes();
+
+  // Total — bold
+  push(0x1b, 0x45, 0x01);
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+  cols("TOTAL", `${total.toFixed(0)} DEN`);
+  push(0x1b, 0x45, 0x00);
+
+  const methodLabel = payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Karte" : "Paguar";
+  text(methodLabel); lf();
+  dashes();
+
+  // Footer centered
+  push(0x1b, 0x61, 0x01);
+  text("Faleminderit! Hvala! Thank you!"); lf();
+  lf(); lf(); lf();
+
+  // Partial cut
+  push(0x1d, 0x56, 0x42, 0x03);
+
+  return new Uint8Array(bytes);
+}
+
+async function sendToUsbPrinter(device: USBDevice, data: Uint8Array): Promise<void> {
+  try { await device.open(); } catch { /* already open */ }
+  if (device.configuration === null) await device.selectConfiguration(1);
+
+  let interfaceNum = -1;
+  let endpointNum = -1;
+  for (const iface of device.configuration!.interfaces) {
+    for (const ep of iface.alternate.endpoints) {
+      if (ep.type === "bulk" && ep.direction === "out") {
+        interfaceNum = iface.interfaceNumber;
+        endpointNum = ep.endpointNumber;
+        break;
       }
-    } catch {}
-    return Array.from({ length: TABLE_COUNT }, emptyTable);
+    }
+    if (interfaceNum !== -1) break;
+  }
+  if (interfaceNum === -1) throw new Error("No bulk OUT endpoint found");
+  try { await device.claimInterface(interfaceNum); } catch { /* already claimed */ }
+  await device.transferOut(endpointNum, data);
+}
+
+function printReceiptWindow({
+  restaurantName,
+  tableLabel,
+  items,
+  payMethod,
+}: {
+  restaurantName: string;
+  tableLabel: string;
+  items: OrderItem[];
+  payMethod?: "cash" | "card";
+}) {
+  const win = window.open(
+    "",
+    "_blank",
+    "width=340,height=700,toolbar=0,scrollbars=0,status=0,menubar=0",
+  );
+  if (!win) return;
+
+  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("sq-MK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
-  const [activeTable, setActiveTable] = useState<number | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>("All");
-  const [screen, setScreen] = useState<Screen>("tables");
-  const [payConfirm, setPayConfirm] = useState(false);
-  const [justPaid, setJustPaid] = useState<number | null>(null);
+  const timeStr = now.toLocaleTimeString("sq-MK", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const methodLabel =
+    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
+
+  const rows = items
+    .map(
+      (item) =>
+        `<tr>
+          <td style="padding:3px 0">${item.qty}x ${item.name}</td>
+          <td style="text-align:right;padding:3px 0;white-space:nowrap">${(item.price * item.qty).toFixed(0)} DEN</td>
+        </tr>`,
+    )
+    .join("");
+
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    width: 80mm;
+    padding: 10px 8px 20px;
+    color: #000;
+    background: #fff;
+  }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .name { font-size: 17px; font-weight: bold; letter-spacing: 1px; }
+  .dash { border: none; border-top: 1px dashed #000; margin: 7px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; }
+  .meta { display: flex; justify-content: space-between; font-size: 11px; color: #333; }
+  .total-row td { font-weight: bold; font-size: 15px; padding-top: 5px; border-top: 1px solid #000; }
+  .method { font-size: 11px; color: #444; padding-top: 2px; }
+  .footer { margin-top: 12px; font-size: 11px; text-align: center; color: #555; }
+  @page { margin: 0; size: 80mm auto; }
+  @media print { body { width: 80mm; } }
+</style>
+</head>
+<body>
+  <div class="center name">${restaurantName}</div>
+  <div class="dash"></div>
+  <div class="meta">
+    <span>${dateStr} &nbsp; ${timeStr}</span>
+    <span>${tableLabel}</span>
+  </div>
+  <div class="dash"></div>
+  <table>
+    ${rows}
+  </table>
+  <div class="dash"></div>
+  <table>
+    <tr class="total-row">
+      <td>TOTAL</td>
+      <td style="text-align:right">${total.toFixed(0)} DEN</td>
+    </tr>
+    <tr>
+      <td class="method" colspan="2">${methodLabel}</td>
+    </tr>
+  </table>
+  <div class="dash"></div>
+  <div class="footer">Faleminderit! &nbsp;•&nbsp; Hvala! &nbsp;•&nbsp; Thank you!</div>
+</body>
+</html>`);
+
+  win.document.close();
+  win.focus();
+  setTimeout(() => {
+    win.print();
+    win.onafterprint = () => win.close();
+    setTimeout(() => win.close(), 4000);
+  }, 350);
+}
+
+function playWaiterChime(type: WaiterSignal["type"]) {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.55, ctx.currentTime);
+    master.connect(ctx.destination);
+
+    const notes: [number, number, number][] =
+      type === "help"
+        ? [[880, 0, 0.18], [660, 0.2, 0.28], [660, 0.42, 0.28]]
+        : type === "bill-cash"
+          ? [[660, 0, 0.16], [880, 0.18, 0.16], [1108, 0.36, 0.28]]
+          : [[660, 0, 0.16], [990, 0.18, 0.16], [1320, 0.36, 0.28]];
+
+    notes.forEach(([freq, start, dur]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      gain.gain.setValueAtTime(0, ctx.currentTime + start);
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur + 0.05);
+    });
+
+    setTimeout(() => ctx.close(), 1500);
+  } catch {}
+}
+
+export default function POS({ slug }: POSProps) {
+  const RESTAURANT_SLUG = slug;
+  const TABLES_KEY = `pos-${slug}-tables-v3`;
+  const PERSONS_KEY = `pos-${slug}-persons-v1`;
+  const SECTIONS_KEY = `pos-${slug}-sections-v1`;
 
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["pos-restaurant"],
     queryFn: async () => {
       const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
       if (!res.ok) throw new Error("Restaurant not found");
-      return res.json();
+      return res.json() as Promise<Restaurant>;
     },
     retry: false,
   });
 
-  const menuItems: MenuItem[] = useMemo(
-    () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
-    [restaurant],
-  );
+  const TABLE_COUNT = restaurant?.tableCount || 6;
 
-  const categories = useMemo(() => {
-    const cats = Array.from(new Set(menuItems.map((i) => i.category)));
-    return ["All", ...cats];
-  }, [menuItems]);
+  const [sections, setSections] = useState<TableSection[]>(() => {
+    try {
+      const saved = localStorage.getItem(SECTIONS_KEY);
+      if (saved) return JSON.parse(saved) as TableSection[];
+    } catch {}
+    return defaultSections;
+  });
 
-  const filteredItems = useMemo(
-    () =>
-      activeCategory === "All"
-        ? menuItems
-        : menuItems.filter((i) => i.category === activeCategory),
-    [menuItems, activeCategory],
-  );
+  const [draftSections, setDraftSections] = useState<TableSection[]>([]);
+  const [activeDraftSection, setActiveDraftSection] =
+    useState<string>("Indoor");
 
-  const currentTable = activeTable !== null ? tables[activeTable] : null;
+  const [tables, setTables] = useState<TableOrder[]>(() => {
+    try {
+      const saved = localStorage.getItem(TABLES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as TableOrder[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return Array.from({ length: TABLE_COUNT }, emptyTable);
+  });
+  const tablesRef = useRef(tables);
+  useEffect(() => { tablesRef.current = tables; }, [tables]);
 
-  const tableTotal = (t: TableOrder) =>
-    t.items.reduce((s, i) => s + i.price * i.qty, 0);
-  const tableCount = (t: TableOrder) => t.items.reduce((s, i) => s + i.qty, 0);
+  useEffect(() => {
+    setTables((prev) => {
+      if (prev.length === TABLE_COUNT) return prev;
+      if (prev.length < TABLE_COUNT) {
+        return [
+          ...prev,
+          ...Array.from({ length: TABLE_COUNT - prev.length }, emptyTable),
+        ];
+      }
+      return prev.slice(0, TABLE_COUNT);
+    });
+  }, [TABLE_COUNT]);
 
-  const elapsed = (t: TableOrder) => {
-    if (!t.startedAt) return null;
-    const mins = Math.floor(
-      (Date.now() - new Date(t.startedAt).getTime()) / 60000,
-    );
-    if (mins < 1) return "< 1 min";
-    if (mins < 60) return `${mins}min`;
-    return `${Math.floor(mins / 60)}h${mins % 60}m`;
+  const [personTabs, setPersonTabs] = useState<PersonTab[]>(() => {
+    try {
+      const saved = localStorage.getItem(PERSONS_KEY);
+      if (saved) return JSON.parse(saved) as PersonTab[];
+    } catch {}
+    return [];
+  });
+
+  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(null);
+  const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
+  const [tableFlash, setTableFlash] = useState<number | null>(null);
+
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showSectionsModal, setShowSectionsModal] = useState(false);
+  const [transferSource, setTransferSource] = useState<number | null>(null);
+  const [mergeSource, setMergeSource] = useState<number | null>(null);
+  const [selectedSection, setSelectedSection] = useState<string>("all");
+
+  // ─── Split Bill State ────────────────────────────────────────────────────────
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [splitTableIdx, setSplitTableIdx] = useState<number | null>(null);
+  const [splitPersons, setSplitPersons] = useState<SplitPerson[]>([]);
+  // itemAssignments[i] = person index (or null = unassigned)
+  const [itemAssignments, setItemAssignments] = useState<(number | null)[]>([]);
+
+  const openSplitBill = (tableIdx: number) => {
+    const order = tables[tableIdx];
+    setSplitTableIdx(tableIdx);
+    setSplitPersons([
+      { name: "Person 1", colorIdx: 0, paid: false, payMethod: null },
+      { name: "Person 2", colorIdx: 1, paid: false, payMethod: null },
+    ]);
+    setItemAssignments(order.items.map(() => null));
+    setShowSplitModal(true);
   };
 
-  const addItem = (item: MenuItem) => {
-    if (activeTable === null) return;
-    setTables((prev) => {
+  const addSplitPerson = () => {
+    setSplitPersons((prev) => [
+      ...prev,
+      {
+        name: `Person ${prev.length + 1}`,
+        colorIdx: prev.length % SPLIT_COLORS.length,
+        paid: false,
+        payMethod: null,
+      },
+    ]);
+  };
+
+  const assignItem = (itemIdx: number, personIdx: number | null) => {
+    setItemAssignments((prev) => {
       const next = [...prev];
-      const table = {
-        ...next[activeTable],
-        items: [...next[activeTable].items],
-      };
-      const idx = table.items.findIndex((i) => i.id === item.id);
-      if (idx >= 0) {
-        table.items[idx] = {
-          ...table.items[idx],
-          qty: table.items[idx].qty + 1,
-        };
-      } else {
-        table.items.push({
-          id: item.id,
-          name: item.name,
-          price: parsePrice(item.price),
-          qty: 1,
+      next[itemIdx] = personIdx;
+      return next;
+    });
+  };
+
+  const personTotal = (personIdx: number): number => {
+    if (splitTableIdx === null) return 0;
+    const order = tables[splitTableIdx];
+    return order.items.reduce((sum, item, i) => {
+      if (itemAssignments[i] === personIdx) return sum + item.price * item.qty;
+      return sum;
+    }, 0);
+  };
+
+  const unassignedItems = (): { item: OrderItem; idx: number }[] => {
+    if (splitTableIdx === null) return [];
+    return tables[splitTableIdx].items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ idx }) => itemAssignments[idx] === null);
+  };
+
+  const unassignedTotal = (): number =>
+    unassignedItems().reduce((s, { item }) => s + item.price * item.qty, 0);
+
+  const markPaid = (personIdx: number, method: "cash" | "card") => {
+    if (splitTableIdx !== null) {
+      const personItems = tables[splitTableIdx].items.filter(
+        (_, i) => itemAssignments[i] === personIdx,
+      );
+      const person = splitPersons[personIdx];
+      if (personItems.length > 0) {
+        handlePrint({
+          restaurantName: restaurant?.name ?? "Restaurant",
+          tableLabel: `Tavolina ${splitTableIdx + 1} — ${person.name}`,
+          items: personItems,
+          payMethod: method,
         });
       }
-      if (!table.startedAt) table.startedAt = new Date();
-      next[activeTable] = table;
+    }
+    setSplitPersons((prev) => {
+      const next = prev.map((p, i) =>
+        i === personIdx ? { ...p, paid: true, payMethod: method } : p,
+      );
+      const allPaid = next.every((p) => p.paid);
+      if (allPaid && splitTableIdx !== null) {
+        setTables((t) => {
+          const updated = [...t];
+          updated[splitTableIdx] = emptyTable();
+          return updated;
+        });
+        // ADD THIS:
+        fetch("/api/table/cart-cleared", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
+          }),
+        }).catch(() => {});
+        setJustPaid({ kind: "table", idx: splitTableIdx });
+        setTimeout(() => setJustPaid(null), 2500);
+        setShowSplitModal(false);
+        setActive(null);
+        setScreen("tables");
+      }
       return next;
     });
   };
+  // ───────────────────────────────────────────er�─────────────────────────────────
 
-  const updateQty = (itemId: number, delta: number) => {
-    if (activeTable === null) return;
-    setTables((prev) => {
-      const next = [...prev];
-      const table = {
-        ...next[activeTable],
-        items: [...next[activeTable].items],
-      };
-      table.items = table.items
-        .map((i) => (i.id === itemId ? { ...i, qty: i.qty + delta } : i))
-        .filter((i) => i.qty > 0);
-      if (table.items.length === 0) table.startedAt = null;
-      next[activeTable] = table;
-      return next;
-    });
-  };
-
-  const payTable = () => {
-    if (activeTable === null) return;
-    const idx = activeTable;
-    setTables((prev) => {
-      const next = [...prev];
-      next[idx] = emptyTable();
-      return next;
-    });
-    setJustPaid(idx);
-    setPayConfirm(false);
-    setActiveTable(null);
-    setScreen("tables");
-    setTimeout(() => setJustPaid(null), 2500);
-  };
-
-  const [, forceUpdate] = useState(0);
-
-  // Override PWA manifest so Chrome installs POS not HAJDE HA
-  useEffect(() => {
-    const link = document.querySelector("link[rel=\"manifest\"]") as HTMLLinkElement;
-    if (link) link.href = "/pos-manifest.json";
-    return () => { if (link) link.href = "/manifest.json"; };
-  }, []);
-  useEffect(() => {
-    // Override manifest for POS page
-    const link = document.querySelector(
-      'link[rel="manifest"]',
-    ) as HTMLLinkElement;
-    if (link) link.href = "/pos-manifest.json";
-    return () => {
-      if (link) link.href = "/manifest.json";
-    };
-  }, []);
-  // Tick every 30s so elapsed times update live
-  useEffect(() => {
-    const id = setInterval(() => forceUpdate((n) => n + 1), 30000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Persist tables to localStorage on every change
+  const THEME_KEY = `pos-${slug}-theme`;
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    try {
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === "light" || saved === "dark") return saved;
+    } catch {}
+    return "dark";
+  });
   useEffect(() => {
     try {
-      localStorage.setItem("pos-tables-v1", JSON.stringify(tables));
+      localStorage.setItem(THEME_KEY, theme);
     } catch {}
-  }, [tables]);
+  }, [theme]);
+  const isLight = theme === "light";
 
-  const tableStatus = (t: TableOrder): "empty" | "fresh" | "mid" | "late" => {
-    if (!t.startedAt || t.items.length === 0) return "empty";
-    const mins = Math.floor(
-      (Date.now() - new Date(t.startedAt).getTime()) / 60000,
-    );
-    if (mins < 15) return "fresh";
-    if (mins < 30) return "mid";
-    return "late";
+  const [usbDevice, setUsbDevice] = useState<USBDevice | null>(null);
+  const [printerStatus, setPrinterStatus] = useState<"idle" | "printing" | "error">("idle");
+
+  useEffect(() => {
+    if (!("usb" in navigator)) return;
+    (navigator as any).usb.getDevices().then((devices: USBDevice[]) => {
+      if (devices.length > 0) setUsbDevice(devices[0]);
+    }).catch(() => {});
+  }, []);
+
+  const connectPrinter = async () => {
+    if (!("usb" in navigator)) {
+      alert("WebUSB not supported in this browser. Use Chrome or Edge.");
+      return;
+    }
+    try {
+      const device = await (navigator as any).usb.requestDevice({ filters: [] });
+      setUsbDevice(device);
+    } catch (err: any) {
+      if (err.name !== "NotFoundError") {
+        alert("Could not connect to printer. Try again.");
+      }
+    }
   };
 
-  const statusColors = {
+  const handlePrint = async (data: {
+    restaurantName: string;
+    tableLabel: string;
+    items: OrderItem[];
+    payMethod?: "cash" | "card";
+  }) => {
+    if (data.items.length === 0) return;
+    if (usbDevice) {
+      try {
+        setPrinterStatus("printing");
+        const bytes = buildEscPosBytes(data);
+        await sendToUsbPrinter(usbDevice, bytes);
+        setPrinterStatus("idle");
+        return;
+      } catch (err) {
+        console.error("USB print failed, falling back:", err);
+        setUsbDevice(null);
+        setPrinterStatus("error");
+        setTimeout(() => setPrinterStatus("idle"), 3000);
+      }
+    }
+    printReceiptWindow(data);
+  };
+
+  const t = isLight
+    ? {
+        appBg: "bg-[#FAFAF9]",
+        panelBg: "bg-white",
+        text: "text-[#1A1A1A]",
+        textSoft: "text-[#3A3A3A]",
+        textMuted: "text-[#7A7A7A]",
+        textFaint: "text-[#A8A8A8]",
+        textDim: "text-[#BFBDB9]",
+        border: "border-[#E8E6E3]",
+        borderSoft: "border-[#EFEDEA]",
+        borderDashed: "border-[#D8D4CF]",
+        surface: "bg-[#F4F2EF]",
+        surfaceSoft: "bg-[#EDEAE5]",
+        surfaceHover: "hover:bg-[#ECE9E5]",
+        chipInactive:
+          "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
+        cartItemActive: "bg-amber-100 border-amber-400",
+        cartItemInactive:
+          "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
+        backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
+        modalBg: "bg-white",
+        modalOverlay: "bg-black/50",
+        inputBgStyle: "#F4F2EF",
+        inputTextStyle: "#1A1A1A",
+        inputBorder: "border-[#E0DDD8]",
+        cancelBtn: "bg-[#EDEAE5] text-[#7A7A7A] hover:bg-[#E2DED9]",
+        deletePersonBtn: "bg-[#EDEAE5] hover:bg-red-100 text-[#7A7A7A]",
+        personIconEmpty: "bg-[#EDEAE5] text-[#A8A8A8]",
+        qtyControlBg: "bg-[#EDEAE5]",
+        qtyBtnText: "text-[#5A5A5A] hover:bg-[#D8D4CF]",
+        actionBtn: "bg-blue-50 text-blue-600 hover:bg-blue-100",
+        actionBtnAlt: "bg-purple-50 text-purple-600 hover:bg-purple-100",
+      }
+    : {
+        appBg: "bg-[#0F0F0F]",
+        panelBg: "bg-[#0B0B0B]",
+        text: "text-white",
+        textSoft: "text-white/85",
+        textMuted: "text-white/40",
+        textFaint: "text-white/25",
+        textDim: "text-white/30",
+        border: "border-white/10",
+        borderSoft: "border-white/5",
+        borderDashed: "border-white/10",
+        surface: "bg-white/[0.04]",
+        surfaceSoft: "bg-white/[0.08]",
+        surfaceHover: "hover:bg-white/[0.06]",
+        chipInactive:
+          "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
+        cartItemActive: "bg-amber-500/15 border-amber-500/50",
+        cartItemInactive:
+          "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
+        backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
+        modalBg: "bg-[#1A1A1A]",
+        modalOverlay: "bg-black/70",
+        inputBgStyle: "#2A2A2A",
+        inputTextStyle: "#FFFFFF",
+        inputBorder: "border-white/12",
+        cancelBtn: "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]",
+        deletePersonBtn: "bg-white/[0.06] hover:bg-red-500/20 text-white/30",
+        personIconEmpty: "bg-white/[0.06] text-white/30",
+        qtyControlBg: "bg-white/[0.06]",
+        qtyBtnText:
+          "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
+        actionBtn: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30",
+        actionBtnAlt: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30",
+      };
+
+  const statusColorsLight = {
     empty: {
-      bg: "bg-white/4",
-      border: "border-white/8",
+      bg: "bg-[#F4F2EF]",
+      border: "border-[#E8E6E3]",
+      dot: "",
+      text: "text-[#A8A8A8]",
+      time: "text-[#A8A8A8]",
+    },
+    fresh: {
+      bg: "bg-emerald-50",
+      border: "border-emerald-300",
+      dot: "bg-emerald-500",
+      text: "text-[#1A1A1A]",
+      time: "text-emerald-600",
+    },
+    mid: {
+      bg: "bg-amber-50",
+      border: "border-amber-300",
+      dot: "bg-amber-500",
+      text: "text-[#1A1A1A]",
+      time: "text-amber-600",
+    },
+    late: {
+      bg: "bg-red-50",
+      border: "border-red-300",
+      dot: "bg-red-500",
+      text: "text-[#1A1A1A]",
+      time: "text-red-600",
+    },
+  };
+  const statusColorsDark = {
+    empty: {
+      bg: "bg-white/[0.04]",
+      border: "border-white/10",
       dot: "",
       text: "text-white/25",
       time: "text-white/20",
@@ -236,16 +761,427 @@ export default function POS() {
       time: "text-red-400",
     },
   };
+  const dotColors = isLight
+    ? { fresh: "bg-emerald-500", mid: "bg-amber-500", late: "bg-red-500" }
+    : { fresh: "bg-emerald-400", mid: "bg-amber-400", late: "bg-red-400" };
 
-  const openTable = (idx: number) => {
-    setActiveTable(idx);
+  const [active, setActive] = useState<ActiveSlot>(null);
+  const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [screen, setScreen] = useState<Screen>("tables");
+  const [payConfirm, setPayConfirm] = useState(false);
+  const [justPaid, setJustPaid] = useState<ActiveSlot>(null);
+  const [showNewPerson, setShowNewPerson] = useState(false);
+  const [newPersonName, setNewPersonName] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [, forceUpdate] = useState(0);
+
+  const menuItems: MenuItem[] = useMemo(
+    () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
+    [restaurant],
+  );
+
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(menuItems.map((i) => i.category)));
+    return ["All", ...cats];
+  }, [menuItems]);
+
+  const filteredItems = useMemo(
+    () =>
+      activeCategory === "All"
+        ? menuItems
+        : menuItems.filter((i) => i.category === activeCategory),
+    [menuItems, activeCategory],
+  );
+
+  const currentOrder: TableOrder | PersonTab | null = useMemo(() => {
+    if (!active) return null;
+    if (active.kind === "table") return tables[active.idx] ?? null;
+    return personTabs[active.idx] ?? null;
+  }, [active, tables, personTabs]);
+
+  const orderTotal = (o: TableOrder | PersonTab) =>
+    o.items.reduce((s, i) => s + i.price * i.qty, 0);
+  const orderCount = (o: TableOrder | PersonTab) =>
+    o.items.reduce((s, i) => s + i.qty, 0);
+
+  const elapsed = (o: TableOrder | PersonTab) => {
+    if (!o.startedAt) return null;
+    const mins = Math.floor(
+      (Date.now() - new Date(o.startedAt).getTime()) / 60000,
+    );
+    if (mins < 1) return "< 1 min";
+    if (mins < 60) return `${mins}min`;
+    return `${Math.floor(mins / 60)}h${mins % 60}m`;
+  };
+
+  const handleTransfer = (sourceIdx: number, targetIdx: number) => {
+    if (sourceIdx === targetIdx) return;
+    setTables((prev) => {
+      const next = [...prev];
+      const source = next[sourceIdx];
+      const target = next[targetIdx];
+      next[targetIdx] = {
+        ...target,
+        items: [...target.items, ...source.items],
+        startedAt: target.startedAt || source.startedAt,
+      };
+      next[sourceIdx] = emptyTable();
+      return next;
+    });
+    setShowTransferModal(false);
+    setTransferSource(null);
+    setTableFlash(targetIdx);
+    setTimeout(() => setTableFlash(null), 2000);
+  };
+
+  const handleMerge = (sourceIdx: number, targetIdx: number) => {
+    if (sourceIdx === targetIdx) return;
+    setTables((prev) => {
+      const next = [...prev];
+      const source = next[sourceIdx];
+      const target = next[targetIdx];
+      const merged = [...target.items];
+      source.items.forEach((sourceItem) => {
+        const existing = merged.find((i) => i.id === sourceItem.id);
+        if (existing) {
+          existing.qty += sourceItem.qty;
+        } else {
+          merged.push({ ...sourceItem });
+        }
+      });
+      next[targetIdx] = {
+        ...target,
+        items: merged,
+        startedAt: target.startedAt || source.startedAt,
+      };
+      next[sourceIdx] = emptyTable();
+      return next;
+    });
+    setShowMergeModal(false);
+    setMergeSource(null);
+    setTableFlash(targetIdx);
+    setTimeout(() => setTableFlash(null), 2000);
+  };
+
+  const getTableSection = (tableIdx: number): string => {
+    const section = sections.find((s) => s.tables.includes(tableIdx));
+    return section?.name || "Other";
+  };
+
+  const visibleTables = useMemo(() => {
+    if (selectedSection === "all") {
+      return tables.map((_, idx) => idx);
+    }
+    const section = sections.find((s) => s.name === selectedSection);
+    return section?.tables || [];
+  }, [selectedSection, sections, tables]);
+
+  const addItem = (item: MenuItem) => {
+    if (!active) return;
+    const add = (order: TableOrder | PersonTab): TableOrder | PersonTab => {
+      const items = [...order.items];
+      const idx = items.findIndex((i) => i.id === item.id);
+      if (idx >= 0) {
+        items[idx] = { ...items[idx], qty: items[idx].qty + 1 };
+      } else {
+        items.push({
+          id: item.id,
+          name: item.name,
+          price: parsePrice(item.price),
+          qty: 1,
+        });
+      }
+      return { ...order, items, startedAt: order.startedAt ?? new Date() };
+    };
+    if (active.kind === "table") {
+      setTables((prev) => {
+        const next = [...prev];
+        next[active.idx] = add(next[active.idx]) as TableOrder;
+        return next;
+      });
+    } else {
+      setPersonTabs((prev) => {
+        const next = [...prev];
+        next[active.idx] = add(next[active.idx]) as PersonTab;
+        return next;
+      });
+    }
+  };
+
+  const updateQty = (itemId: number, delta: number) => {
+    if (!active) return;
+    const upd = (order: TableOrder | PersonTab): TableOrder | PersonTab => {
+      const items = order.items
+        .map((i) => (i.id === itemId ? { ...i, qty: i.qty + delta } : i))
+        .filter((i) => i.qty > 0);
+      return {
+        ...order,
+        items,
+        startedAt: items.length ? order.startedAt : null,
+      };
+    };
+    if (active.kind === "table") {
+      setTables((prev) => {
+        const next = [...prev];
+        next[active.idx] = upd(next[active.idx]) as TableOrder;
+        return next;
+      });
+    } else {
+      setPersonTabs((prev) => {
+        const next = [...prev];
+        next[active.idx] = upd(next[active.idx]) as PersonTab;
+        return next;
+      });
+    }
+  };
+
+  const payOrder = () => {
+    if (!active) return;
+    const slot = active;
+    const receiptItems =
+      slot.kind === "table"
+        ? tables[slot.idx].items
+        : personTabs[slot.idx].items;
+    const tableLabel =
+      slot.kind === "table"
+        ? `Tavolina ${slot.idx + 1}`
+        : (personTabs[slot.idx]?.name ?? "Tab");
+    if (receiptItems.length > 0) {
+      handlePrint({
+        restaurantName: restaurant?.name ?? "Restaurant",
+        tableLabel,
+        items: receiptItems,
+      });
+    }
+    if (slot.kind === "table") {
+      setTables((prev) => {
+        const next = [...prev];
+        next[slot.idx] = emptyTable();
+        return next;
+      });
+      // ADD THIS:
+      fetch("/api/table/cart-cleared", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
+        }),
+      }).catch(() => {});
+    } else {
+      setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
+    }
+    setJustPaid(slot);
+    setPayConfirm(false);
+    setActive(null);
+    setScreen("tables");
+    setTimeout(() => setJustPaid(null), 2500);
+  };
+
+  const deletePersonTab = (idx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const openSlot = (slot: ActiveSlot) => {
+    setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
   };
 
+  const handleCreatePerson = () => {
+    const trimmed = newPersonName.trim();
+    if (!trimmed) return;
+    setPersonTabs((prev) => {
+      const newIdx = prev.length;
+      const newTab: PersonTab = { name: trimmed, items: [], startedAt: null };
+      const next = [...prev, newTab];
+      setTimeout(() => {
+        setActive({ kind: "person", idx: newIdx });
+        setScreen("menu");
+        setActiveCategory("All");
+      }, 50);
+      return next;
+    });
+    setNewPersonName("");
+    setShowNewPerson(false);
+  };
+
+  useEffect(() => {
+    const link = document.querySelector(
+      'link[rel="manifest"]',
+    ) as HTMLLinkElement;
+    if (link) link.href = "/pos-manifest.json";
+    return () => {
+      if (link) link.href = "/manifest.json";
+    };
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => forceUpdate((n) => n + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
+    } catch {}
+  }, [tables, TABLES_KEY]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(PERSONS_KEY, JSON.stringify(personTabs));
+    } catch {}
+  }, [personTabs, PERSONS_KEY]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
+    } catch {}
+  }, [sections, SECTIONS_KEY]);
+
+  useEffect(() => {
+    if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
+  }, [showNewPerson]);
+
+  useEffect(() => {
+    let pusher: Pusher | null = null;
+    let cancelled = false;
+
+    const playChime = () => {
+      try {
+        const ctx = new (window.AudioContext ||
+          (window as any).webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.frequency.setValueAtTime(880, ctx.currentTime);
+        o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+        o.start();
+        o.stop(ctx.currentTime + 0.55);
+      } catch {}
+    };
+
+    const handleIncoming = (data: any) => {
+      const cart: OrderItem[] = data.cart || [];
+      const tableNumber = data.tableNumber;
+      const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
+      const tableIdx = tableDigits - 1;
+
+      const existingRounds = (tableIdx >= 0 && tableIdx < TABLE_COUNT)
+        ? (tablesRef.current[tableIdx]?.rounds ?? [])
+        : [];
+      const roundNumber = existingRounds.length + 1;
+
+      if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+        setTables((prev) => {
+          const next = [...prev];
+          const merged = [...next[tableIdx].items];
+          cart.forEach((it) => {
+            const ex = merged.find((m) => m.id === it.id);
+            if (ex) ex.qty += it.qty;
+            else merged.push({ ...it });
+          });
+          const prevRounds = next[tableIdx].rounds ?? [];
+          next[tableIdx] = {
+            items: merged,
+            rounds: [...prevRounds, { items: cart, sentAt: Date.now() }],
+            startedAt: next[tableIdx].startedAt ?? new Date(),
+            section: next[tableIdx].section,
+          };
+          return next;
+        });
+        setTableFlash(tableIdx);
+        setTimeout(() => setTableFlash(null), 4000);
+      }
+
+      setIncomingBanner({
+        id: `${Date.now()}-${Math.random()}`,
+        tableNumber,
+        cart,
+        timestamp: data.timestamp || Date.now(),
+        roundNumber,
+      });
+      playChime();
+      if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
+      setTimeout(
+        () =>
+          setIncomingBanner((b) =>
+            b && b.tableNumber === tableNumber ? null : b,
+          ),
+        12000,
+      );
+    };
+
+    (async () => {
+      try {
+        const res = await fetch("/api/config/pusher");
+        if (!res.ok) return;
+        const cfg = await res.json();
+        if (cancelled || !cfg.key || !cfg.cluster) return;
+        pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
+        const channel = pusher.subscribe(`pos-${RESTAURANT_SLUG}`);
+        channel.bind("incoming-order", handleIncoming);
+        channel.bind("waiter-request", (data: { tableNumber: number | string; type: string }) => {
+          const signal: WaiterSignal = {
+            id: `${Date.now()}-${Math.random()}`,
+            tableNumber: data.tableNumber,
+            type: data.type as WaiterSignal["type"],
+            timestamp: Date.now(),
+          };
+          setWaiterSignals((prev) => [...prev, signal]);
+          setTimeout(() => {
+            setWaiterSignals((prev) => prev.filter((s) => s.id !== signal.id));
+          }, 30000);
+          playWaiterChime(data.type as WaiterSignal["type"]);
+        });
+      } catch (e) {
+        console.error("Pusher subscribe failed:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        pusher?.unsubscribe(`pos-${RESTAURANT_SLUG}`);
+        pusher?.disconnect();
+      } catch {}
+    };
+  }, [RESTAURANT_SLUG, TABLE_COUNT]);
+
+  const tableStatus = (
+    o: TableOrder | PersonTab,
+  ): "empty" | "fresh" | "mid" | "late" => {
+    if (!o.startedAt || o.items.length === 0) return "empty";
+    const mins = Math.floor(
+      (Date.now() - new Date(o.startedAt).getTime()) / 60000,
+    );
+    if (mins < 15) return "fresh";
+    if (mins < 30) return "mid";
+    return "late";
+  };
+
+  const statusColors = isLight ? statusColorsLight : statusColorsDark;
+
+  const activeLabel =
+    active === null
+      ? null
+      : active.kind === "table"
+        ? `T${active.idx + 1}`
+        : (personTabs[active.idx]?.name ?? "—");
+
+  const allTotal =
+    tables.reduce((s, t) => s + orderTotal(t), 0) +
+    personTabs.reduce((s, p) => s + orderTotal(p), 0);
+
+  const allActive =
+    tables.filter((t) => t.items.length > 0).length +
+    personTabs.filter((p) => p.items.length > 0).length;
+
   return (
     <div
-      className="h-[100dvh] w-screen bg-[#0F0F0F] text-white flex flex-col overflow-hidden"
+      className={`h-[100dvh] w-screen ${t.appBg} ${t.text} flex flex-col overflow-hidden transition-colors`}
       style={{ fontFamily: "'DM Sans', sans-serif" }}
     >
       <style>{`
@@ -254,61 +1190,176 @@ export default function POS() {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div
-        className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/8"
+        className={`flex-shrink-0 flex items-center gap-3 px-4 lg:px-6 py-3 lg:py-4 border-b ${t.border}`}
         style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
       >
         {screen !== "tables" && (
           <button
             onClick={() => setScreen(screen === "order" ? "menu" : "tables")}
-            className="h-8 w-8 rounded-full bg-white/8 flex items-center justify-center flex-shrink-0"
+            className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full ${t.backBtn} flex items-center justify-center flex-shrink-0 transition-colors`}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
           </button>
         )}
-        <div className="h-7 w-7 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
-          <Coffee className="h-3.5 w-3.5 text-black" />
+        <div className="h-7 w-7 lg:h-9 lg:w-9 rounded-lg bg-amber-500 flex items-center justify-center flex-shrink-0">
+          <Coffee className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-black" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold leading-none truncate">
+          <p className="text-sm lg:text-base font-semibold leading-none truncate">
             {restaurant?.name || "POS"}
-            {activeTable !== null && (
-              <span className="text-amber-400"> · T{activeTable + 1}</span>
+            {activeLabel && (
+              <span className="text-amber-400"> · {activeLabel}</span>
             )}
           </p>
           <p
-            className="text-[10px] text-white/30 mt-0.5"
+            className={`text-[10px] lg:text-[11px] ${t.textDim} mt-0.5`}
             style={{ fontFamily: "'DM Mono', monospace" }}
           >
             {screen === "tables"
-              ? `${tables.filter((t) => t.items.length > 0).length}/${TABLE_COUNT} ACTIVE`
+              ? `${allActive} ACTIVE`
               : screen === "menu"
                 ? "ADD ITEMS"
                 : "ORDER"}
           </p>
         </div>
-        {/* Cart badge — only in menu screen */}
+        <button
+          onClick={usbDevice ? () => setUsbDevice(null) : connectPrinter}
+          title={usbDevice ? "Printer connected — click to disconnect" : "Connect thermal printer"}
+          className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors relative ${t.backBtn}`}
+        >
+          <Printer className={`h-4 w-4 lg:h-5 lg:w-5 ${printerStatus === "error" ? "text-red-400" : usbDevice ? "text-emerald-400" : t.textMuted.replace("text-","text-")}`} />
+          {usbDevice && printerStatus === "idle" && (
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />
+          )}
+          {printerStatus === "printing" && (
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          )}
+        </button>
+        <button
+          onClick={() => setTheme(isLight ? "dark" : "light")}
+          className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
+        >
+          {isLight ? (
+            <Moon className="h-4 w-4 lg:h-5 lg:w-5" />
+          ) : (
+            <Sun className="h-4 w-4 lg:h-5 lg:w-5 text-amber-400" />
+          )}
+        </button>
         {screen === "menu" &&
-          activeTable !== null &&
-          currentTable &&
-          currentTable.items.length > 0 && (
+          active !== null &&
+          currentOrder &&
+          currentOrder.items.length > 0 && (
             <button
               onClick={() => setScreen("order")}
-              className="flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
+              className="lg:hidden flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
             >
               <ShoppingBag className="h-3.5 w-3.5 text-black" />
               <span
                 className="text-xs font-bold text-black"
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
-                {tableCount(currentTable)} · {tableTotal(currentTable)} DEN
+                {orderCount(currentOrder)} · {orderTotal(currentOrder)} DEN
               </span>
             </button>
           )}
       </div>
 
-      {/* ── SCREEN: TABLES ── */}
+      {/* Waiter signal banners */}
+      <AnimatePresence>
+        {waiterSignals.length > 0 && (
+          <div className="absolute left-3 right-3 z-30 flex flex-col gap-2" style={{ top: 64 }}>
+            {waiterSignals.map((signal, i) => {
+              const cfg =
+                signal.type === "bill-cash"
+                  ? { grad: "from-emerald-600 to-emerald-500", icon: "💵", label: `Fatura Kesh — Tavolina ${signal.tableNumber}` }
+                  : signal.type === "bill-card"
+                    ? { grad: "from-blue-600 to-blue-500", icon: "💳", label: `Fatura Kartë — Tavolina ${signal.tableNumber}` }
+                    : { grad: "from-amber-500 to-amber-400", icon: "🔔", label: `Keni nevojë — Tavolina ${signal.tableNumber}` };
+              return (
+                <motion.button
+                  key={signal.id}
+                  initial={{ y: -60, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -60, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 380, damping: 28, delay: i * 0.05 }}
+                  onClick={() => setWaiterSignals((prev) => prev.filter((s) => s.id !== signal.id))}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r ${cfg.grad} text-white shadow-2xl`}
+                >
+                  <motion.span
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 0.9, repeat: Infinity }}
+                    className="text-xl flex-shrink-0"
+                  >
+                    {cfg.icon}
+                  </motion.span>
+                  <p className="flex-1 text-sm font-bold text-left leading-tight">{cfg.label}</p>
+                  <span className="text-[10px] font-bold opacity-70 flex-shrink-0" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    TAP ✕
+                  </span>
+                </motion.button>
+              );
+            })}
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Incoming order banner */}
+      <AnimatePresence>
+        {incomingBanner && (
+          <motion.button
+            key={incomingBanner.id}
+            onClick={() => {
+              const td = parseInt(
+                String(incomingBanner.tableNumber).replace(/\D/g, ""),
+                10,
+              );
+              const idx = td - 1;
+              if (idx >= 0 && idx < TABLE_COUNT) {
+                openSlot({ kind: "table", idx });
+              }
+              setIncomingBanner(null);
+            }}
+            initial={{ y: -80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+            className="absolute top-[60px] left-3 right-3 z-30 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl"
+            style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+          >
+            <motion.div
+              animate={{ scale: [1, 1.18, 1] }}
+              transition={{ duration: 0.9, repeat: Infinity }}
+            >
+              <Bell className="h-5 w-5" />
+            </motion.div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-bold leading-tight">
+                {incomingBanner.roundNumber > 1
+                  ? `⚡ Porosi ${incomingBanner.roundNumber} — Tavolina ${incomingBanner.tableNumber}`
+                  : `Porosi e re — Tavolina ${incomingBanner.tableNumber}`}
+              </p>
+              <p
+                className="text-[11px] font-semibold opacity-80 truncate"
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                {incomingBanner.cart.reduce((s, i) => s + i.qty, 0)} artikuj ·{" "}
+                {incomingBanner.cart.reduce((s, i) => s + i.price * i.qty, 0)}{" "}
+                DEN
+              </p>
+            </div>
+            <span
+              className="text-[10px] font-bold opacity-70"
+              style={{ fontFamily: "'DM Mono', monospace" }}
+            >
+              SHIH →
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* SCREEN: TABLES */}
       <AnimatePresence mode="wait">
         {screen === "tables" && (
           <motion.div
@@ -317,75 +1368,283 @@ export default function POS() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.18 }}
-            className="flex-1 overflow-y-auto p-4"
+            className="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-8 space-y-4 lg:space-y-6 max-w-[1400px] w-full mx-auto"
           >
-            <div className="grid grid-cols-4 gap-3">
-              {tables.map((table, idx) => {
-                const occupied = table.items.length > 0;
-                const wasJustPaid = justPaid === idx;
-                return (
-                  <motion.button
-                    key={idx}
-                    onClick={() => openTable(idx)}
-                    whileTap={{ scale: 0.9 }}
-                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
-                      wasJustPaid
-                        ? "bg-emerald-500/20 border-emerald-500/40"
-                        : `${statusColors[tableStatus(table)].bg} ${statusColors[tableStatus(table)].border}`
-                    }`}
-                  >
-                    {wasJustPaid ? (
-                      <CheckCircle className="h-6 w-6 text-emerald-400" />
-                    ) : (
-                      <>
-                        <span
-                          className={`text-sm font-bold font-['DM_Mono'] ${statusColors[tableStatus(table)].text}`}
-                        >
-                          T{idx + 1}
-                        </span>
-                        {occupied && (
-                          <>
+            {/* Table Management Actions */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowTransferModal(true)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                Transfer Table
+              </button>
+              <button
+                onClick={() => setShowMergeModal(true)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
+              >
+                <Merge className="h-3.5 w-3.5" />
+                Merge Tables
+              </button>
+              <button
+                onClick={() => {
+                  setDraftSections(JSON.parse(JSON.stringify(sections)));
+                  setActiveDraftSection(sections[0]?.name || "Indoor");
+                  setShowSectionsModal(true);
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtnAlt} transition-colors`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Sections
+              </button>
+            </div>
+
+            {/* Section Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setSelectedSection("all")}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  selectedSection === "all"
+                    ? "bg-amber-500 text-black"
+                    : t.chipInactive
+                }`}
+              >
+                All Sections
+              </button>
+              {sections.map((section) => (
+                <button
+                  key={section.name}
+                  onClick={() => setSelectedSection(section.name)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    selectedSection === section.name
+                      ? "bg-amber-500 text-black"
+                      : t.chipInactive
+                  }`}
+                >
+                  {section.name} ({section.tables.length})
+                </button>
+              ))}
+            </div>
+
+            {/* Tables Grid */}
+            <div>
+              <p
+                className={`text-[10px] lg:text-[11px] ${t.textFaint} mb-2 lg:mb-3 px-0.5`}
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                {selectedSection === "all"
+                  ? `ALL TABLES (${TABLE_COUNT})`
+                  : selectedSection.toUpperCase()}
+              </p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 lg:gap-4">
+                {visibleTables.map((idx) => {
+                  const table = tables[idx];
+                  const status = tableStatus(table);
+                  const c = statusColors[status];
+                  const wasJustPaid =
+                    justPaid?.kind === "table" && justPaid.idx === idx;
+                  const sectionName = getTableSection(idx);
+                  return (
+                    <motion.button
+                      key={idx}
+                      onClick={() => openSlot({ kind: "table", idx })}
+                      whileTap={{ scale: 0.92 }}
+                      animate={
+                        tableFlash === idx
+                          ? { scale: [1, 1.08, 1, 1.08, 1] }
+                          : { scale: 1 }
+                      }
+                      transition={{
+                        duration: 1.6,
+                        repeat: tableFlash === idx ? 2 : 0,
+                      }}
+                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
+                        wasJustPaid
+                          ? "bg-emerald-500/20 border-emerald-500/40"
+                          : tableFlash === idx
+                            ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
+                            : `${c.bg} ${c.border}`
+                      }`}
+                    >
+                      {wasJustPaid ? (
+                        <CheckCircle className="h-6 w-6 text-emerald-400" />
+                      ) : (
+                        <>
+                          <span
+                            className={`text-sm font-bold font-['DM_Mono'] ${c.text}`}
+                          >
+                            T{idx + 1}
+                          </span>
+                          {selectedSection === "all" && (
                             <span
-                              className={`text-[10px] font-bold font-['DM_Mono'] ${statusColors[tableStatus(table)].time}`}
+                              className={`text-[9px] font-['DM_Mono'] ${t.textFaint}`}
                             >
-                              {tableTotal(table)}
+                              {sectionName}
                             </span>
-                            {table.startedAt && (
+                          )}
+                          {table.items.length > 0 && (
+                            <>
                               <span
-                                className={`text-[9px] font-['DM_Mono'] ${statusColors[tableStatus(table)].time}`}
+                                className={`text-[10px] font-bold font-['DM_Mono'] ${c.time}`}
                               >
-                                {elapsed(table)}
+                                {orderTotal(table)}
                               </span>
+                              {table.startedAt && (
+                                <span
+                                  className={`text-[9px] font-['DM_Mono'] ${c.time}`}
+                                >
+                                  {elapsed(table)}
+                                </span>
+                              )}
+                              <motion.div
+                                animate={
+                                  status === "late"
+                                    ? { scale: [1, 1.4, 1] }
+                                    : {}
+                                }
+                                transition={{ duration: 1.2, repeat: Infinity }}
+                                className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${c.dot}`}
+                              />
+                            </>
+                          )}
+                        </>
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Person tabs */}
+            <div>
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <p
+                  className={`text-[10px] ${t.textFaint}`}
+                  style={{ fontFamily: "'DM Mono', monospace" }}
+                >
+                  PERSONAT
+                </p>
+                <button
+                  onClick={() => setShowNewPerson(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold active:bg-amber-500/25"
+                >
+                  <UserPlus className="h-3 w-3" />
+                  Krijo
+                </button>
+              </div>
+
+              {personTabs.length === 0 ? (
+                <div
+                  className={`rounded-2xl border border-dashed ${t.borderDashed} flex items-center justify-center py-6 lg:py-10`}
+                >
+                  <p className={`${t.textFaint} text-xs lg:text-sm`}>
+                    Nuk ka persona aktiv
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:space-y-0">
+                  {personTabs.map((person, idx) => {
+                    const status = tableStatus(person);
+                    const c = statusColors[status];
+                    const wasJustPaid =
+                      justPaid?.kind === "person" && justPaid.idx === idx;
+                    const occupied = person.items.length > 0;
+                    return (
+                      <motion.button
+                        key={idx}
+                        onClick={() => openSlot({ kind: "person", idx })}
+                        whileTap={{ scale: 0.98 }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border relative transition-all duration-500 ${
+                          wasJustPaid
+                            ? "bg-emerald-500/20 border-emerald-500/40"
+                            : `${c.bg} ${c.border}`
+                        }`}
+                      >
+                        {wasJustPaid ? (
+                          <>
+                            <CheckCircle className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+                            <span className="text-sm text-emerald-400 font-semibold">
+                              Paguar ✓
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <div
+                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                occupied ? "bg-amber-500/20" : t.surfaceSoft
+                              }`}
+                            >
+                              <User
+                                className={`h-4 w-4 ${
+                                  occupied ? "text-amber-400" : t.textDim
+                                }`}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p
+                                className={`text-sm font-semibold ${c.text} truncate`}
+                              >
+                                {person.name}
+                              </p>
+                              {occupied ? (
+                                <p
+                                  className={`text-xs font-bold mt-0.5 ${c.time}`}
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {orderTotal(person)} DEN
+                                  {person.startedAt && (
+                                    <span
+                                      className={`font-normal ${t.textFaint} ml-2`}
+                                    >
+                                      {elapsed(person)}
+                                    </span>
+                                  )}
+                                </p>
+                              ) : (
+                                <p className={`text-xs ${t.textFaint} mt-0.5`}>
+                                  Bosh
+                                </p>
+                              )}
+                            </div>
+                            {occupied && status !== "empty" && (
+                              <motion.div
+                                animate={
+                                  status === "late"
+                                    ? { scale: [1, 1.4, 1] }
+                                    : {}
+                                }
+                                transition={{ duration: 1.2, repeat: Infinity }}
+                                className={`h-2 w-2 rounded-full flex-shrink-0 ${c.dot}`}
+                              />
                             )}
-                            <motion.div
-                              animate={
-                                tableStatus(table) === "late"
-                                  ? { scale: [1, 1.4, 1] }
-                                  : {}
-                              }
-                              transition={{ duration: 1.2, repeat: Infinity }}
-                              className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${statusColors[tableStatus(table)].dot}`}
-                            />
+                            {!occupied && (
+                              <button
+                                onClick={(e) => deletePersonTab(idx, e)}
+                                className={`h-6 w-6 rounded-full ${t.surfaceSoft} flex items-center justify-center flex-shrink-0 active:bg-red-500/20`}
+                              >
+                                <X className={`h-3 w-3 ${t.textDim}`} />
+                              </button>
+                            )}
                           </>
                         )}
-                      </>
-                    )}
-                  </motion.button>
-                );
-              })}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Status legend */}
-            <div className="mt-4 flex items-center gap-4 px-1">
+            <div className="flex items-center gap-4 px-1">
               {[
-                { dot: "bg-emerald-400", label: "< 15min" },
-                { dot: "bg-amber-400", label: "15–30min" },
-                { dot: "bg-red-400", label: "30min+" },
+                { dot: dotColors.fresh, label: "< 15min" },
+                { dot: dotColors.mid, label: "15–30min" },
+                { dot: dotColors.late, label: "30min+" },
               ].map(({ dot, label }) => (
                 <div key={label} className="flex items-center gap-1.5">
                   <div className={`h-2 w-2 rounded-full ${dot}`} />
                   <span
-                    className="text-[10px] text-white/30"
+                    className={`text-[10px] ${t.textDim}`}
                     style={{ fontFamily: "'DM Mono', monospace" }}
                   >
                     {label}
@@ -395,10 +1654,12 @@ export default function POS() {
             </div>
 
             {/* Summary bar */}
-            <div className="mt-3 p-4 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-between">
+            <div
+              className={`p-4 lg:p-5 rounded-2xl ${t.surface} border ${t.border} flex items-center justify-between`}
+            >
               <div>
                 <p
-                  className="text-[10px] text-white/30"
+                  className={`text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
                   TOTAL OPEN
@@ -407,228 +1668,1040 @@ export default function POS() {
                   className="text-xl font-bold text-amber-400"
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  {tables.reduce((s, t) => s + tableTotal(t), 0)}{" "}
-                  <span className="text-sm text-white/30">DEN</span>
+                  {allTotal} <span className={`text-sm ${t.textDim}`}>DEN</span>
                 </p>
               </div>
               <div className="text-right">
                 <p
-                  className="text-[10px] text-white/30"
+                  className={`text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  TABLES IN USE
+                  AKTIV
                 </p>
                 <p
-                  className="text-xl font-bold text-white"
+                  className={`text-xl font-bold ${t.text}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  {tables.filter((t) => t.items.length > 0).length}
-                  <span className="text-sm text-white/30">/{TABLE_COUNT}</span>
+                  {allActive}
+                  <span className={`text-sm ${t.textDim}`}>
+                    /{TABLE_COUNT + personTabs.length}
+                  </span>
                 </p>
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* ── SCREEN: MENU ── */}
-        {screen === "menu" && (
-          <motion.div
-            key="menu"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.18 }}
-            className="flex-1 flex flex-col overflow-hidden"
-          >
-            {/* Category tabs */}
-            <div className="flex-shrink-0 flex gap-2 px-4 py-2.5 overflow-x-auto border-b border-white/5">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    activeCategory === cat
-                      ? "bg-amber-500 text-black"
-                      : "bg-white/6 text-white/40"
-                  }`}
+        {/* SCREEN: MENU + ORDER */}
+        {(screen === "menu" || screen === "order") &&
+          active !== null &&
+          currentOrder && (
+            <motion.div
+              key="menu-order"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.18 }}
+              className="flex-1 flex overflow-hidden"
+            >
+              {/* MENU PANEL */}
+              <div
+                className={`flex-1 flex-col overflow-hidden ${
+                  screen === "order" ? "hidden lg:flex" : "flex"
+                }`}
+              >
+                <div
+                  className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b ${t.borderSoft}`}
                 >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {/* Items grid */}
-            <div className="flex-1 overflow-y-auto p-3">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-40">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 1,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
-                  >
-                    <Coffee className="h-7 w-7 text-amber-500" />
-                  </motion.div>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={`flex-shrink-0 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-semibold transition-all ${
+                        activeCategory === cat
+                          ? "bg-amber-500 text-black"
+                          : t.chipInactive
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {filteredItems.map((item) => {
-                    const inCart = currentTable?.items.find(
-                      (i) => i.id === item.id,
-                    );
-                    return (
-                      <motion.button
+
+                <div className="flex-1 overflow-y-auto p-3 lg:p-5">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-40">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          ease: "linear",
+                        }}
+                      >
+                        <Coffee className="h-7 w-7 text-amber-500" />
+                      </motion.div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-3">
+                      {filteredItems.map((item) => {
+                        const inCart = currentOrder.items.find(
+                          (i) => i.id === item.id,
+                        );
+                        return (
+                          <motion.button
+                            key={item.id}
+                            onClick={() => addItem(item)}
+                            whileTap={{ scale: 0.95 }}
+                            className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all ${
+                              inCart
+                                ? "bg-amber-500/15 border-amber-500/50"
+                                : t.cartItemInactive
+                            }`}
+                          >
+                            {inCart && (
+                              <div className="absolute top-2 right-2 h-5 w-5 lg:h-6 lg:w-6 rounded-full bg-amber-500 flex items-center justify-center">
+                                <span className="text-[10px] lg:text-xs font-bold text-black">
+                                  {inCart.qty}
+                                </span>
+                              </div>
+                            )}
+                            <p
+                              className={`text-xs lg:text-sm font-semibold ${t.textSoft} leading-snug pr-6 line-clamp-2`}
+                            >
+                              {item.name}
+                            </p>
+                            <p
+                              className="text-xs lg:text-sm font-bold text-amber-400 mt-1.5"
+                              style={{ fontFamily: "'DM Mono', monospace" }}
+                            >
+                              {parsePrice(item.price)}{" "}
+                              <span
+                                className={`text-[9px] lg:text-[10px] ${t.textFaint}`}
+                              >
+                                DEN
+                              </span>
+                            </p>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ORDER PANEL */}
+              <div
+                className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${
+                  screen === "menu"
+                    ? "hidden lg:flex"
+                    : "flex flex-1 lg:flex-none"
+                }`}
+              >
+                <div
+                  className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}
+                >
+                  <ShoppingBag className="h-4 w-4 text-amber-400" />
+                  <p className="text-sm font-bold">
+                    Porosia ·{" "}
+                    <span className="text-amber-400">{activeLabel}</span>
+                  </p>
+                  <span
+                    className={`ml-auto text-[10px] ${t.textDim}`}
+                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  >
+                    {orderCount(currentOrder)} ITEMS
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 lg:p-5">
+                  {currentOrder.items.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-12">
+                      <ShoppingBag className={`h-8 w-8 ${t.textFaint}`} />
+                      <p className={`${t.textFaint} text-sm`}>Asnjë artikull</p>
+                      <p className={`${t.textFaint} text-xs hidden lg:block`}>
+                        Klikoni një artikull nga menyja për ta shtuar
+                      </p>
+                    </div>
+                  ) : (() => {
+                    const rounds: OrderRound[] = (currentOrder as TableOrder).rounds ?? [];
+
+                    const itemCard = (item: OrderItem, isNew: boolean) => (
+                      <div
                         key={item.id}
-                        onClick={() => addItem(item)}
-                        whileTap={{ scale: 0.95 }}
-                        className={`relative p-3 rounded-xl text-left border transition-all ${
-                          inCart
-                            ? "bg-amber-500/15 border-amber-500/50"
-                            : "bg-white/4 border-white/8"
+                        className={`flex items-center gap-3 p-3 rounded-xl border mb-2 transition-colors ${
+                          isNew
+                            ? "bg-amber-500/5 border-amber-500/25"
+                            : `${t.surface} ${t.border}`
                         }`}
                       >
-                        {inCart && (
-                          <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-amber-500 flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-black">
-                              {inCart.qty}
-                            </span>
-                          </div>
+                        {isNew && (
+                          <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
                         )}
-                        <p className="text-xs font-semibold text-white/85 leading-snug pr-6 line-clamp-2">
-                          {item.name}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
+                            {item.name}
+                          </p>
+                          <p
+                            className="text-xs text-amber-400 mt-0.5"
+                            style={{ fontFamily: "'DM Mono', monospace" }}
+                          >
+                            {item.price} × {item.qty} = {item.price * item.qty} DEN
+                          </p>
+                        </div>
+                        <div className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}>
+                          <button
+                            onClick={() => updateQty(item.id, -1)}
+                            className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span
+                            className="text-sm font-bold text-amber-400 w-5 text-center"
+                            style={{ fontFamily: "'DM Mono', monospace" }}
+                          >
+                            {item.qty}
+                          </span>
+                          <button
+                            onClick={() => updateQty(item.id, 1)}
+                            className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+
+                    if (rounds.length <= 1) {
+                      return <>{currentOrder.items.map((item) => itemCard(item, false))}</>;
+                    }
+
+                    // Group merged items by the first round they appear in
+                    const itemFirstRound = (id: number): number => {
+                      for (let i = 0; i < rounds.length; i++) {
+                        if (rounds[i].items.some((ri) => ri.id === id)) return i;
+                      }
+                      return -1; // manually added via POS
+                    };
+
+                    const groups = new Map<number, OrderItem[]>();
+                    for (const item of currentOrder.items) {
+                      const r = itemFirstRound(item.id);
+                      const arr = groups.get(r) ?? [];
+                      arr.push(item);
+                      groups.set(r, arr);
+                    }
+
+                    return (
+                      <>
+                        {/* Items added manually by staff (not from any customer round) */}
+                        {(groups.get(-1) ?? []).map((item) => itemCard(item, false))}
+
+                        {rounds.map((round, rIdx) => {
+                          const items = groups.get(rIdx) ?? [];
+                          if (items.length === 0) return null;
+                          const isNew = rIdx > 0;
+                          const roundTime = new Date(round.sentAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                          return (
+                            <div key={rIdx}>
+                              {/* Round divider */}
+                              <div className="flex items-center gap-2 py-2 px-0.5 mb-1">
+                                <div className={`h-px flex-1 ${t.borderSoft}`} />
+                                <span
+                                  className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                                    isNew
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : `${t.surfaceSoft} ${t.textDim}`
+                                  }`}
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {isNew && (
+                                    <motion.span
+                                      animate={{ opacity: [1, 0.4, 1] }}
+                                      transition={{ duration: 1.4, repeat: Infinity }}
+                                    >
+                                      ⚡
+                                    </motion.span>
+                                  )}
+                                  {isNew ? `POROSI ${rIdx + 1}` : `POROSI 1`}
+                                  <span className="font-normal opacity-60 ml-1">{roundTime}</span>
+                                </span>
+                                <div className={`h-px flex-1 ${t.borderSoft}`} />
+                              </div>
+
+                              {/* Items for this round */}
+                              {items.map((item) => itemCard(item, isNew))}
+                            </div>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {currentOrder.items.length > 0 && (
+                  <div
+                    className={`flex-shrink-0 p-4 lg:p-5 border-t ${t.border} space-y-3`}
+                    style={{
+                      paddingBottom:
+                        "max(16px, env(safe-area-inset-bottom, 16px))",
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`flex items-center gap-2 ${t.textMuted} text-xs`}
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        {currentOrder.startedAt ? elapsed(currentOrder) : "—"}
+                      </div>
+                      <div className="text-right">
                         <p
-                          className="text-xs font-bold text-amber-400 mt-1.5"
+                          className={`text-[10px] ${t.textDim}`}
                           style={{ fontFamily: "'DM Mono', monospace" }}
                         >
-                          {parsePrice(item.price)}{" "}
-                          <span className="text-[9px] text-white/25">DEN</span>
+                          TOTAL
                         </p>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── SCREEN: ORDER ── */}
-        {screen === "order" && activeTable !== null && currentTable && (
-          <motion.div
-            key="order"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.18 }}
-            className="flex-1 flex flex-col overflow-hidden"
-          >
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {currentTable.items.length === 0 ? (
-                <div className="flex items-center justify-center h-40">
-                  <p className="text-white/20 text-sm">Empty table</p>
-                </div>
-              ) : (
-                currentTable.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-white/4 border border-white/8"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white/85 truncate">
-                        {item.name}
-                      </p>
-                      <p
-                        className="text-xs text-amber-400 mt-0.5"
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        {item.price} × {item.qty} = {item.price * item.qty} DEN
-                      </p>
+                        <p
+                          className={`text-2xl lg:text-3xl font-bold ${t.text}`}
+                          style={{ fontFamily: "'DM Mono', monospace" }}
+                        >
+                          {orderTotal(currentOrder)}{" "}
+                          <span className={`text-sm ${t.textDim}`}>DEN</span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/6 rounded-xl px-2 py-1.5">
-                      <button
-                        onClick={() => updateQty(item.id, -1)}
-                        className="h-6 w-6 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <span
-                        className="text-sm font-bold text-amber-400 w-5 text-center"
-                        style={{ fontFamily: "'DM Mono', monospace" }}
-                      >
-                        {item.qty}
-                      </span>
-                      <button
-                        onClick={() => updateQty(item.id, 1)}
-                        className="h-6 w-6 rounded-lg flex items-center justify-center text-white/50 active:bg-white/10"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
 
-            {/* Total + Pay */}
-            {currentTable.items.length > 0 && (
-              <div
-                className="flex-shrink-0 p-4 border-t border-white/8 space-y-3"
-                style={{
-                  paddingBottom: "max(16px, env(safe-area-inset-bottom, 16px))",
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-white/40 text-xs">
-                    <Clock className="h-3.5 w-3.5" />
-                    {currentTable.startedAt ? elapsed(currentTable) : "—"}
+                    {payConfirm ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setPayConfirm(false)}
+                          className={`flex-1 h-12 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold hover:bg-white/12`}
+                        >
+                          Anulo
+                        </button>
+                        <button
+                          onClick={payOrder}
+                          className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-400"
+                        >
+                          ✓ Paguar
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {/* Split Bill button — only for tables */}
+                        {active?.kind === "table" && (
+                          <button
+                            onClick={() => openSplitBill(active.idx)}
+                            className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-amber-500/40 transition-colors`}
+                          >
+                            <Divide className="h-4 w-4" />
+                            Split Bill
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setPayConfirm(true)}
+                          className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
+                        >
+                          <Receipt className="h-4 w-4" />
+                          Paguaj {orderTotal(currentOrder)} DEN
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <p
-                      className="text-[10px] text-white/30"
-                      style={{ fontFamily: "'DM Mono', monospace" }}
-                    >
-                      TOTAL
-                    </p>
-                    <p
-                      className="text-2xl font-bold text-white"
-                      style={{ fontFamily: "'DM Mono', monospace" }}
-                    >
-                      {tableTotal(currentTable)}{" "}
-                      <span className="text-sm text-white/30">DEN</span>
-                    </p>
-                  </div>
-                </div>
-
-                {payConfirm ? (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPayConfirm(false)}
-                      className="flex-1 h-12 rounded-2xl bg-white/8 text-sm text-white/50 font-semibold"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={payTable}
-                      className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white"
-                    >
-                      ✓ Paid — Cash
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setPayConfirm(true)}
-                    className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    Pay {tableTotal(currentTable)} DEN — Cash
-                  </button>
                 )}
               </div>
-            )}
-          </motion.div>
+            </motion.div>
+          )}
+      </AnimatePresence>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODALS
+      ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── Split Bill Modal ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSplitModal &&
+          splitTableIdx !== null &&
+          (() => {
+            const order = tables[splitTableIdx];
+            const allPersonsPaid =
+              splitPersons.length > 0 && splitPersons.every((p) => p.paid);
+            const unassigned = unassignedItems();
+            const totalUnassigned = unassignedTotal();
+
+            return (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className={`fixed inset-0 ${t.modalOverlay} z-40`}
+                  onClick={() => setShowSplitModal(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.94, y: 24 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.94, y: 24 }}
+                  transition={{ duration: 0.2 }}
+                  className={`fixed left-3 right-3 top-14 bottom-4 z-50 ${t.modalBg} rounded-3xl border ${t.border} shadow-2xl flex flex-col overflow-hidden`}
+                >
+                  {/* Header */}
+                  <div
+                    className={`flex-shrink-0 flex items-center justify-between px-5 py-4 border-b ${t.border}`}
+                  >
+                    <div>
+                      <p className="text-base font-bold flex items-center gap-2">
+                        <Divide className="h-4 w-4 text-amber-400" />
+                        Split Bill · T{splitTableIdx + 1}
+                      </p>
+                      <p
+                        className={`text-[10px] ${t.textDim} mt-0.5`}
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        {order.items.reduce((s, i) => s + i.qty, 0)} ITEMS ·{" "}
+                        {orderTotal(order)} DEN TOTAL
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={addSplitPerson}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Add Person
+                      </button>
+                      <button
+                        onClick={() => setShowSplitModal(false)}
+                        className={`h-8 w-8 rounded-full ${t.backBtn} flex items-center justify-center`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Body: two columns */}
+                  <div className="flex-1 flex overflow-hidden min-h-0">
+                    {/* LEFT — item list with person assignment */}
+                    <div
+                      className={`flex-1 overflow-y-auto p-4 space-y-2 border-r ${t.border}`}
+                    >
+                      <p
+                        className={`text-[10px] ${t.textFaint} mb-3`}
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        ASSIGN EACH ITEM TO A PERSON
+                      </p>
+                      {order.items.map((item, itemIdx) => {
+                        const assignedPerson = itemAssignments[itemIdx];
+                        const pc =
+                          assignedPerson !== null
+                            ? SPLIT_COLORS[
+                                splitPersons[assignedPerson]?.colorIdx %
+                                  SPLIT_COLORS.length
+                              ]
+                            : null;
+                        return (
+                          <div
+                            key={`${item.id}-${itemIdx}`}
+                            className={`rounded-xl border p-3 transition-all ${
+                              pc
+                                ? `${pc.bg} ${pc.border}`
+                                : `${t.surface} ${t.border}`
+                            }`}
+                          >
+                            {/* Item info row */}
+                            <div className="flex items-center justify-between mb-2.5">
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className={`text-sm font-semibold ${t.textSoft} truncate`}
+                                >
+                                  {item.name}
+                                </p>
+                                <p
+                                  className={`text-xs mt-0.5 ${pc ? pc.text : t.textFaint}`}
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {item.price} × {item.qty} ={" "}
+                                  <span className="font-bold">
+                                    {item.price * item.qty}
+                                  </span>{" "}
+                                  DEN
+                                </p>
+                              </div>
+                              {assignedPerson !== null && pc && (
+                                <div
+                                  className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ml-2 ${pc.dot}`}
+                                >
+                                  {assignedPerson + 1}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Person chip row */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {/* Unassign chip */}
+                              <button
+                                onClick={() => assignItem(itemIdx, null)}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                                  assignedPerson === null
+                                    ? "bg-amber-500 text-black"
+                                    : `${t.surfaceSoft} ${t.textMuted} hover:${t.surfaceHover}`
+                                }`}
+                              >
+                                —
+                              </button>
+                              {splitPersons.map((person, pIdx) => {
+                                const pColor =
+                                  SPLIT_COLORS[
+                                    person.colorIdx % SPLIT_COLORS.length
+                                  ];
+                                const isSelected = assignedPerson === pIdx;
+                                return (
+                                  <button
+                                    key={pIdx}
+                                    onClick={() => assignItem(itemIdx, pIdx)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border ${
+                                      isSelected
+                                        ? `${pColor.bg} ${pColor.border} ${pColor.text}`
+                                        : `${t.surfaceSoft} ${t.border} ${t.textMuted}`
+                                    }`}
+                                  >
+                                    {person.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Unassigned total warning */}
+                      {totalUnassigned > 0 && (
+                        <div
+                          className={`rounded-xl border border-dashed ${t.borderDashed} p-3 text-center`}
+                        >
+                          <p className={`text-xs ${t.textFaint}`}>
+                            Unassigned:{" "}
+                            <span className="text-amber-400 font-bold">
+                              {totalUnassigned} DEN
+                            </span>{" "}
+                            ({unassigned.length} item
+                            {unassigned.length !== 1 ? "s" : ""})
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* RIGHT — persons + pay */}
+                    <div className="w-48 lg:w-56 flex-shrink-0 overflow-y-auto p-3 space-y-2">
+                      <p
+                        className={`text-[10px] ${t.textFaint} mb-3`}
+                        style={{ fontFamily: "'DM Mono', monospace" }}
+                      >
+                        CHECKOUT
+                      </p>
+
+                      {splitPersons.map((person, pIdx) => {
+                        const pc =
+                          SPLIT_COLORS[person.colorIdx % SPLIT_COLORS.length];
+                        const total = personTotal(pIdx);
+                        return (
+                          <div
+                            key={pIdx}
+                            className={`rounded-xl border p-3 transition-all ${
+                              person.paid
+                                ? "bg-emerald-500/15 border-emerald-500/40"
+                                : `${pc.bg} ${pc.border}`
+                            }`}
+                          >
+                            {/* Person label */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <div
+                                className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${pc.dot}`}
+                              >
+                                {pIdx + 1}
+                              </div>
+                              <p
+                                className={`text-xs font-semibold ${t.textSoft} flex-1 truncate`}
+                              >
+                                {person.name}
+                              </p>
+                            </div>
+
+                            {/* Amount */}
+                            <p
+                              className={`text-lg font-bold mb-2 ${
+                                person.paid ? "text-emerald-400" : t.text
+                              }`}
+                              style={{ fontFamily: "'DM Mono', monospace" }}
+                            >
+                              {total}{" "}
+                              <span
+                                className={`text-xs ${t.textDim} font-normal`}
+                              >
+                                DEN
+                              </span>
+                            </p>
+
+                            {/* Pay buttons or paid state */}
+                            {person.paid ? (
+                              <div className="flex items-center gap-1.5 text-emerald-400">
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                <span className="text-xs font-semibold">
+                                  {person.payMethod === "cash"
+                                    ? "Cash ✓"
+                                    : "Card ✓"}
+                                </span>
+                              </div>
+                            ) : total > 0 ? (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => markPaid(pIdx, "cash")}
+                                  className="flex-1 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/30 transition-colors"
+                                >
+                                  CASH
+                                </button>
+                                <button
+                                  onClick={() => markPaid(pIdx, "card")}
+                                  className="flex-1 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 text-[10px] font-bold hover:bg-blue-500/30 transition-colors"
+                                >
+                                  CARD
+                                </button>
+                              </div>
+                            ) : (
+                              <p className={`text-[10px] ${t.textFaint}`}>
+                                Nothing assigned
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {/* All paid banner */}
+                      {allPersonsPaid && (
+                        <div className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 p-3 text-center">
+                          <CheckCircle className="h-5 w-5 text-emerald-400 mx-auto mb-1" />
+                          <p className="text-xs font-bold text-emerald-400">
+                            All Paid!
+                          </p>
+                          <p className={`text-[10px] ${t.textFaint} mt-0.5`}>
+                            Table cleared
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            );
+          })()}
+      </AnimatePresence>
+
+      {/* ── Transfer Modal ───────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showTransferModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => {
+                setShowTransferModal(false);
+                setTransferSource(null);
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 top-1/4 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.border} shadow-2xl max-h-[60vh] overflow-y-auto`}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <ArrowRightLeft className="h-5 w-5 text-blue-400" />
+                <p className="text-base font-bold">Transfer Table</p>
+              </div>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                {transferSource === null
+                  ? "Select source table (table to move FROM)"
+                  : `Select destination table (move T${transferSource + 1} TO...)`}
+              </p>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {tables.map((table, idx) => {
+                  const hasItems = table.items.length > 0;
+                  const isSource = transferSource === idx;
+                  const canSelect =
+                    transferSource === null ? hasItems : transferSource !== idx;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={!canSelect}
+                      onClick={() => {
+                        if (transferSource === null) {
+                          setTransferSource(idx);
+                        } else {
+                          handleTransfer(transferSource, idx);
+                        }
+                      }}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${
+                        isSource
+                          ? "bg-blue-500/20 border-blue-500/50"
+                          : !canSelect
+                            ? `${t.surface} ${t.border} opacity-30`
+                            : `${t.surface} ${t.border} hover:bg-blue-500/10`
+                      }`}
+                    >
+                      <span className="text-sm font-bold">T{idx + 1}</span>
+                      {hasItems && (
+                        <span className="text-[10px] text-amber-400">
+                          {orderTotal(table)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setTransferSource(null);
+                }}
+                className={`w-full h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Merge Modal ──────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showMergeModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => {
+                setShowMergeModal(false);
+                setMergeSource(null);
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 top-1/4 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.border} shadow-2xl max-h-[60vh] overflow-y-auto`}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Merge className="h-5 w-5 text-blue-400" />
+                <p className="text-base font-bold">Merge Tables</p>
+              </div>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                {mergeSource === null
+                  ? "Select first table to merge"
+                  : `Select second table to merge T${mergeSource + 1} with...`}
+              </p>
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {tables.map((table, idx) => {
+                  const hasItems = table.items.length > 0;
+                  const isSource = mergeSource === idx;
+                  const canSelect =
+                    mergeSource === null ? hasItems : mergeSource !== idx;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={!canSelect}
+                      onClick={() => {
+                        if (mergeSource === null) {
+                          setMergeSource(idx);
+                        } else {
+                          handleMerge(mergeSource, idx);
+                        }
+                      }}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${
+                        isSource
+                          ? "bg-purple-500/20 border-purple-500/50"
+                          : !canSelect
+                            ? `${t.surface} ${t.border} opacity-30`
+                            : `${t.surface} ${t.border} hover:bg-purple-500/10`
+                      }`}
+                    >
+                      <span className="text-sm font-bold">T{idx + 1}</span>
+                      {hasItems && (
+                        <span className="text-[10px] text-amber-400">
+                          {orderTotal(table)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => {
+                  setShowMergeModal(false);
+                  setMergeSource(null);
+                }}
+                className={`w-full h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Sections Manager Modal ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSectionsModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => setShowSectionsModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 top-16 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.border} shadow-2xl max-h-[75vh] overflow-y-auto`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <LayoutGrid className="h-5 w-5 text-purple-400" />
+                <p className="text-base font-bold">Table Sections</p>
+              </div>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                Select a section, then tap tables to assign them
+              </p>
+
+              {/* Section tabs */}
+              <div className="flex gap-2 mb-4">
+                {draftSections.map((section) => (
+                  <button
+                    key={section.name}
+                    onClick={() => setActiveDraftSection(section.name)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                      activeDraftSection === section.name
+                        ? section.name === "Indoor"
+                          ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                          : section.name === "Outdoor"
+                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                            : "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                        : `${t.surface} ${t.border} ${t.textMuted}`
+                    }`}
+                  >
+                    {section.name}
+                    <span className="ml-1 opacity-60">
+                      ({section.tables.length})
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Table grid */}
+              <div className="grid grid-cols-5 gap-2 mb-5">
+                {Array.from({ length: TABLE_COUNT }, (_, idx) => {
+                  const ownerSection = draftSections.find((s) =>
+                    s.tables.includes(idx),
+                  );
+                  const isAssignedHere =
+                    ownerSection?.name === activeDraftSection;
+                  const isAssignedElsewhere =
+                    ownerSection && ownerSection.name !== activeDraftSection;
+
+                  const sectionColor =
+                    activeDraftSection === "Indoor"
+                      ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                      : activeDraftSection === "Outdoor"
+                        ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                        : "bg-purple-500/20 border-purple-500/50 text-purple-400";
+
+                  const elseColor =
+                    ownerSection?.name === "Indoor"
+                      ? "border-blue-500/30 text-blue-400/50"
+                      : ownerSection?.name === "Outdoor"
+                        ? "border-emerald-500/30 text-emerald-400/50"
+                        : "border-purple-500/30 text-purple-400/50";
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setDraftSections((prev) =>
+                          prev.map((s) => {
+                            if (s.name === activeDraftSection) {
+                              return isAssignedHere
+                                ? {
+                                    ...s,
+                                    tables: s.tables.filter(
+                                      (tableId) => tableId !== idx,
+                                    ),
+                                  }
+                                : {
+                                    ...s,
+                                    tables: [...s.tables, idx].sort(
+                                      (a, b) => a - b,
+                                    ),
+                                  };
+                            }
+                            return {
+                              ...s,
+                              tables: s.tables.filter(
+                                (tableId) => tableId !== idx,
+                              ),
+                            };
+                          }),
+                        );
+                      }}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center border transition-all text-xs font-bold ${
+                        isAssignedHere
+                          ? sectionColor
+                          : isAssignedElsewhere
+                            ? `${t.surface} ${elseColor} opacity-50`
+                            : `${t.surface} ${t.border} ${t.textMuted}`
+                      }`}
+                    >
+                      T{idx + 1}
+                      {isAssignedElsewhere && (
+                        <span className="text-[9px] font-normal mt-0.5 opacity-70">
+                          {ownerSection.name.slice(0, 3)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex gap-3 mb-5 flex-wrap">
+                {draftSections.map((s) => (
+                  <div key={s.name} className="flex items-center gap-1.5">
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        s.name === "Indoor"
+                          ? "bg-blue-400"
+                          : s.name === "Outdoor"
+                            ? "bg-emerald-400"
+                            : "bg-purple-400"
+                      }`}
+                    />
+                    <span
+                      className={`text-[10px] ${t.textDim}`}
+                      style={{ fontFamily: "'DM Mono', monospace" }}
+                    >
+                      {s.name.toUpperCase()} · {s.tables.length}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <div
+                    className={`h-2 w-2 rounded-full ${t.surfaceSoft} border ${t.border}`}
+                  />
+                  <span
+                    className={`text-[10px] ${t.textDim}`}
+                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  >
+                    UNASSIGNED ·{" "}
+                    {TABLE_COUNT -
+                      draftSections.reduce(
+                        (sum, s) => sum + s.tables.length,
+                        0,
+                      )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowSectionsModal(false)}
+                  className={`flex-1 h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setSections(draftSections);
+                    setShowSectionsModal(false);
+                  }}
+                  className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black"
+                >
+                  Save sections
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── New Person Modal ─────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showNewPerson && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => {
+                setShowNewPerson(false);
+                setNewPersonName("");
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 bottom-1/3 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.borderDashed} shadow-2xl`}
+            >
+              <p className={`text-base font-bold ${t.text} mb-1`}>
+                Krijo Person
+              </p>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                Shkruaj emrin e personit
+              </p>
+              <input
+                ref={nameInputRef}
+                value={newPersonName}
+                onChange={(e) => setNewPersonName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreatePerson();
+                }}
+                placeholder="p.sh. Besart, Mirem, Person1…"
+                className={`w-full h-12 rounded-xl border ${t.inputBorder} px-4 text-sm outline-none focus:border-amber-500/50 mb-4`}
+                style={{ background: t.inputBgStyle, color: t.inputTextStyle }}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowNewPerson(false);
+                    setNewPersonName("");
+                  }}
+                  className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
+                >
+                  Anulo
+                </button>
+                <button
+                  onClick={handleCreatePerson}
+                  disabled={!newPersonName.trim()}
+                  className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
+                >
+                  Krijo
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

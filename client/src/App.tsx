@@ -1,4 +1,5 @@
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -40,7 +41,8 @@ function Router() {
         <Route path="/table/:restaurantSlug/:tableNumber" component={TablePage} />
 
         {/* Fallback */}
-        <Route path="/pos/bujar" component={POS} />
+        <Route path="/pos/bujar">{() => <POS slug="embeltoresport" />}</Route>
+        <Route path="/pos/:slug">{(params: any) => <POS slug={params.slug} />}</Route>
         <Route component={NotFound} />
       </Switch>
     </div>
@@ -54,6 +56,7 @@ function App() {
         <Toaster />
         <Router />
         <Analytics />
+        <SpeedInsights />
       </TooltipProvider>
     </QueryClientProvider>
   );

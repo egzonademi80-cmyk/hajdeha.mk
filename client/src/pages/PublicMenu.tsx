@@ -57,6 +57,79 @@ const LANG_KEY = "hajdeha-lang" as const;
 const DEFAULT_COORDS: [number, number] = [42.01, 20.97];
 const LEAFLET_CDN = "https://unpkg.com/leaflet@1.7.1/dist/images";
 
+// ─── Category name translations ───────────────────────────────────────────────
+
+const CATEGORY_NAMES: Record<string, { al: string; mk: string }> = {
+  food: { al: "Ushqim", mk: "Храна" },
+  foods: { al: "Ushqime", mk: "Храна" },
+  drinks: { al: "Pije", mk: "Пијалоци" },
+  beverages: { al: "Pije", mk: "Пијалоци" },
+  coffee: { al: "Kafe", mk: "Кафе" },
+  coffees: { al: "Kafeja", mk: "Кафиња" },
+  dessert: { al: "Ëmbëlsirë", mk: "Десерт" },
+  desserts: { al: "Ëmbëlsirat", mk: "Десерти" },
+  sweet: { al: "Të ëmbla", mk: "Слатко" },
+  sweets: { al: "Ëmbëlsirat", mk: "Слатки" },
+  mains: { al: "Pjata kryesore", mk: "Главни јадења" },
+  main: { al: "Pjata kryesore", mk: "Главно јадење" },
+  starters: { al: "Antipastet", mk: "Предјадења" },
+  starter: { al: "Antipaste", mk: "Предјадење" },
+  salads: { al: "Sallata", mk: "Салати" },
+  salad: { al: "Sallatë", mk: "Салата" },
+  soups: { al: "Supa", mk: "Супи" },
+  soup: { al: "Supë", mk: "Супа" },
+  pizza: { al: "Picë", mk: "Пица" },
+  pizzas: { al: "Pica", mk: "Пици" },
+  burgers: { al: "Hamburgerë", mk: "Бургери" },
+  burger: { al: "Hamburger", mk: "Бургер" },
+  grill: { al: "Skarë", mk: "Скара" },
+  grills: { al: "Skarë", mk: "Скара" },
+  sandwiches: { al: "Sanduiçe", mk: "Сендвичи" },
+  sandwich: { al: "Sanduiç", mk: "Сендвич" },
+  pasta: { al: "Paste", mk: "Тестенини" },
+  seafood: { al: "Fruta deti", mk: "Морска храна" },
+  meat: { al: "Mish", mk: "Месо" },
+  chicken: { al: "Pule", mk: "Пилешко" },
+  snacks: { al: "Snacks", mk: "Грицки" },
+  breakfast: { al: "Mëngjes", mk: "Појадок" },
+  lunch: { al: "Drekë", mk: "Ручек" },
+  dinner: { al: "Darkë", mk: "Вечера" },
+  specials: { al: "Specialitete", mk: "Специјалитети" },
+  special: { al: "Specialitet", mk: "Специјалитет" },
+  vegetarian: { al: "Vegjetarian", mk: "Вегетаријанско" },
+  vegan: { al: "Vegan", mk: "Веганско" },
+  sides: { al: "Anëse", mk: "Прилози" },
+  side: { al: "Anëse", mk: "Прилог" },
+  sauces: { al: "Salca", mk: "Сосови" },
+  alcohol: { al: "Alkool", mk: "Алкохол" },
+  wine: { al: "Verë", mk: "Вино" },
+  beer: { al: "Birrë", mk: "Пиво" },
+  cocktails: { al: "Kokteje", mk: "Коктели" },
+  juices: { al: "Lëngje", mk: "Сокови" },
+  juice: { al: "Lëng", mk: "Сок" },
+  tea: { al: "Çaj", mk: "Чај" },
+  water: { al: "Ujë", mk: "Вода" },
+  extra: { al: "Ekstra", mk: "Екстра" },
+  extras: { al: "Ekstra", mk: "Екстра" },
+  "hot drinks": { al: "Pije të nxehta", mk: "Топли пијалоци" },
+  "hot drink": { al: "Pije e nxehtë", mk: "Топол пијалок" },
+  "cold drinks": { al: "Pije të ftohta", mk: "Ладни пијалоци" },
+  "soft drinks": { al: "Pije freskuese", mk: "Безалкохолни пијалоци" },
+  appetizers: { al: "Antipastet", mk: "Предјадења" },
+  appetizer: { al: "Antipaste", mk: "Предјадење" },
+  wraps: { al: "Rolat", mk: "Ролати" },
+  wrap: { al: "Rolat", mk: "Ролат" },
+  sushi: { al: "Sushi", mk: "Суши" },
+  tacos: { al: "Takos", mk: "Такос" },
+};
+
+function getCategoryDisplay(cat: string, lang: "en" | "al" | "mk"): string {
+  if (lang === "en") return cat;
+  const entry = CATEGORY_NAMES[cat.toLowerCase().trim()];
+  if (entry) return entry[lang];
+  return cat;
+}
+
 // ─── Translations ─────────────────────────────────────────────────────────────
 
 const translations: Record<string, any> = {
@@ -783,7 +856,6 @@ function RestaurantMap({
   const { slug } = useParams<{ slug: string }>();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
-  const menuSectionRef = useRef<HTMLElement>(null);
   const initedRef = useRef(false); // ← prevents double-init in StrictMode
   const watchIdRef = useRef<number | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -1363,7 +1435,7 @@ function AIRestaurantAssistant({
       send: "Испрати",
       addToCart: "Додај",
       added: "Додадено!",
-      greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè — го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
+      greeting: `Здраво! Јас сум вашиот AI келнер за **${restaurantName}** 👋\n\nПрашајте ме сè e � го знам целото мени, можам да предложам јадења по вашиот расположение, исхрана или буџет!`,
       errorMsg: "Се извинуваме, имаше проблем. Обидете се повторно!",
     },
   };
@@ -3140,83 +3212,90 @@ export default function PublicMenu() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-primary/10" />
           )}
 
-          <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center space-y-5 sm:space-y-8 text-white">
-            {/* ✅ Improved: staggered hero with variants */}
-            <motion.div variants={heroVariants} initial="hidden" animate="show">
-              <motion.h1
-                variants={heroItem}
-                className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight"
-              >
-                {restaurant.name}
-              </motion.h1>
-
-              <motion.div variants={heroItem}>
-                <div
-                  className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
-                    isOpen
-                      ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
-                      : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
-                  }`}
-                >
-                  {isOpen ? (
-                    <>
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {t.openNow}
-                    </>
-                  ) : (
-                    <>
-                      <Clock className="h-3.5 w-3.5" />
-                      {t.closed}
-                    </>
-                  )}
-                </div>
-              </motion.div>
-
-              {restaurant.description && (
-                <motion.p
-                  variants={heroItem}
-                  className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed mt-4"
-                >
-                  {restaurant.description}
-                </motion.p>
-              )}
-
+          <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+            {/* Restaurant Info Frame */}
+            <div className="bg-white/5 backdrop-blur-xl rounded-3xl border-2 border-primary/40 shadow-2xl p-8 sm:p-12 text-center space-y-5 sm:space-y-8 text-white">
+              {/* Staggered hero with variants */}
               <motion.div
-                variants={heroItem}
-                className="flex flex-wrap justify-center gap-3 pt-2"
+                variants={heroVariants}
+                initial="hidden"
+                animate="show"
               >
-                {restaurant.website && (
-                  <a
-                    href={restaurant.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
-                  >
-                    <Globe className="h-3.5 w-3.5" />
-                    {t.website}
-                  </a>
-                )}
-                <a
-                  href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
-                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
+                <motion.h1
+                  variants={heroItem}
+                  className="font-display font-bold text-4xl sm:text-6xl tracking-tight text-white drop-shadow-2xl leading-tight"
                 >
-                  <Phone className="h-3.5 w-3.5" />
-                  {t.reserve}
-                </a>
-              </motion.div>
+                  {restaurant.name}
+                </motion.h1>
 
-              {restaurant.openingTime && restaurant.closingTime && (
+                <motion.div variants={heroItem}>
+                  <div
+                    className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg mt-4 ${
+                      isOpen
+                        ? "bg-emerald-500/30 text-emerald-300 border-2 border-emerald-400/50"
+                        : "bg-red-500/30 text-red-300 border-2 border-red-400/50"
+                    }`}
+                  >
+                    {isOpen ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {t.openNow}
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="h-3.5 w-3.5" />
+                        {t.closed}
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+
+                {restaurant.description && (
+                  <motion.p
+                    variants={heroItem}
+                    className="text-stone-100 text-base sm:text-lg font-medium max-w-xl mx-auto drop-shadow leading-relaxed mt-4"
+                  >
+                    {restaurant.description}
+                  </motion.p>
+                )}
+
                 <motion.div
                   variants={heroItem}
-                  className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2"
+                  className="flex flex-wrap justify-center gap-3 pt-2"
                 >
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>
-                    {restaurant.openingTime} - {restaurant.closingTime}
-                  </span>
+                  {restaurant.website && (
+                    <a
+                      href={restaurant.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg px-5 py-2.5 rounded-full border-2 border-white/30 transition-all text-xs font-bold hover:scale-105"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      {t.website}
+                    </a>
+                  )}
+                  <a
+                    href={`tel:${restaurant.phoneNumber || "+38944123456"}`}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 px-6 py-2.5 rounded-full shadow-xl transition-all text-xs font-bold text-white hover:scale-105"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                    {t.reserve}
+                  </a>
                 </motion.div>
-              )}
-            </motion.div>
+
+                {restaurant.openingTime && restaurant.closingTime && (
+                  <motion.div
+                    variants={heroItem}
+                    className="flex items-center justify-center gap-2 text-stone-300 text-xs pt-2"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>
+                      {restaurant.openingTime} - {restaurant.closingTime}
+                    </span>
+                  </motion.div>
+                )}
+              </motion.div>
+            </div>
           </div>
         </header>
 
@@ -3286,7 +3365,18 @@ export default function PublicMenu() {
               <button
                 onClick={() => {
                   setSelectedCategory("All");
-                  menuSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  setTimeout(() => {
+                    const first = document.querySelector(
+                      "[id^='category-']",
+                    ) as HTMLElement;
+                    if (!first) return;
+                    const stickyBarHeight = 120;
+                    const top =
+                      first.getBoundingClientRect().top +
+                      window.scrollY -
+                      stickyBarHeight;
+                    window.scrollTo({ top, behavior: "smooth" });
+                  }, 50);
                 }}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === "All" ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
               >
@@ -3297,11 +3387,20 @@ export default function PublicMenu() {
                   key={cat}
                   onClick={() => {
                     setSelectedCategory(cat);
-                    menuSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    setTimeout(() => {
+                      const el = document.getElementById(`category-${cat}`);
+                      if (!el) return;
+                      const stickyBarHeight = 120; // adjust if your bar is taller/shorter
+                      const top =
+                        el.getBoundingClientRect().top +
+                        window.scrollY -
+                        stickyBarHeight;
+                      window.scrollTo({ top, behavior: "smooth" });
+                    }, 50);
                   }}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${selectedCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-700"}`}
                 >
-                  {cat}
+                  {getCategoryDisplay(cat, lang)}
                 </button>
               ))}
             </div>
@@ -3309,7 +3408,7 @@ export default function PublicMenu() {
         </div>
 
         {/* Menu */}
-        <main ref={menuSectionRef} className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
+        <main className="max-w-4xl mx-auto px-3 sm:px-4 py-8 space-y-10">
           <SurpriseMe
             menuItems={restaurant.menuItems || []}
             onAddToCart={updateCart}
@@ -3346,6 +3445,7 @@ export default function PublicMenu() {
             ([category, items]: [string, MenuItem[]], idx: number) => (
               <motion.section
                 key={category}
+                id={`category-${category}`}
                 // ✅ Improved: spring + slide from left
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -3359,7 +3459,7 @@ export default function PublicMenu() {
                 <div className="flex items-center gap-3 mb-5">
                   <div className="h-px flex-1 bg-gradient-to-r from-transparent to-stone-200 dark:to-stone-700" />
                   <h2 className="font-display font-bold text-xl text-primary px-4 py-1.5 bg-primary/5 dark:bg-primary/10 rounded-full">
-                    {category}
+                    {getCategoryDisplay(category, lang)}
                   </h2>
                   <div className="h-px flex-1 bg-gradient-to-l from-transparent to-stone-200 dark:to-stone-700" />
                 </div>
