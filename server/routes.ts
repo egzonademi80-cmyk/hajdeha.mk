@@ -249,19 +249,31 @@ export async function registerRoutes(
         tableNumber,
       });
 
-      // ── Tablet POS live broadcast ──
+      // ── POS live broadcast + DB save (always, regardless of orderMode) ──
       // channel format: `table-{slug}-{tableNumber}` → extract slug, look up restaurant
       try {
         const m = String(channel).match(/^table-(.+)-([^-]+)$/);
         if (m) {
           const slug = m[1];
           const restaurant = await storage.getRestaurantBySlug(slug);
-          if (restaurant && (restaurant as any).orderMode === "tablet") {
+          if (restaurant) {
+            // Always fire to POS so orders panel always works
             await pusherServer.trigger(`pos-${slug}`, "incoming-order", {
               cart: safeCart,
               tableNumber,
               timestamp: Date.now(),
             });
+            // Always persist to DB so waiter PIN claiming works
+            const tableNum = parseInt(String(tableNumber), 10) || 0;
+            if (Array.isArray(safeCart) && safeCart.length > 0) {
+              await storage.createOrder({
+                restaurantId: restaurant.id,
+                tableNumber: tableNum,
+                cart: JSON.stringify(safeCart),
+                status: "pending",
+                waiterId: null,
+              });
+            }
           }
         }
       } catch (e) {

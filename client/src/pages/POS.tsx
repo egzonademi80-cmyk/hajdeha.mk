@@ -1092,15 +1092,8 @@ export default function POS({ slug }: POSProps) {
       const cart: OrderItem[] = data.cart || [];
       const tableNumber = data.tableNumber;
 
-      // Persist to DB for waiter claiming
-      const rid = restaurant?.id;
-      if (rid && Array.isArray(cart) && cart.length > 0) {
-        fetch("/api/orders", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ restaurantId: rid, tableNumber: parseInt(String(tableNumber)) || 0, cart }),
-        }).catch(() => {});;
-      }
+      // Order is already persisted to DB server-side; just refresh the panel
+      refetchOrders();
       const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
       const tableIdx = tableDigits - 1;
 
