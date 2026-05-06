@@ -573,6 +573,7 @@ export async function registerRoutes(
 
   // === ADMIN WAITERS — /api/admin/waiters?action=list|create|update|delete ===
   app.all("/api/admin/waiters", async (req, res) => {
+    console.log("[waiters] method:", req.method, "| isAuth:", req.isAuthenticated(), "| session:", JSON.stringify(req.session), "| user:", req.user ? (req.user as any).id : "none");
     if (!requireAuth(req, res)) return;
     const user = req.user as any;
     const action = req.query.action as string;
