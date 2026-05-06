@@ -699,9 +699,11 @@ export async function registerRoutes(
 
       const order = await storage.getOrder(id);
       if (!order) return res.status(404).json({ message: "Order not found" });
+      if (order.restaurantId !== Number(restaurantId))
+        return res.status(403).json({ message: "Order does not belong to this restaurant" });
       if (order.status !== "pending") return res.status(409).json({ message: "Order already taken" });
 
-      const waiter = await storage.getWaiterByPin(restaurantId, pinCode);
+      const waiter = await storage.getWaiterByPin(Number(restaurantId), pinCode);
       if (!waiter) return res.status(401).json({ message: "Invalid PIN" });
 
       const updated = await storage.claimOrder(id, waiter.id);
@@ -715,6 +717,7 @@ export async function registerRoutes(
   });
 
   app.post("/api/orders/:id/complete", async (req, res) => {
+    if (!requireAuth(req, res)) return;
     try {
       const id = parseInt(req.params.id);
       const order = await storage.getOrder(id);
