@@ -726,6 +726,63 @@ export async function registerRoutes(
     }
   });
 
+  // === VERIFY WAITER PIN (for POS table claim) ===
+  app.post("/api/pos/verify-pin", async (req, res) => {
+    try {
+      const { pinCode, restaurantId } = req.body;
+      if (!pinCode || !restaurantId)
+        return res.status(400).json({ message: "Missing fields" });
+      const waiter = await storage.getWaiterByPin(Number(restaurantId), String(pinCode));
+      if (!waiter) return res.status(401).json({ message: "PIN i gabuar" });
+      return res.json({ id: waiter.id, name: waiter.name });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // === WAITER EARNINGS TODAY ===
+  app.get("/api/admin/waiter-earnings", async (req, res) => {
+    try {
+      const restaurantId = parseInt(req.query.restaurantId as string);
+      if (isNaN(restaurantId))
+        return res.status(400).json({ message: "restaurantId required" });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const allOrders = await storage.getOrders(restaurantId);
+      const todayOrders = allOrders.filter(
+        (o) =>
+          (o.status === "claimed" || o.status === "completed") &&
+          new Date(o.createdAt) >= today &&
+          o.waiterId !== null,
+      );
+      const waiterList = await storage.getWaiters(restaurantId);
+      const waiterMap = new Map(waiterList.map((w) => [w.id, w.name]));
+      const earningsMap = new Map<number, number>();
+      for (const order of todayOrders) {
+        if (!order.waiterId) continue;
+        const cart = JSON.parse(order.cart);
+        const total = cart.reduce(
+          (s: number, i: any) => s + i.price * i.qty,
+          0,
+        );
+        earningsMap.set(
+          order.waiterId,
+          (earningsMap.get(order.waiterId) ?? 0) + total,
+        );
+      }
+      const earnings = Array.from(earningsMap.entries()).map(
+        ([waiterId, total]) => ({
+          waiterId,
+          waiterName: waiterMap.get(waiterId) ?? "Unknown",
+          total,
+        }),
+      );
+      return res.json(earnings);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // === SEED DATA ===
   seedDatabase(hashPassword).catch((err) => {
     console.warn("[seed] Skipped:", err?.message ?? err);

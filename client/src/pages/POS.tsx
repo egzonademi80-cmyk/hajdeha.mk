@@ -51,6 +51,8 @@ interface TableOrder {
   rounds: OrderRound[];
   startedAt: Date | null;
   section?: string;
+  waiterId?: number;
+  waiterName?: string;
 }
 
 interface PersonTab {
@@ -469,7 +471,26 @@ export default function POS({ slug }: POSProps) {
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimError, setClaimError] = useState("");
 
+  // ─── Table PIN Modal ──────────────────────────────────────────────────────────
+  const [showTablePinModal, setShowTablePinModal] = useState(false);
+  const [tablePinSlot, setTablePinSlot] = useState<ActiveSlot>(null);
+  const [tablePinDigits, setTablePinDigits] = useState("");
+  const [tablePinError, setTablePinError] = useState("");
+  const [tablePinLoading, setTablePinLoading] = useState(false);
+
   const restaurantId = restaurant?.id;
+
+  const { data: waiters = [] } = useQuery<{ id: number; name: string; pinCode: string }[]>({
+    queryKey: ["/api/admin/waiters", restaurantId],
+    queryFn: async () => {
+      if (!restaurantId) return [];
+      const res = await fetch(`/api/admin/waiters?action=list&restaurantId=${restaurantId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!restaurantId,
+  });
+
   const { data: dbOrders = [], refetch: refetchOrders } = useQuery({
     queryKey: ["/api/orders", restaurantId],
     queryFn: async () => {
@@ -1008,9 +1029,54 @@ export default function POS({ slug }: POSProps) {
   };
 
   const openSlot = (slot: ActiveSlot) => {
+    if (slot?.kind === "table" && waiters.length > 0) {
+      setTablePinSlot(slot);
+      setTablePinDigits("");
+      setTablePinError("");
+      setShowTablePinModal(true);
+      return;
+    }
     setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
+  };
+
+  const confirmTablePin = async () => {
+    if (!tablePinSlot || tablePinSlot.kind !== "table") return;
+    setTablePinLoading(true);
+    setTablePinError("");
+    try {
+      const res = await fetch("/api/pos/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setTablePinError(d.message || "PIN i gabuar");
+        return;
+      }
+      const waiter: { id: number; name: string } = await res.json();
+      const tableIdx = tablePinSlot.idx;
+      const existingWaiterId = tables[tableIdx].waiterId;
+      if (existingWaiterId && existingWaiterId !== waiter.id) {
+        setTablePinError(`Kjo tryezë i takon ${tables[tableIdx].waiterName}`);
+        return;
+      }
+      setTables((prev) => {
+        const next = [...prev];
+        next[tableIdx] = { ...next[tableIdx], waiterId: waiter.id, waiterName: waiter.name };
+        return next;
+      });
+      setShowTablePinModal(false);
+      setActive(tablePinSlot);
+      setScreen("menu");
+      setActiveCategory("All");
+    } catch {
+      setTablePinError("Gabim rrjeti");
+    } finally {
+      setTablePinLoading(false);
+    }
   };
 
   const handleCreatePerson = () => {
@@ -1534,6 +1600,14 @@ export default function POS({ slug }: POSProps) {
                                   className={`text-[9px] font-['DM_Mono'] ${c.time}`}
                                 >
                                   {elapsed(table)}
+                                </span>
+                              )}
+                              {table.waiterName && (
+                                <span
+                                  className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/30 text-amber-400 max-w-[90%] truncate"
+                                  style={{ fontFamily: "'DM Sans', sans-serif" }}
+                                >
+                                  {table.waiterName.split(" ").map((n) => n[0]).join("").toUpperCase()}
                                 </span>
                               )}
                               <motion.div
@@ -2738,6 +2812,88 @@ export default function POS({ slug }: POSProps) {
                   className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
                 >
                   Krijo
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Table Waiter PIN Modal ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showTablePinModal && tablePinSlot?.kind === "table" && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-40`}
+              onClick={() => {
+                setShowTablePinModal(false);
+                setTablePinDigits("");
+                setTablePinError("");
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.18 }}
+              className={`fixed left-4 right-4 bottom-1/3 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.border} shadow-2xl`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <KeyRound className="h-4 w-4 text-amber-400" />
+                <p className={`text-base font-bold ${t.text}`}>
+                  {tables[tablePinSlot.idx].waiterId
+                    ? `Tavolina ${tablePinSlot.idx + 1} · ${tables[tablePinSlot.idx].waiterName}`
+                    : `Tavolina ${tablePinSlot.idx + 1}`}
+                </p>
+              </div>
+              <p className={`text-xs ${t.textDim} mb-4`}>
+                {tables[tablePinSlot.idx].waiterId
+                  ? "Futni PIN-in tuaj për të vazhduar"
+                  : "Futni PIN-in tuaj për të marrë tavolinën"}
+              </p>
+              <input
+                type="number"
+                inputMode="numeric"
+                maxLength={3}
+                placeholder="PIN 3-shifror"
+                value={tablePinDigits}
+                autoFocus
+                onChange={(e) => {
+                  setTablePinDigits(e.target.value.slice(0, 3));
+                  setTablePinError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && tablePinDigits.length === 3) confirmTablePin();
+                }}
+                className={`w-full h-12 rounded-xl border ${t.inputBorder} px-4 text-sm outline-none focus:border-amber-500/50 mb-2`}
+                style={{ background: t.inputBgStyle, color: t.inputTextStyle }}
+                data-testid="input-table-pin"
+              />
+              {tablePinError && (
+                <p className="text-xs text-red-400 mb-3">{tablePinError}</p>
+              )}
+              {!tablePinError && <div className="mb-3" />}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowTablePinModal(false);
+                    setTablePinDigits("");
+                    setTablePinError("");
+                  }}
+                  className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
+                >
+                  Anulo
+                </button>
+                <button
+                  onClick={confirmTablePin}
+                  disabled={tablePinDigits.length !== 3 || tablePinLoading}
+                  className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
+                  data-testid="button-confirm-table-pin"
+                >
+                  {tablePinLoading ? "…" : "Hyr"}
                 </button>
               </div>
             </motion.div>

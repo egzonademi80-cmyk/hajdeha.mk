@@ -34,6 +34,7 @@ import {
   BarChart2,
   ChevronDown,
   ChevronUp,
+  Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -293,6 +294,70 @@ function AnalyticsPanel({ restaurantId }: { restaurantId: number }) {
           </ResponsiveContainer>
         </div>
       )}
+    </div>
+  );
+}
+
+function WaiterEarningsPanel({ restaurantId }: { restaurantId: number }) {
+  const { data, isLoading } = useQuery<{ waiterId: number; waiterName: string; total: number }[]>({
+    queryKey: [`waiter-earnings-${restaurantId}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/waiter-earnings?restaurantId=${restaurantId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  if (isLoading)
+    return (
+      <div className="py-2 flex justify-center">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+
+  if (!data || data.length === 0)
+    return (
+      <div className="mt-3 pt-3 border-t border-border">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+          <p className="text-xs font-semibold text-muted-foreground">Kamarierat sot</p>
+        </div>
+        <p className="text-xs text-muted-foreground">Nuk ka të dhëna për sot</p>
+      </div>
+    );
+
+  const grandTotal = data.reduce((s, w) => s + w.total, 0);
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+          <p className="text-xs font-semibold text-muted-foreground">Kamarierat sot</p>
+        </div>
+        <p className="text-xs font-bold text-foreground">{grandTotal} DEN total</p>
+      </div>
+      <div className="space-y-1.5">
+        {data.map((w) => (
+          <div
+            key={w.waiterId}
+            className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2"
+            data-testid={`waiter-earnings-${w.waiterId}`}
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center">
+                <span className="text-[10px] font-bold text-primary">
+                  {w.waiterName.split(" ").map((n) => n[0]).join("").toUpperCase()}
+                </span>
+              </div>
+              <span className="text-sm font-medium text-foreground">{w.waiterName}</span>
+            </div>
+            <span className="text-sm font-bold text-foreground">{w.total} DEN</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -998,7 +1063,10 @@ export default function AdminDashboard() {
 
                   {/* Analytics panel — expandable */}
                   {expandedAnalytics.has(restaurant.id) && (
-                    <AnalyticsPanel restaurantId={restaurant.id} />
+                    <>
+                      <AnalyticsPanel restaurantId={restaurant.id} />
+                      <WaiterEarningsPanel restaurantId={restaurant.id} />
+                    </>
                   )}
                 </CardContent>
               </div>
