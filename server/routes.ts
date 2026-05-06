@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import Pusher from "pusher";
 import { storage } from "./storage.js";
-import { setupAuth } from "./auth.js";
+import { setupAuth, generateToken } from "./auth.js";
 import { api } from "../shared/routes.js";
 import passport from "passport";
 import { db } from "./db.js";
@@ -42,7 +42,8 @@ const pusherServer = new Pusher({
 });
 
 function requireAuth(req: Request, res: Response): boolean {
-  if (!req.isAuthenticated()) {
+  // Accept either passport session OR Bearer-token user attached by attachTokenUser
+  if (!req.isAuthenticated() && !(req as any).user) {
     res.status(401).json({ message: "Not authenticated" });
     return false;
   }
@@ -74,7 +75,8 @@ export async function registerRoutes(
           req.logIn(user, (err) => {
             if (err) return next(err);
             const { password: _pw, ...safeUser } = user;
-            return res.json({ user: safeUser });
+            const token = generateToken(user.id);
+            return res.json({ user: safeUser, token });
           });
         },
       )(req, res, next);
@@ -573,7 +575,6 @@ export async function registerRoutes(
 
   // === ADMIN WAITERS — /api/admin/waiters?action=list|create|update|delete ===
   app.all("/api/admin/waiters", async (req, res) => {
-    console.log("[waiters] method:", req.method, "| isAuth:", req.isAuthenticated(), "| session:", JSON.stringify(req.session), "| user:", req.user ? (req.user as any).id : "none");
     if (!requireAuth(req, res)) return;
     const user = req.user as any;
     const action = req.query.action as string;

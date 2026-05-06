@@ -1,6 +1,6 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import cookieSession from "cookie-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -17,15 +17,43 @@ async function hashPassword(password: string) {
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  // Bcrypt hashes always start with $2a$ or $2b$
   if (stored.startsWith("$2")) {
     return bcrypt.compare(supplied, stored);
   }
-  // Scrypt format: salt:hexKey
   const [salt, key] = stored.split(":");
   if (!salt || !key) return false;
   const derivedKey = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(Buffer.from(key, "hex"), derivedKey);
+}
+
+// ── Token store (survives restarts badly but fine for this scale) ─────────────
+const tokenStore = new Map<string, number>(); // token → userId
+
+export function generateToken(userId: number): string {
+  const token = randomBytes(32).toString("hex");
+  tokenStore.set(token, userId);
+  return token;
+}
+
+export async function getUserFromToken(token: string): Promise<SelectUser | null> {
+  const userId = tokenStore.get(token);
+  if (!userId) return null;
+  return storage.getUser(userId) ?? null;
+}
+
+// ── Middleware: attach user from Bearer token if session auth didn't work ─────
+export async function attachTokenUser(req: Request, _res: Response, next: NextFunction) {
+  if (req.isAuthenticated()) return next();
+  const auth = req.headers.authorization;
+  if (auth?.startsWith("Bearer ")) {
+    const token = auth.slice(7);
+    const user = await getUserFromToken(token);
+    if (user) {
+      (req as any).user = user;
+      (req as any)._tokenAuth = true;
+    }
+  }
+  next();
 }
 
 export function setupAuth(app: Express) {
@@ -33,13 +61,12 @@ export function setupAuth(app: Express) {
     cookieSession({
       name: "session",
       keys: [process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y"],
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
     }),
   );
 
-  // Fix for req.session.regenerate is not a function with cookie-session
   app.use((req, res, next) => {
     if (req.session && !req.session.regenerate) {
       req.session.regenerate = (cb: any) => cb();
@@ -57,18 +84,16 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Attach user from Bearer token for every request (fallback when cookies fail)
+  app.use(attachTokenUser);
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        if (!user) {
-          return done(null, false, { message: "Invalid username" });
-        }
-
+        if (!user) return done(null, false, { message: "Invalid username" });
         const isValid = await comparePasswords(password, user.password);
-        if (!isValid) {
-          return done(null, false, { message: "Invalid password" });
-        }
+        if (!isValid) return done(null, false, { message: "Invalid password" });
         return done(null, user);
       } catch (err) {
         return done(err);
