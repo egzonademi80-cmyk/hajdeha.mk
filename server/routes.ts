@@ -671,6 +671,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/orders", async (req, res) => {
+    if (!requireAuth(req, res)) return;
     try {
       const restaurantId = parseInt(req.query.restaurantId as string);
       if (isNaN(restaurantId)) return res.status(400).json({ message: "restaurantId required" });

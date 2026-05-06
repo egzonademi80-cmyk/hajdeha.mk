@@ -595,7 +595,6 @@ export default function POS({ slug }: POSProps) {
           updated[splitTableIdx] = emptyTable();
           return updated;
         });
-        // ADD THIS:
         fetch("/api/table/cart-cleared", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1005,7 +1004,6 @@ export default function POS({ slug }: POSProps) {
         next[slot.idx] = emptyTable();
         return next;
       });
-      // ADD THIS:
       fetch("/api/table/cart-cleared", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
