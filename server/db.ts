@@ -10,7 +10,9 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL.includes("sslmode=require") || process.env.DATABASE_URL.includes("neon.tech")
+  ssl: process.env.DATABASE_URL.includes("sslmode=require") || 
+       process.env.DATABASE_URL.includes("sslmode=verify") ||
+       process.env.DATABASE_URL.includes("neon.tech")
     ? { rejectUnauthorized: false }
     : false,
   max: 10,
