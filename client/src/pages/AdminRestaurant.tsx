@@ -64,7 +64,7 @@ import {
   type MenuItem,
 } from "@shared/schema";
 import { api } from "@shared/routes";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getToken } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ── dnd-kit ───────────────────────────────────────────────────────────────────
@@ -1171,7 +1171,10 @@ function WaitersSection({ restaurantId }: { restaurantId: number }) {
   const { data: waiters = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/waiters", restaurantId],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/waiters?action=list&restaurantId=${restaurantId}`, { credentials: "include" });
+      const token = getToken();
+      const headers: HeadersInit = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`/api/admin/waiters?action=list&restaurantId=${restaurantId}`, { credentials: "include", headers });
       if (!res.ok) return [];
       return res.json();
     },
@@ -1190,9 +1193,12 @@ function WaitersSection({ restaurantId }: { restaurantId: number }) {
       const url = isEdit
         ? `/api/admin/waiters?action=update&id=${editId}`
         : `/api/admin/waiters?action=create`;
+      const token = getToken();
+      const authHeaders: HeadersInit = { "Content-Type": "application/json" };
+      if (token) authHeaders["Authorization"] = `Bearer ${token}`;
       const res = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders,
         credentials: "include",
         body: JSON.stringify({ restaurantId, name: name.trim(), pinCode: pin }),
       });
@@ -1209,7 +1215,10 @@ function WaitersSection({ restaurantId }: { restaurantId: number }) {
   };
 
   const deleteWaiter = async (id: number) => {
-    await fetch(`/api/admin/waiters?action=delete&id=${id}`, { method: "DELETE", credentials: "include" });
+    const token = getToken();
+    const headers: HeadersInit = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    await fetch(`/api/admin/waiters?action=delete&id=${id}`, { method: "DELETE", credentials: "include", headers });
     qc.invalidateQueries({ queryKey: ["/api/admin/waiters", restaurantId] });
     toast({ title: "Kamarieri u fshi" });
   };

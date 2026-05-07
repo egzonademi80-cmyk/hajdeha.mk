@@ -54,6 +54,7 @@ export const getQueryFn: <T>(options: {
 
     const res = await fetch(queryKey.join("/") as string, {
       headers,
+      credentials: "include",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

@@ -6,6 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage.js";
+import { db } from "./db.js";
 import { User as SelectUser } from "../shared/schema.js";
 
 const scryptAsync = promisify(scrypt);
@@ -26,19 +27,23 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(Buffer.from(key, "hex"), derivedKey);
 }
 
-// ── Token store (survives restarts badly but fine for this scale) ─────────────
-const tokenStore = new Map<string, number>(); // token → userId
-
-export function generateToken(userId: number): string {
+// ── DB-persisted token store (survives server restarts) ───────────────────────
+export async function generateToken(userId: number): Promise<string> {
   const token = randomBytes(32).toString("hex");
-  tokenStore.set(token, userId);
+  await db.execute(
+    `INSERT INTO user_tokens (token, user_id) VALUES ('${token}', ${userId}) ON CONFLICT (token) DO NOTHING`
+  );
   return token;
 }
 
 export async function getUserFromToken(token: string): Promise<SelectUser | null> {
-  const userId = tokenStore.get(token);
-  if (!userId) return null;
-  return storage.getUser(userId) ?? null;
+  const result = await db.execute(
+    `SELECT user_id FROM user_tokens WHERE token = '${token}' LIMIT 1`
+  );
+  const rows = (result as any).rows ?? result;
+  if (!rows || rows.length === 0) return null;
+  const userId = rows[0].user_id;
+  return (await storage.getUser(userId)) ?? null;
 }
 
 // ── Middleware: attach user from Bearer token if session auth didn't work ─────
@@ -47,10 +52,14 @@ export async function attachTokenUser(req: Request, _res: Response, next: NextFu
   const auth = req.headers.authorization;
   if (auth?.startsWith("Bearer ")) {
     const token = auth.slice(7);
-    const user = await getUserFromToken(token);
-    if (user) {
-      (req as any).user = user;
-      (req as any)._tokenAuth = true;
+    try {
+      const user = await getUserFromToken(token);
+      if (user) {
+        (req as any).user = user;
+        (req as any)._tokenAuth = true;
+      }
+    } catch {
+      // token lookup failed, continue without user
     }
   }
   next();

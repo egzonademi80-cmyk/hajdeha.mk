@@ -72,10 +72,10 @@ export async function registerRoutes(
             return res
               .status(401)
               .json({ message: info?.message || "Authentication failed" });
-          req.logIn(user, (err) => {
+          req.logIn(user, async (err) => {
             if (err) return next(err);
             const { password: _pw, ...safeUser } = user;
-            const token = generateToken(user.id);
+            const token = await generateToken(user.id);
             return res.json({ user: safeUser, token });
           });
         },
