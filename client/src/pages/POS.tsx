@@ -471,6 +471,10 @@ export default function POS({ slug }: POSProps) {
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimError, setClaimError] = useState("");
 
+  // ─── Incoming Order Claim Modal ───────────────────────────────────────────────
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimModalOrder, setClaimModalOrder] = useState<any>(null);
+
   // ─── Table PIN Modal ──────────────────────────────────────────────────────────
   const [showTablePinModal, setShowTablePinModal] = useState(false);
   const [tablePinSlot, setTablePinSlot] = useState<ActiveSlot>(null);
@@ -1039,6 +1043,14 @@ export default function POS({ slug }: POSProps) {
     setActiveCategory("All");
   };
 
+  const openIncomingClaim = (order: any) => {
+    setClaimModalOrder(order);
+    setClaimTarget(order.id);
+    setPinDigits("");
+    setClaimError("");
+    setShowClaimModal(true);
+  };
+
   const confirmTablePin = async () => {
     if (!tablePinSlot || tablePinSlot.kind !== "table") return;
     setTablePinLoading(true);
@@ -1415,13 +1427,15 @@ export default function POS({ slug }: POSProps) {
           <motion.button
             key={incomingBanner.id}
             onClick={() => {
-              const td = parseInt(
-                String(incomingBanner.tableNumber).replace(/\D/g, ""),
-                10,
+              const tableNum = parseInt(String(incomingBanner.tableNumber).replace(/\D/g, ""), 10);
+              const pendingOrder = [...dbOrders].find(
+                (o: any) => o.status === "pending" && Number(o.tableNumber) === tableNum
               );
-              const idx = td - 1;
-              if (idx >= 0 && idx < TABLE_COUNT) {
-                openSlot({ kind: "table", idx });
+              if (pendingOrder && waiters.length > 0) {
+                openIncomingClaim(pendingOrder);
+              } else {
+                const idx = tableNum - 1;
+                if (idx >= 0 && idx < TABLE_COUNT) openSlot({ kind: "table", idx });
               }
               setIncomingBanner(null);
             }}
@@ -1457,7 +1471,7 @@ export default function POS({ slug }: POSProps) {
               className="text-[10px] font-bold opacity-70"
               style={{ fontFamily: "'DM Mono', monospace" }}
             >
-              SHIH →
+              {waiters.length > 0 ? "MERR →" : "SHIH →"}
             </span>
           </motion.button>
         )}
@@ -2897,6 +2911,204 @@ export default function POS({ slug }: POSProps) {
             </motion.div>
           </>
         )}
+      </AnimatePresence>
+
+      {/* ─── Incoming Order Claim Modal (full-screen numpad) ─────────────── */}
+      <AnimatePresence>
+        {showClaimModal && claimModalOrder && (() => {
+          const order = claimModalOrder;
+          const cartTotal = order.cart.reduce((s: number, i: any) => s + i.price * i.qty, 0);
+          const tableNum = Number(order.tableNumber);
+
+          const numpadKeys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+
+          const handleNumpad = (key: string) => {
+            if (key === "⌫") {
+              setPinDigits(prev => prev.slice(0, -1));
+              setClaimError("");
+            } else if (key !== "" && pinDigits.length < 3) {
+              setPinDigits(prev => prev + key);
+              setClaimError("");
+            }
+          };
+
+          const handleConfirmClaim = async () => {
+            if (pinDigits.length !== 3 || claimLoading) return;
+            setClaimLoading(true);
+            setClaimError("");
+            try {
+              const res = await fetch(`/api/orders/${order.id}/claim`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pinCode: pinDigits, restaurantId }),
+              });
+              if (res.ok) {
+                const claimed = await res.json();
+                // Assign waiter to local table state
+                const tableIdx = tableNum - 1;
+                if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+                  setTables(prev => {
+                    const next = [...prev];
+                    next[tableIdx] = {
+                      ...next[tableIdx],
+                      waiterId: claimed.waiterId,
+                      waiterName: claimed.waiterName,
+                    };
+                    return next;
+                  });
+                }
+                setShowClaimModal(false);
+                setClaimModalOrder(null);
+                setClaimTarget(null);
+                setPinDigits("");
+                refetchOrders();
+                // Navigate to the table
+                if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+                  if (waiters.length > 0) {
+                    setTablePinSlot({ kind: "table", idx: tableIdx });
+                    setTablePinDigits("");
+                    setTablePinError("");
+                    setShowTablePinModal(true);
+                  } else {
+                    setActive({ kind: "table", idx: tableIdx });
+                    setScreen("menu");
+                    setActiveCategory("All");
+                  }
+                }
+              } else {
+                const d = await res.json();
+                setClaimError(d.message || "PIN i gabuar");
+              }
+            } catch {
+              setClaimError("Gabim rrjeti");
+            } finally {
+              setClaimLoading(false);
+            }
+          };
+
+          return (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className={`fixed inset-0 ${t.modalOverlay} z-50`}
+                onClick={() => { setShowClaimModal(false); setClaimModalOrder(null); setPinDigits(""); setClaimError(""); }}
+              />
+              <motion.div
+                initial={{ opacity: 0, y: "100%" }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: "100%" }}
+                transition={{ type: "spring", stiffness: 340, damping: 34 }}
+                className={`fixed left-0 right-0 bottom-0 z-50 ${t.modalBg} rounded-t-3xl border-t border-l border-r ${t.border} shadow-2xl overflow-hidden`}
+                style={{ paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))" }}
+              >
+                {/* Header */}
+                <div className={`flex items-center justify-between px-5 py-4 border-b ${t.border}`}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                      <Bell className="h-4 w-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${t.text}`}>Merr Porosinë</p>
+                      <p className={`text-[11px] ${t.textMuted}`} style={{ fontFamily: "'DM Mono', monospace" }}>
+                        TAVOLINA {tableNum} · {cartTotal} DEN
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setShowClaimModal(false); setClaimModalOrder(null); setPinDigits(""); setClaimError(""); }}
+                    className={`h-8 w-8 rounded-full ${t.backBtn} flex items-center justify-center`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Order items summary */}
+                <div className={`mx-4 mt-3 rounded-2xl ${t.surface} border ${t.border} px-4 py-3 max-h-28 overflow-y-auto`}>
+                  {order.cart.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between text-xs py-0.5">
+                      <span className={t.textMuted}>{item.qty}× {item.name}</span>
+                      <span className={`font-semibold ${t.text}`}>{item.price * item.qty} DEN</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* PIN display */}
+                <div className="px-5 pt-4 pb-2">
+                  <p className={`text-[10px] font-bold ${t.textDim} mb-2 text-center`} style={{ fontFamily: "'DM Mono', monospace" }}>
+                    FUTNI PIN-IN TUAJ
+                  </p>
+                  <div className="flex items-center justify-center gap-4 mb-2">
+                    {[0,1,2].map(i => (
+                      <div
+                        key={i}
+                        className={`h-12 w-12 rounded-2xl border-2 flex items-center justify-center text-xl font-bold transition-all ${
+                          pinDigits.length > i
+                            ? "border-amber-500 bg-amber-500/15 text-amber-400"
+                            : `${t.border} ${t.surface} ${t.textFaint}`
+                        }`}
+                      >
+                        {pinDigits.length > i ? "●" : ""}
+                      </div>
+                    ))}
+                  </div>
+                  {claimError && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-red-400 text-center mb-1"
+                    >
+                      {claimError}
+                    </motion.p>
+                  )}
+                </div>
+
+                {/* Numpad */}
+                <div className="grid grid-cols-3 gap-2 px-5 pb-1">
+                  {numpadKeys.map((key, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleNumpad(key)}
+                      disabled={key === ""}
+                      className={`h-14 rounded-2xl text-xl font-bold transition-all select-none ${
+                        key === ""
+                          ? "opacity-0 pointer-events-none"
+                          : key === "⌫"
+                            ? `${t.surfaceSoft} ${t.textMuted} active:scale-95`
+                            : `${t.surface} ${t.text} active:bg-amber-500/20 active:scale-95 hover:${t.surfaceSoft}`
+                      }`}
+                      style={{ fontFamily: key === "⌫" ? "system-ui" : "'DM Mono', monospace" }}
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Confirm button */}
+                <div className="px-5 pt-2">
+                  <button
+                    onClick={handleConfirmClaim}
+                    disabled={pinDigits.length !== 3 || claimLoading}
+                    className="w-full h-14 rounded-2xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    data-testid="button-confirm-incoming-claim"
+                  >
+                    {claimLoading ? (
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
+                        <Coffee className="h-4 w-4" />
+                      </motion.div>
+                    ) : (
+                      <>
+                        <KeyRound className="h-4 w-4" />
+                        Konfirmo dhe Merr Porosinë
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          );
+        })()}
       </AnimatePresence>
 
       {/* ─── Orders Panel ───────────────────────────────────────────────────── */}

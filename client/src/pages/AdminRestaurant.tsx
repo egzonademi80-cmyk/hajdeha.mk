@@ -55,6 +55,7 @@ import {
   Users,
   PencilLine,
   ShieldCheck,
+  Receipt,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -658,6 +659,9 @@ export default function AdminRestaurant() {
         {/* ── Waiters Section ── */}
         <WaitersSection restaurantId={restaurant.id} />
 
+        {/* ── Waiter Earnings Section ── */}
+        <WaiterEarningsSection restaurantId={restaurant.id} />
+
         {/* ── QR Codes Section ── */}
         <TableQRSection restaurant={restaurant} />
       </main>
@@ -1159,6 +1163,79 @@ function MenuItemDialog({
 }
 
 // ── Waiters Section ──────────────────────────────────────────────────────────
+function WaiterEarningsSection({ restaurantId }: { restaurantId: number }) {
+  const { data: earnings = [], isLoading } = useQuery<{ waiterId: number; waiterName: string; total: number }[]>({
+    queryKey: ["/api/admin/waiter-earnings", restaurantId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/waiter-earnings?restaurantId=${restaurantId}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const grandTotal = earnings.reduce((s, e) => s + e.total, 0);
+  const today = new Date().toLocaleDateString("sq-MK", { day: "2-digit", month: "long", year: "numeric" });
+
+  return (
+    <section className="bg-card rounded-2xl border border-border p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+            <Receipt className="h-5 w-5 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground">Të ardhurat e sotme</h2>
+            <p className="text-xs text-muted-foreground">{today}</p>
+          </div>
+        </div>
+        {grandTotal > 0 && (
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground font-mono">TOTAL</p>
+            <p className="text-lg font-bold text-emerald-600 font-mono">{grandTotal} DEN</p>
+          </div>
+        )}
+      </div>
+
+      {isLoading && <p className="text-sm text-muted-foreground">Duke ngarkuar…</p>}
+
+      {!isLoading && earnings.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center">
+          <p className="text-sm text-muted-foreground">Nuk ka porosi të kryera sot ende.</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Të dhënat shfaqen pasi kamarierët marrin dhe kryejnë porositë.</p>
+        </div>
+      )}
+
+      {earnings.length > 0 && (
+        <div className="space-y-2">
+          {[...earnings].sort((a, b) => b.total - a.total).map((e, idx) => {
+            const pct = grandTotal > 0 ? (e.total / grandTotal) * 100 : 0;
+            return (
+              <div key={e.waiterId} className="rounded-xl border border-border bg-background px-4 py-3 space-y-2" data-testid={`row-earnings-${e.waiterId}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0 font-bold text-xs text-emerald-600">
+                      #{idx + 1}
+                    </div>
+                    <p className="text-sm font-semibold text-foreground truncate">{e.waiterName}</p>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-600 font-mono flex-shrink-0">{e.total} DEN</p>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-700"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WaitersSection({ restaurantId }: { restaurantId: number }) {
   const { toast } = useToast();
   const qc = useQueryClient();
