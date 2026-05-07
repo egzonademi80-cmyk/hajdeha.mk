@@ -26,20 +26,31 @@ interface TableRoom {
 }
 
 const tableRooms = new Map<string, TableRoom>();
-console.log("Pusher ENV:", {
-  appId: process.env.PUSHER_APP_ID,
-  key: process.env.PUSHER_KEY,
-  secret: process.env.PUSHER_SECRET,
-  cluster: process.env.PUSHER_CLUSTER,
-});
 // ── Pusher server client ──────────────────────────────────────────────────────
-const pusherServer = new Pusher({
-  appId: process.env.PUSHER_APP_ID!,
-  key: process.env.PUSHER_KEY!,
-  secret: process.env.PUSHER_SECRET!,
-  cluster: process.env.PUSHER_CLUSTER!,
-  useTLS: true,
-});
+const pusherConfigured =
+  !!process.env.PUSHER_APP_ID &&
+  !!process.env.PUSHER_KEY &&
+  !!process.env.PUSHER_SECRET &&
+  !!process.env.PUSHER_CLUSTER;
+
+const pusherServer = pusherConfigured
+  ? new Pusher({
+      appId: process.env.PUSHER_APP_ID!,
+      key: process.env.PUSHER_KEY!,
+      secret: process.env.PUSHER_SECRET!,
+      cluster: process.env.PUSHER_CLUSTER!,
+      useTLS: true,
+    })
+  : null;
+
+async function safeTrigger(channel: string, event: string, data: object) {
+  if (!pusherServer) return;
+  try {
+    await pusherServer.trigger(channel, event, data);
+  } catch (e: any) {
+    console.warn("[pusher] trigger failed:", e.message);
+  }
+}
 
 function requireAuth(req: Request, res: Response): boolean {
   // Accept either passport session OR Bearer-token user attached by attachTokenUser
@@ -169,17 +180,10 @@ export async function registerRoutes(
         cart,
         sessionOrder: clearSession ? [] : existing?.sessionOrder || [],
       });
-      try {
-        console.log("triggering pusher on channel:", channel);
-        if (clearSession) {
-          await pusherServer.trigger(channel, "cart-cleared", {});
-          console.log("pusher cart-cleared trigger succeeded");
-        } else {
-          await pusherServer.trigger(channel, "cart-update", { cart });
-          console.log("pusher trigger succeeded");
-        }
-      } catch (e: any) {
-        console.error("PUSHER FAIL:", e.message, e.status, e.stack);
+      if (clearSession) {
+        await safeTrigger(channel, "cart-cleared", {});
+      } else {
+        await safeTrigger(channel, "cart-update", { cart });
       }
       res.json({ ok: true });
     } catch (err: any) {
@@ -193,7 +197,7 @@ export async function registerRoutes(
       if (!channel) return res.status(400).json({ message: "Missing channel" });
 
       tableRooms.delete(channel); // wipe server-side room too
-      await pusherServer.trigger(channel, "cart-cleared", {});
+      await safeTrigger(channel, "cart-cleared", {});
 
       res.json({ ok: true });
     } catch (err: any) {
@@ -207,7 +211,7 @@ export async function registerRoutes(
       if (!restaurantSlug || !tableNumber || !type) {
         return res.status(400).json({ message: "Missing fields" });
       }
-      await pusherServer.trigger(`pos-${restaurantSlug}`, "waiter-request", {
+      await safeTrigger(`pos-${restaurantSlug}`, "waiter-request", {
         tableNumber,
         type,
       });
@@ -244,7 +248,7 @@ export async function registerRoutes(
 
       const safeCart = cart as CartItem[];
 
-      await pusherServer.trigger(channel, "order-placed", {
+      await safeTrigger(channel, "order-placed", {
         cart: safeCart,
         tableNumber,
       });
@@ -258,7 +262,7 @@ export async function registerRoutes(
           const restaurant = await storage.getRestaurantBySlug(slug);
           if (restaurant) {
             // Always fire to POS so orders panel always works
-            await pusherServer.trigger(`pos-${slug}`, "incoming-order", {
+            await safeTrigger(`pos-${slug}`, "incoming-order", {
               cart: safeCart,
               tableNumber,
               timestamp: Date.now(),
@@ -291,8 +295,8 @@ export async function registerRoutes(
 
       tableRooms.set(channel, { cart: [], sessionOrder: merged });
 
-      await pusherServer.trigger(channel, "cart-update", { cart: [] });
-      await pusherServer.trigger(channel, "order-snapshot", {
+      await safeTrigger(channel, "cart-update", { cart: [] });
+      await safeTrigger(channel, "order-snapshot", {
         sessionOrder: merged,
       });
 
@@ -307,7 +311,7 @@ export async function registerRoutes(
     try {
       const { channel, tableNumber } = req.body;
       if (!channel) return res.status(400).json({ message: "Missing channel" });
-      await pusherServer.trigger(channel, "waiter-called", {
+      await safeTrigger(channel, "waiter-called", {
         tableNumber,
         timestamp: Date.now(),
       });
