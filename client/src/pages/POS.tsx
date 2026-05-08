@@ -736,12 +736,7 @@ export default function POS({ slug }: POSProps) {
       return res.json();
     },
     enabled: !!restaurantId,
-    });
-  {
-   
-   ;
- 
-   >                                
+  });
 
   const { data: dbOrders = [], refetch: refetchOrders } = useQuery({
     queryKey: ["/api/orders", restaurantId],
