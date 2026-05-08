@@ -23,6 +23,7 @@ interface CartItem {
 }
 interface TableRoom {
   cart: CartItem[];
+  sessionOrder: CartItem[];
 }
 
 const tableRooms = new Map<string, TableRoom>();
@@ -598,7 +599,8 @@ export async function registerRoutes(
     try {
       if (action === "list") {
         const restaurantId = parseInt(req.query.restaurantId as string);
-        if (isNaN(restaurantId)) return res.status(400).json({ message: "restaurantId required" });
+        if (isNaN(restaurantId))
+          return res.status(400).json({ message: "restaurantId required" });
         const restaurant = await storage.getRestaurant(restaurantId);
         if (!restaurant || restaurant.userId !== user.id)
           return res.status(403).json({ message: "Forbidden" });
@@ -609,12 +611,20 @@ export async function registerRoutes(
       if (action === "create") {
         const result = insertWaiterSchema.safeParse(req.body);
         if (!result.success)
-          return res.status(400).json({ message: result.error.errors[0]?.message || "Invalid input" });
-        const restaurant = await storage.getRestaurant(result.data.restaurantId);
+          return res.status(400).json({
+            message: result.error.errors[0]?.message || "Invalid input",
+          });
+        const restaurant = await storage.getRestaurant(
+          result.data.restaurantId,
+        );
         if (!restaurant || restaurant.userId !== user.id)
           return res.status(403).json({ message: "Forbidden" });
-        const existing = await storage.getWaiterByPin(result.data.restaurantId, result.data.pinCode);
-        if (existing) return res.status(409).json({ message: "PIN already in use" });
+        const existing = await storage.getWaiterByPin(
+          result.data.restaurantId,
+          result.data.pinCode,
+        );
+        if (existing)
+          return res.status(409).json({ message: "PIN already in use" });
         const waiter = await storage.createWaiter(result.data);
         return res.status(201).json(waiter);
       }
@@ -628,8 +638,12 @@ export async function registerRoutes(
         if (!restaurant || restaurant.userId !== user.id)
           return res.status(403).json({ message: "Forbidden" });
         if (req.body.pinCode) {
-          const existing = await storage.getWaiterByPin(waiter.restaurantId, req.body.pinCode);
-          if (existing && existing.id !== id) return res.status(409).json({ message: "PIN already in use" });
+          const existing = await storage.getWaiterByPin(
+            waiter.restaurantId,
+            req.body.pinCode,
+          );
+          if (existing && existing.id !== id)
+            return res.status(409).json({ message: "PIN already in use" });
         }
         const updated = await storage.updateWaiter(id, req.body);
         return res.json(updated);
@@ -675,10 +689,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/orders", async (req, res) => {
-    if (!requireAuth(req, res)) return;
     try {
       const restaurantId = parseInt(req.query.restaurantId as string);
-      if (isNaN(restaurantId)) return res.status(400).json({ message: "restaurantId required" });
+      if (isNaN(restaurantId))
+        return res.status(400).json({ message: "restaurantId required" });
       const status = req.query.status as string | undefined;
       const list = await storage.getOrders(restaurantId, status);
       const waiters = await storage.getWaiters(restaurantId);
@@ -686,7 +700,7 @@ export async function registerRoutes(
       const enriched = list.map((o) => ({
         ...o,
         cart: JSON.parse(o.cart),
-        waiterName: o.waiterId ? waiterMap.get(o.waiterId) ?? null : null,
+        waiterName: o.waiterId ? (waiterMap.get(o.waiterId) ?? null) : null,
       }));
       return res.json(enriched);
     } catch (err: any) {
@@ -699,21 +713,33 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id);
       const { pinCode, restaurantId } = req.body;
-      if (!pinCode || !restaurantId) return res.status(400).json({ message: "Missing fields" });
+      if (!pinCode || !restaurantId)
+        return res.status(400).json({ message: "Missing fields" });
 
       const order = await storage.getOrder(id);
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (order.restaurantId !== Number(restaurantId))
-        return res.status(403).json({ message: "Order does not belong to this restaurant" });
-      if (order.status !== "pending") return res.status(409).json({ message: "Order already taken" });
+        return res
+          .status(403)
+          .json({ message: "Order does not belong to this restaurant" });
+      if (order.status !== "pending")
+        return res.status(409).json({ message: "Order already taken" });
 
-      const waiter = await storage.getWaiterByPin(Number(restaurantId), pinCode);
+      const waiter = await storage.getWaiterByPin(
+        Number(restaurantId),
+        pinCode,
+      );
       if (!waiter) return res.status(401).json({ message: "Invalid PIN" });
 
       const updated = await storage.claimOrder(id, waiter.id);
-      if (!updated) return res.status(409).json({ message: "Order already taken" });
+      if (!updated)
+        return res.status(409).json({ message: "Order already taken" });
 
-      return res.json({ ...updated, cart: JSON.parse(updated.cart), waiterName: waiter.name });
+      return res.json({
+        ...updated,
+        cart: JSON.parse(updated.cart),
+        waiterName: waiter.name,
+      });
     } catch (err: any) {
       console.error("Claim order error:", err);
       res.status(500).json({ message: err.message });
@@ -740,7 +766,10 @@ export async function registerRoutes(
       const { pinCode, restaurantId } = req.body;
       if (!pinCode || !restaurantId)
         return res.status(400).json({ message: "Missing fields" });
-      const waiter = await storage.getWaiterByPin(Number(restaurantId), String(pinCode));
+      const waiter = await storage.getWaiterByPin(
+        Number(restaurantId),
+        String(pinCode),
+      );
       if (!waiter) return res.status(401).json({ message: "PIN i gabuar" });
       return res.json({ id: waiter.id, name: waiter.name });
     } catch (err: any) {
