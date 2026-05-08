@@ -74,7 +74,6 @@ interface TableSection {
   tables: number[];
 }
 
-// ─── Split Bill Types ──────────────────────────────────────────────────────────
 interface SplitPerson {
   name: string;
   colorIdx: number;
@@ -121,10 +120,13 @@ const SPLIT_COLORS = [
   },
 ];
 
+// FIX [1]: emptyTable always wipes waiter fields so payment fully resets the table
 const emptyTable = (): TableOrder => ({
   items: [],
   rounds: [],
   startedAt: null,
+  waiterId: undefined,
+  waiterName: undefined,
 });
 
 function parsePrice(price: string): number {
@@ -135,7 +137,6 @@ type ActiveSlot =
   | { kind: "table"; idx: number }
   | { kind: "person"; idx: number }
   | null;
-
 type Screen = "tables" | "menu" | "order";
 
 interface IncomingOrder {
@@ -174,8 +175,7 @@ function buildEscPosBytes({
   items: OrderItem[];
   payMethod?: "cash" | "card";
 }): Uint8Array {
-  // Use 32 cols for 58mm compatibility (works on 80mm too)
-  const COL = 32;
+  const COL = 42;
   const enc = new TextEncoder();
   const bytes: number[] = [];
 
@@ -183,37 +183,33 @@ function buildEscPosBytes({
   const text = (s: string) => bytes.push(...enc.encode(s));
   const lf = () => bytes.push(0x0a);
   const dashes = () => {
-    text("─".repeat ? "-".repeat(COL) : "-".repeat(COL));
+    text("-".repeat(COL));
     lf();
   };
   const center = (s: string) => {
     const pad = Math.max(0, Math.floor((COL - s.length) / 2));
-    text(" ".repeat(pad) + s.slice(0, COL));
+    text(" ".repeat(pad) + s);
     lf();
   };
   const cols = (left: string, right: string) => {
     const max = COL - right.length - 1;
-    const l = left.length > max ? left.slice(0, max - 1) + "." : left;
-    text(l + " ".repeat(Math.max(1, COL - l.length - right.length)) + right);
+    const l = left.length > max ? left.slice(0, max - 1) + "…" : left;
+    text(l + " ".repeat(COL - l.length - right.length) + right);
     lf();
   };
 
-  // Init + charset
   push(0x1b, 0x40);
-  push(0x1b, 0x74, 0x10); // PC737 or nearest
-
-  // ── Restaurant name: large + bold + centered
-  push(0x1b, 0x61, 0x01); // center
-  push(0x1b, 0x45, 0x01); // bold on
-  push(0x1d, 0x21, 0x11); // double width + height
-  text(restaurantName.slice(0, 16));
+  push(0x1b, 0x61, 0x01);
+  push(0x1b, 0x45, 0x01);
+  push(0x1d, 0x21, 0x01);
+  text(restaurantName);
   lf();
-  push(0x1d, 0x21, 0x00); // normal size
-  push(0x1b, 0x45, 0x00); // bold off
+  push(0x1d, 0x21, 0x00);
+  push(0x1b, 0x45, 0x00);
+  push(0x1b, 0x61, 0x00);
   lf();
+  dashes();
 
-  // ── Date / table
-  push(0x1b, 0x61, 0x00); // left
   const now = new Date();
   const dateStr = now.toLocaleDateString("sq-MK", {
     day: "2-digit",
@@ -224,67 +220,32 @@ function buildEscPosBytes({
     hour: "2-digit",
     minute: "2-digit",
   });
-  cols(`${dateStr} ${timeStr}`, tableLabel.slice(0, 10));
+  cols(`${dateStr}  ${timeStr}`, tableLabel);
   dashes();
 
-  // ── Items (normal size, bold name)
   for (const item of items) {
-    const price = `${item.price * item.qty} DEN`;
-    // qty prefix
-    const qty = `${item.qty}x `;
-    const maxName = COL - price.length - qty.length - 1;
-    const name =
-      item.name.length > maxName
-        ? item.name.slice(0, maxName - 1) + "."
-        : item.name;
-    push(0x1b, 0x45, 0x01); // bold
-    text(qty + name);
-    push(0x1b, 0x45, 0x00);
-    text(
-      " ".repeat(Math.max(1, COL - qty.length - name.length - price.length)) +
-        price,
-    );
-    lf();
+    const price = `${(item.price * item.qty).toFixed(0)} DEN`;
+    cols(`${item.qty}x ${item.name}`, price);
   }
-
   dashes();
 
-  // ── Total: large
-  push(0x1b, 0x61, 0x02); // right align
   push(0x1b, 0x45, 0x01);
-  push(0x1d, 0x21, 0x01); // double height
   const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-  text(`${total} DEN`);
-  lf();
-  push(0x1d, 0x21, 0x00);
+  cols("TOTAL", `${total.toFixed(0)} DEN`);
   push(0x1b, 0x45, 0x00);
 
-  // ── Payment method
-  push(0x1b, 0x61, 0x00); // left
   const methodLabel =
-    payMethod === "cash"
-      ? "[ KESH ]"
-      : payMethod === "card"
-        ? "[ KARTE ]"
-        : "[ PAGUAR ]";
-  push(0x1b, 0x45, 0x01);
+    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Karte" : "Paguar";
   text(methodLabel);
   lf();
-  push(0x1b, 0x45, 0x00);
-
   dashes();
 
-  // ── Footer centered
   push(0x1b, 0x61, 0x01);
-  text("Faleminderit!");
-  lf();
-  text("Hvala! / Thank you!");
+  text("Faleminderit! Hvala! Thank you!");
   lf();
   lf();
   lf();
   lf();
-
-  // Partial cut
   push(0x1d, 0x56, 0x42, 0x03);
 
   return new Uint8Array(bytes);
@@ -296,9 +257,7 @@ async function sendToUsbPrinter(
 ): Promise<void> {
   try {
     await device.open();
-  } catch {
-    /* already open */
-  }
+  } catch {}
   if (device.configuration === null) await device.selectConfiguration(1);
 
   let interfaceNum = -1;
@@ -316,9 +275,7 @@ async function sendToUsbPrinter(
   if (interfaceNum === -1) throw new Error("No bulk OUT endpoint found");
   try {
     await device.claimInterface(interfaceNum);
-  } catch {
-    /* already claimed */
-  }
+  } catch {}
   await device.transferOut(endpointNum, data);
 }
 
@@ -336,7 +293,7 @@ function printReceiptWindow({
   const win = window.open(
     "",
     "_blank",
-    "width=360,height=800,toolbar=0,scrollbars=0,status=0,menubar=0",
+    "width=340,height=700,toolbar=0,scrollbars=0,status=0,menubar=0",
   );
   if (!win) return;
 
@@ -352,18 +309,15 @@ function printReceiptWindow({
     minute: "2-digit",
   });
   const methodLabel =
-    payMethod === "cash" ? "KESH" : payMethod === "card" ? "KARTË" : "PAGUAR";
-  const methodIcon =
-    payMethod === "cash" ? "💵" : payMethod === "card" ? "💳" : "✓";
+    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
 
   const rows = items
     .map(
       (item) =>
         `<tr>
-          <td class="item-qty">${item.qty}×</td>
-          <td class="item-name">${item.name}</td>
-          <td class="item-price">${(item.price * item.qty).toFixed(0)}</td>
-        </tr>`,
+      <td style="padding:3px 0">${item.qty}x ${item.name}</td>
+      <td style="text-align:right;padding:3px 0;white-space:nowrap">${(item.price * item.qty).toFixed(0)} DEN</td>
+    </tr>`,
     )
     .join("");
 
@@ -371,180 +325,36 @@ function printReceiptWindow({
 <html>
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width"/>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    font-family: 'IBM Plex Mono', 'Courier New', monospace;
-    font-size: 15px;
-    line-height: 1.5;
-    color: #111;
-    background: #fff;
-    padding: 16px 14px 32px;
-    width: 80mm;
-    max-width: 100%;
-  }
-
-  /* ── Restaurant Name ── */
-  .restaurant {
-    font-family: 'IBM Plex Sans', sans-serif;
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    text-align: center;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #111;
-    margin-bottom: 10px;
-  }
-
-  /* ── Meta row ── */
-  .meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 12px;
-    color: #555;
-    margin-bottom: 4px;
-  }
-  .table-label {
-    font-size: 14px;
-    font-weight: 700;
-    color: #111;
-    background: #f0f0f0;
-    padding: 2px 8px;
-    border-radius: 4px;
-  }
-
-  /* ── Divider ── */
-  .div-solid { border: none; border-top: 1.5px solid #111; margin: 10px 0; }
-  .div-dashed { border: none; border-top: 1.5px dashed #999; margin: 10px 0; }
-
-  /* ── Items table ── */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 4px;
-  }
-  .item-qty {
-    width: 24px;
-    font-size: 13px;
-    color: #777;
-    vertical-align: top;
-    padding: 4px 6px 4px 0;
-    white-space: nowrap;
-  }
-  .item-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: #111;
-    padding: 4px 8px 4px 0;
-    vertical-align: top;
-  }
-  .item-price {
-    text-align: right;
-    font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-    vertical-align: top;
-    padding: 4px 0;
-  }
-  .item-price::after { content: " DEN"; font-size: 11px; font-weight: 400; color: #888; }
-
-  /* ── Total block ── */
-  .total-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 6px 0 2px;
-  }
-  .total-label {
-    font-family: 'IBM Plex Sans', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    color: #555;
-  }
-  .total-amount {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -1px;
-    color: #111;
-  }
-  .total-currency {
-    font-size: 14px;
-    font-weight: 400;
-    color: #888;
-    margin-left: 3px;
-  }
-
-  /* ── Payment method ── */
-  .pay-method {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 6px;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    padding: 4px 10px;
-    background: #111;
-    color: #fff;
-    border-radius: 20px;
-  }
-
-  /* ── Footer ── */
-  .footer {
-    margin-top: 16px;
-    text-align: center;
-    font-size: 12px;
-    color: #999;
-    letter-spacing: 0.3px;
-    line-height: 1.8;
-  }
-  .footer strong {
-    display: block;
-    font-size: 13px;
-    color: #555;
-    margin-bottom: 2px;
-  }
-
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Courier New', Courier, monospace; font-size: 13px; width: 80mm; padding: 10px 8px 20px; color: #000; background: #fff; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .name { font-size: 17px; font-weight: bold; letter-spacing: 1px; }
+  .dash { border: none; border-top: 1px dashed #000; margin: 7px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; }
+  .meta { display: flex; justify-content: space-between; font-size: 11px; color: #333; }
+  .total-row td { font-weight: bold; font-size: 15px; padding-top: 5px; border-top: 1px solid #000; }
+  .method { font-size: 11px; color: #444; padding-top: 2px; }
+  .footer { margin-top: 12px; font-size: 11px; text-align: center; color: #555; }
   @page { margin: 0; size: 80mm auto; }
-  @media print {
-    body { width: 80mm; padding: 10px 12px 24px; }
-    .restaurant { font-size: 20px; }
-  }
+  @media print { body { width: 80mm; } }
 </style>
 </head>
 <body>
-  <div class="restaurant">${restaurantName}</div>
-
-  <div class="meta">
-    <span>${dateStr} &nbsp; ${timeStr}</span>
-    <span class="table-label">${tableLabel}</span>
-  </div>
-
-  <hr class="div-dashed"/>
-
+  <div class="center name">${restaurantName}</div>
+  <div class="dash"></div>
+  <div class="meta"><span>${dateStr} &nbsp; ${timeStr}</span><span>${tableLabel}</span></div>
+  <div class="dash"></div>
   <table>${rows}</table>
-
-  <hr class="div-solid"/>
-
-  <div class="total-row">
-    <span class="total-label">TOTAL</span>
-    <span>
-      <span class="total-amount">${total.toFixed(0)}</span>
-      <span class="total-currency">DEN</span>
-    </span>
-  </div>
-  <hr class="div-dashed"/>
-
-  <div class="footer">
-    <strong>Faleminderit!</strong>
-    Hvala! &nbsp;•&nbsp; Thank you!
-  </div>
+  <div class="dash"></div>
+  <table>
+    <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${total.toFixed(0)} DEN</td></tr>
+    <tr><td class="method" colspan="2">${methodLabel}</td></tr>
+  </table>
+  <div class="dash"></div>
+  <div class="footer">Faleminderit! &nbsp;•&nbsp; Hvala! &nbsp;•&nbsp; Thank you!</div>
 </body>
 </html>`);
 
@@ -554,8 +364,9 @@ function printReceiptWindow({
     win.print();
     win.onafterprint = () => win.close();
     setTimeout(() => win.close(), 4000);
-  }, 500);
+  }, 350);
 }
+
 function playWaiterChime(type: WaiterSignal["type"]) {
   try {
     const ctx = new (window.AudioContext ||
@@ -603,7 +414,167 @@ function playWaiterChime(type: WaiterSignal["type"]) {
     setTimeout(() => ctx.close(), 1500);
   } catch {}
 }
+// ─── Radial Quick-Add Menu ───────────────────────────────────────────────────
+interface RadialMenuProps {
+  x: number;
+  y: number;
+  onSelect: (qty: number) => void;
+  onClose: () => void;
+  isLight: boolean;
+}
 
+function RadialMenu({ x, y, onSelect, onClose, isLight }: RadialMenuProps) {
+  const options = [1, 2, 3, 4];
+  const positions = [
+    { dx: 0, dy: -70 }, // top
+    { dx: -70, dy: 0 }, // left
+    { dx: 70, dy: 0 }, // right
+    { dx: 0, dy: 70 }, // bottom
+  ];
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-[200]"
+        style={{ backdropFilter: "blur(2px)" }}
+        onPointerMove={(e) => {
+          const dx = e.clientX - x;
+          const dy = e.clientY - y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 22) {
+            setHovered(null);
+            return;
+          }
+          let best = 0,
+            bestDist = 9999;
+          positions.forEach(({ dx: px, dy: py }, i) => {
+            const d = Math.sqrt(
+              (e.clientX - (x + px)) ** 2 + (e.clientY - (y + py)) ** 2,
+            );
+            if (d < bestDist) {
+              bestDist = d;
+              best = i;
+            }
+          });
+          setHovered(best);
+        }}
+        onPointerUp={() => {
+          if (hovered !== null) onSelect(options[hovered]);
+          else onClose();
+        }}
+        onPointerLeave={onClose}
+        onContextMenu={(e) => e.preventDefault()}
+      />
+
+      <div
+        className="fixed z-[201] pointer-events-none"
+        style={{ left: x, top: y }}
+      >
+        {/* connecting lines */}
+        <svg
+          className="absolute"
+          style={{
+            left: -80,
+            top: -80,
+            width: 160,
+            height: 160,
+            overflow: "visible",
+          }}
+        >
+          {positions.map(({ dx, dy }, i) => (
+            <line
+              key={i}
+              x1={80}
+              y1={80}
+              x2={80 + dx}
+              y2={80 + dy}
+              stroke={hovered === i ? "#f59e0b" : "rgba(245,158,11,0.15)"}
+              strokeWidth={hovered === i ? 2 : 1}
+              strokeDasharray={hovered === i ? "none" : "4 4"}
+              style={{ transition: "stroke 0.1s, stroke-width 0.1s" }}
+            />
+          ))}
+        </svg>
+
+        {/* center ring */}
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-400"
+          style={{
+            left: 0,
+            top: 0,
+            width: 36,
+            height: 36,
+            background: isLight
+              ? "rgba(255,255,255,0.9)"
+              : "rgba(15,15,15,0.9)",
+            boxShadow:
+              "0 0 0 4px rgba(245,158,11,0.15), 0 8px 32px rgba(0,0,0,0.4)",
+          }}
+        />
+
+        {/* option nodes */}
+        {options.map((qty, i) => {
+          const { dx, dy } = positions[i];
+          const active = hovered === i;
+          return (
+            <div
+              key={qty}
+              className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-2xl"
+              style={{
+                left: dx,
+                top: dy,
+                width: active ? 56 : 48,
+                height: active ? 56 : 48,
+                background: active
+                  ? "linear-gradient(135deg, #f59e0b, #b45309)"
+                  : isLight
+                    ? "rgba(255,255,255,0.97)"
+                    : "rgba(22,20,18,0.97)",
+                border: active
+                  ? "2px solid rgba(245,158,11,0.8)"
+                  : "1px solid rgba(245,158,11,0.25)",
+                boxShadow: active
+                  ? "0 8px 30px rgba(245,158,11,0.5), 0 0 0 3px rgba(245,158,11,0.15)"
+                  : "0 4px 20px rgba(0,0,0,0.35)",
+                transition: "all 0.12s cubic-bezier(0.34,1.56,0.64,1)",
+                backdropFilter: "blur(12px)",
+              }}
+            >
+              <div style={{ textAlign: "center", lineHeight: 1 }}>
+                <div
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: active ? 16 : 14,
+                    fontWeight: 700,
+                    color: active ? "#000" : isLight ? "#1a1a1a" : "#fff",
+                    transition: "all 0.12s",
+                  }}
+                >
+                  ×{qty}
+                </div>
+                {active && (
+                  <div
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      color: "rgba(0,0,0,0.5)",
+                      fontFamily: "'DM Sans', sans-serif",
+                      marginTop: 2,
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    ADD
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
 export default function POS({ slug }: POSProps) {
   const RESTAURANT_SLUG = slug;
   const TABLES_KEY = `pos-${slug}-tables-v3`;
@@ -676,36 +647,15 @@ export default function POS({ slug }: POSProps) {
   const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
 
-  const playChime = () => {
-    try {
-      const ctx = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.connect(g);
-      g.connect(ctx.destination);
-      o.frequency.setValueAtTime(880, ctx.currentTime);
-      o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
-      g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
-      o.start();
-      o.stop(ctx.currentTime + 0.55);
-    } catch {}
-  };
-
-  // ─── Orders Panel ─────────────────────────────────────────────────────────────
   const [showOrdersPanel, setShowOrdersPanel] = useState(false);
   const [claimTarget, setClaimTarget] = useState<number | null>(null);
   const [pinDigits, setPinDigits] = useState("");
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimError, setClaimError] = useState("");
 
-  // ─── Incoming Order Claim Modal ───────────────────────────────────────────────
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimModalOrder, setClaimModalOrder] = useState<any>(null);
 
-  // ─── Table PIN Modal ──────────────────────────────────────────────────────────
   const [showTablePinModal, setShowTablePinModal] = useState(false);
   const [tablePinSlot, setTablePinSlot] = useState<ActiveSlot>(null);
   const [tablePinDigits, setTablePinDigits] = useState("");
@@ -720,12 +670,8 @@ export default function POS({ slug }: POSProps) {
     queryKey: ["/api/admin/waiters", restaurantId],
     queryFn: async () => {
       if (!restaurantId) return [];
-      const token = localStorage.getItem("auth_token");
-      const headers: HeadersInit = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(
         `/api/admin/waiters?action=list&restaurantId=${restaurantId}`,
-        { headers, credentials: "include" },
       );
       if (!res.ok) return [];
       return res.json();
@@ -742,83 +688,12 @@ export default function POS({ slug }: POSProps) {
       return res.json();
     },
     enabled: !!restaurantId,
-    refetchInterval: 3000,
+    refetchInterval: 8000,
   });
 
   const pendingCount = dbOrders.filter(
     (o: any) => o.status === "pending",
   ).length;
-
-  // Track which DB order IDs have already been processed so polling never duplicates
-  const seenOrderIds = useRef<Set<number>>(new Set());
-  const initialOrderLoadDone = useRef(false);
-
-  useEffect(() => {
-    if (!initialOrderLoadDone.current) {
-      if (dbOrders.length === 0) return;
-      // First load: seed all existing orders as already seen — don't re-trigger them
-      dbOrders.forEach((o: any) => seenOrderIds.current.add(o.id));
-      initialOrderLoadDone.current = true;
-      return;
-    }
-
-    // Subsequent polls: find brand-new pending orders we haven't processed yet
-    const newPending = dbOrders.filter(
-      (o: any) => o.status === "pending" && !seenOrderIds.current.has(o.id),
-    );
-
-    newPending.forEach((order: any) => {
-      seenOrderIds.current.add(order.id);
-      const cart: OrderItem[] = Array.isArray(order.cart)
-        ? order.cart
-        : JSON.parse(order.cart);
-      const tableNum = Number(order.tableNumber);
-      const tableIdx = tableNum - 1;
-
-      // 1. Add items directly into the table
-      if (tableIdx >= 0 && tableIdx < tablesRef.current.length) {
-        setTables((prev) => {
-          const next = [...prev];
-          const existing = next[tableIdx];
-          const merged = [...existing.items];
-          cart.forEach((item) => {
-            const i = merged.findIndex((m) => m.id === item.id);
-            if (i >= 0)
-              merged[i] = { ...merged[i], qty: merged[i].qty + item.qty };
-            else merged.push({ ...item });
-          });
-          const prevRounds = existing.rounds ?? [];
-          next[tableIdx] = {
-            ...existing,
-            items: merged,
-            rounds: [...prevRounds, { items: cart, sentAt: Date.now() }],
-            startedAt: existing.startedAt ?? new Date(),
-          };
-          return next;
-        });
-        setTableFlash(tableIdx);
-        setTimeout(() => setTableFlash(null), 4000);
-      }
-
-      // 2. Show the incoming banner + claim popup
-      const roundNumber =
-        (tablesRef.current[tableIdx]?.rounds?.length ?? 0) + 1;
-      setIncomingBanner({
-        id: `${Date.now()}-${Math.random()}`,
-        tableNumber: tableNum,
-        cart,
-        timestamp: Date.now(),
-        roundNumber,
-      });
-      playChime();
-      if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
-      setTimeout(
-        () =>
-          setIncomingBanner((b) => (b?.tableNumber === tableNum ? null : b)),
-        12000,
-      );
-    });
-  }, [dbOrders]);
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -827,11 +702,9 @@ export default function POS({ slug }: POSProps) {
   const [mergeSource, setMergeSource] = useState<number | null>(null);
   const [selectedSection, setSelectedSection] = useState<string>("all");
 
-  // ─── Split Bill State ────────────────────────────────────────────────────────
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [splitTableIdx, setSplitTableIdx] = useState<number | null>(null);
   const [splitPersons, setSplitPersons] = useState<SplitPerson[]>([]);
-  // itemAssignments[i] = person index (or null = unassigned)
   const [itemAssignments, setItemAssignments] = useState<(number | null)[]>([]);
 
   const openSplitBill = (tableIdx: number) => {
@@ -884,6 +757,7 @@ export default function POS({ slug }: POSProps) {
   const unassignedTotal = (): number =>
     unassignedItems().reduce((s, { item }) => s + item.price * item.qty, 0);
 
+  // FIX [5]: markPaid calls emptyTable() which now also clears waiter fields
   const markPaid = (personIdx: number, method: "cash" | "card") => {
     if (splitTableIdx !== null) {
       const personItems = tables[splitTableIdx].items.filter(
@@ -905,6 +779,7 @@ export default function POS({ slug }: POSProps) {
       );
       const allPaid = next.every((p) => p.paid);
       if (allPaid && splitTableIdx !== null) {
+        // emptyTable() now resets waiterId/waiterName too
         setTables((t) => {
           const updated = [...t];
           updated[splitTableIdx] = emptyTable();
@@ -926,7 +801,6 @@ export default function POS({ slug }: POSProps) {
       return next;
     });
   };
-  // ───l��───────────────────────────────────────er�─────────────────────────────────
 
   const THEME_KEY = `pos-${slug}-theme`;
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -947,7 +821,12 @@ export default function POS({ slug }: POSProps) {
   const [printerStatus, setPrinterStatus] = useState<
     "idle" | "printing" | "error"
   >("idle");
-
+  const [radialMenu, setRadialMenu] = useState<{
+    item: MenuItem;
+    x: number;
+    y: number;
+  } | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!("usb" in navigator)) return;
     (navigator as any).usb
@@ -969,9 +848,8 @@ export default function POS({ slug }: POSProps) {
       });
       setUsbDevice(device);
     } catch (err: any) {
-      if (err.name !== "NotFoundError") {
+      if (err.name !== "NotFoundError")
         alert("Could not connect to printer. Try again.");
-      }
     }
   };
 
@@ -1097,6 +975,14 @@ export default function POS({ slug }: POSProps) {
       text: "text-[#1A1A1A]",
       time: "text-red-600",
     },
+    // FIX [6]: unclaimed = has items but no waiter assigned yet
+    unclaimed: {
+      bg: "bg-sky-50",
+      border: "border-sky-300",
+      dot: "bg-sky-500",
+      text: "text-[#1A1A1A]",
+      time: "text-sky-600",
+    },
   };
   const statusColorsDark = {
     empty: {
@@ -1127,10 +1013,28 @@ export default function POS({ slug }: POSProps) {
       text: "text-white",
       time: "text-red-400",
     },
+    // FIX [6]: unclaimed style — sky/cyan so it stands out on the grid
+    unclaimed: {
+      bg: "bg-sky-500/15",
+      border: "border-sky-400/50",
+      dot: "bg-sky-400",
+      text: "text-white",
+      time: "text-sky-400",
+    },
   };
   const dotColors = isLight
-    ? { fresh: "bg-emerald-500", mid: "bg-amber-500", late: "bg-red-500" }
-    : { fresh: "bg-emerald-400", mid: "bg-amber-400", late: "bg-red-400" };
+    ? {
+        fresh: "bg-emerald-500",
+        mid: "bg-amber-500",
+        late: "bg-red-500",
+        unclaimed: "bg-sky-500",
+      }
+    : {
+        fresh: "bg-emerald-400",
+        mid: "bg-amber-400",
+        late: "bg-red-400",
+        unclaimed: "bg-sky-400",
+      };
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -1210,11 +1114,8 @@ export default function POS({ slug }: POSProps) {
       const merged = [...target.items];
       source.items.forEach((sourceItem) => {
         const existing = merged.find((i) => i.id === sourceItem.id);
-        if (existing) {
-          existing.qty += sourceItem.qty;
-        } else {
-          merged.push({ ...sourceItem });
-        }
+        if (existing) existing.qty += sourceItem.qty;
+        else merged.push({ ...sourceItem });
       });
       next[targetIdx] = {
         ...target,
@@ -1236,9 +1137,7 @@ export default function POS({ slug }: POSProps) {
   };
 
   const visibleTables = useMemo(() => {
-    if (selectedSection === "all") {
-      return tables.map((_, idx) => idx);
-    }
+    if (selectedSection === "all") return tables.map((_, idx) => idx);
     const section = sections.find((s) => s.name === selectedSection);
     return section?.tables || [];
   }, [selectedSection, sections, tables]);
@@ -1248,16 +1147,14 @@ export default function POS({ slug }: POSProps) {
     const add = (order: TableOrder | PersonTab): TableOrder | PersonTab => {
       const items = [...order.items];
       const idx = items.findIndex((i) => i.id === item.id);
-      if (idx >= 0) {
-        items[idx] = { ...items[idx], qty: items[idx].qty + 1 };
-      } else {
+      if (idx >= 0) items[idx] = { ...items[idx], qty: items[idx].qty + 1 };
+      else
         items.push({
           id: item.id,
           name: item.name,
           price: parsePrice(item.price),
           qty: 1,
         });
-      }
       return { ...order, items, startedAt: order.startedAt ?? new Date() };
     };
     if (active.kind === "table") {
@@ -1302,6 +1199,7 @@ export default function POS({ slug }: POSProps) {
     }
   };
 
+  // FIX [4]: payOrder calls emptyTable() — waiter fields cleared automatically
   const payOrder = () => {
     if (!active) return;
     const slot = active;
@@ -1323,7 +1221,7 @@ export default function POS({ slug }: POSProps) {
     if (slot.kind === "table") {
       setTables((prev) => {
         const next = [...prev];
-        next[slot.idx] = emptyTable();
+        next[slot.idx] = emptyTable(); // clears items + waiter
         return next;
       });
       fetch("/api/table/cart-cleared", {
@@ -1348,8 +1246,13 @@ export default function POS({ slug }: POSProps) {
     setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // FIX [2]: openSlot — PIN gate only when table has NO waiter yet
   const openSlot = (slot: ActiveSlot) => {
-    if (slot?.kind === "table" && waiters.length > 0) {
+    if (
+      slot?.kind === "table" &&
+      waiters.length > 0 &&
+      !tables[slot.idx].waiterId // skip PIN if waiter already owns table
+    ) {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
@@ -1369,6 +1272,7 @@ export default function POS({ slug }: POSProps) {
     setShowClaimModal(true);
   };
 
+  // FIX [3]: confirmTablePin — navigate directly after success, never via openSlot
   const confirmTablePin = async () => {
     if (!tablePinSlot || tablePinSlot.kind !== "table") return;
     setTablePinLoading(true);
@@ -1387,12 +1291,14 @@ export default function POS({ slug }: POSProps) {
       const waiter: { id: number; name: string } = await res.json();
       const tableIdx = tablePinSlot.idx;
       const existingWaiterId = tables[tableIdx].waiterId;
-      const tableHasItems = tables[tableIdx].items.length > 0;
-      // Only block entry if the table has active items belonging to a different waiter
-      if (existingWaiterId && existingWaiterId !== waiter.id && tableHasItems) {
+
+      // Block only if a DIFFERENT waiter already owns this table
+      if (existingWaiterId && existingWaiterId !== waiter.id) {
         setTablePinError(`Kjo tryezë i takon ${tables[tableIdx].waiterName}`);
         return;
       }
+
+      // Assign waiter to table
       setTables((prev) => {
         const next = [...prev];
         next[tableIdx] = {
@@ -1403,6 +1309,9 @@ export default function POS({ slug }: POSProps) {
         return next;
       });
       setShowTablePinModal(false);
+      setTablePinDigits("");
+      setTablePinError("");
+      // Direct navigation — NOT openSlot() to avoid re-triggering PIN
       setActive(tablePinSlot);
       setScreen("menu");
       setActiveCategory("All");
@@ -1470,10 +1379,82 @@ export default function POS({ slug }: POSProps) {
     let pusher: Pusher | null = null;
     let cancelled = false;
 
-    const handleIncoming = () => {
-      // Trigger an immediate refetch — the polling useEffect handles
-      // adding items to the table and showing the claim banner.
+    const playChime = () => {
+      try {
+        const ctx = new (window.AudioContext ||
+          (window as any).webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.frequency.setValueAtTime(880, ctx.currentTime);
+        o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+        o.start();
+        o.stop(ctx.currentTime + 0.55);
+      } catch {}
+    };
+
+    // FIX [6]: QR orders land on the table immediately with NO waiter assigned.
+    // The table shows as "unclaimed" (sky color) until a waiter claims it.
+    const handleIncoming = (data: any) => {
+      const cart: OrderItem[] = data.cart || [];
+      const tableNumber = data.tableNumber;
+
       refetchOrders();
+      const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
+      const tableIdx = tableDigits - 1;
+
+      const existingRounds =
+        tableIdx >= 0 && tableIdx < TABLE_COUNT
+          ? (tablesRef.current[tableIdx]?.rounds ?? [])
+          : [];
+      const roundNumber = existingRounds.length + 1;
+
+      if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+        setTables((prev) => {
+          const next = [...prev];
+          const merged = [...next[tableIdx].items];
+          cart.forEach((it) => {
+            const ex = merged.find((m) => m.id === it.id);
+            if (ex) ex.qty += it.qty;
+            else merged.push({ ...it });
+          });
+          const prevRounds = next[tableIdx].rounds ?? [];
+          next[tableIdx] = {
+            items: merged,
+            rounds: [...prevRounds, { items: cart, sentAt: Date.now() }],
+            startedAt: next[tableIdx].startedAt ?? new Date(),
+            section: next[tableIdx].section,
+            // Preserve existing waiter assignment if table was already claimed,
+            // otherwise leave undefined so table shows as unclaimed
+            waiterId: next[tableIdx].waiterId,
+            waiterName: next[tableIdx].waiterName,
+          };
+          return next;
+        });
+        setTableFlash(tableIdx);
+        setTimeout(() => setTableFlash(null), 4000);
+      }
+
+      setIncomingBanner({
+        id: `${Date.now()}-${Math.random()}`,
+        tableNumber,
+        cart,
+        timestamp: data.timestamp || Date.now(),
+        roundNumber,
+      });
+      playChime();
+      if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
+      setTimeout(
+        () =>
+          setIncomingBanner((b) =>
+            b && b.tableNumber === tableNumber ? null : b,
+          ),
+        12000,
+      );
     };
 
     (async () => {
@@ -1517,9 +1498,23 @@ export default function POS({ slug }: POSProps) {
     };
   }, [RESTAURANT_SLUG, TABLE_COUNT]);
 
+  // FIX [6]: tableStatus now returns "unclaimed" when table has items but no waiter
   const tableStatus = (
-    o: TableOrder | PersonTab,
-  ): "empty" | "fresh" | "mid" | "late" => {
+    o: TableOrder,
+  ): "empty" | "unclaimed" | "fresh" | "mid" | "late" => {
+    if (!o.startedAt || o.items.length === 0) return "empty";
+    // Has items but no waiter claimed it yet — show as unclaimed (sky blue)
+    if (!o.waiterId) return "unclaimed";
+    const mins = Math.floor(
+      (Date.now() - new Date(o.startedAt).getTime()) / 60000,
+    );
+    if (mins < 15) return "fresh";
+    if (mins < 30) return "mid";
+    return "late";
+  };
+
+  // Person tabs don't have waiters so keep the original 4-state version
+  const personStatus = (o: PersonTab): "empty" | "fresh" | "mid" | "late" => {
     if (!o.startedAt || o.items.length === 0) return "empty";
     const mins = Math.floor(
       (Date.now() - new Date(o.startedAt).getTime()) / 60000,
@@ -1601,7 +1596,7 @@ export default function POS({ slug }: POSProps) {
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors relative ${t.backBtn}`}
         >
           <Printer
-            className={`h-4 w-4 lg:h-5 lg:w-5 ${printerStatus === "error" ? "text-red-400" : usbDevice ? "text-emerald-400" : t.textMuted.replace("text-", "text-")}`}
+            className={`h-4 w-4 lg:h-5 lg:w-5 ${printerStatus === "error" ? "text-red-400" : usbDevice ? "text-emerald-400" : ""}`}
           />
           {usbDevice && printerStatus === "idle" && (
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />
@@ -1724,6 +1719,9 @@ export default function POS({ slug }: POSProps) {
         {incomingBanner && (
           <motion.button
             key={incomingBanner.id}
+            // FIX [6]: banner tap — if waiters exist and order is pending, open claim modal.
+            // Otherwise navigate directly (openSlot now skips PIN for unclaimed tables
+            // since we want waiters to claim, not be blocked).
             onClick={() => {
               const tableNum = parseInt(
                 String(incomingBanner.tableNumber).replace(/\D/g, ""),
@@ -1824,11 +1822,7 @@ export default function POS({ slug }: POSProps) {
             <div className="flex gap-2 overflow-x-auto pb-1">
               <button
                 onClick={() => setSelectedSection("all")}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                  selectedSection === "all"
-                    ? "bg-amber-500 text-black"
-                    : t.chipInactive
-                }`}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${selectedSection === "all" ? "bg-amber-500 text-black" : t.chipInactive}`}
               >
                 All Sections
               </button>
@@ -1836,11 +1830,7 @@ export default function POS({ slug }: POSProps) {
                 <button
                   key={section.name}
                   onClick={() => setSelectedSection(section.name)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    selectedSection === section.name
-                      ? "bg-amber-500 text-black"
-                      : t.chipInactive
-                  }`}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${selectedSection === section.name ? "bg-amber-500 text-black" : t.chipInactive}`}
                 >
                   {section.name} ({section.tables.length})
                 </button>
@@ -1905,6 +1895,12 @@ export default function POS({ slug }: POSProps) {
                           )}
                           {table.items.length > 0 && (
                             <>
+                              {/* FIX [6]: Show "?" badge if unclaimed (no waiter yet) */}
+                              {status === "unclaimed" && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500/30 text-sky-400">
+                                  MERR
+                                </span>
+                              )}
                               <span
                                 className={`text-[10px] font-bold font-['DM_Mono'] ${c.time}`}
                               >
@@ -1979,7 +1975,7 @@ export default function POS({ slug }: POSProps) {
               ) : (
                 <div className="space-y-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:space-y-0">
                   {personTabs.map((person, idx) => {
-                    const status = tableStatus(person);
+                    const status = personStatus(person);
                     const c = statusColors[status];
                     const wasJustPaid =
                       justPaid?.kind === "person" && justPaid.idx === idx;
@@ -1989,11 +1985,7 @@ export default function POS({ slug }: POSProps) {
                         key={idx}
                         onClick={() => openSlot({ kind: "person", idx })}
                         whileTap={{ scale: 0.98 }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border relative transition-all duration-500 ${
-                          wasJustPaid
-                            ? "bg-emerald-500/20 border-emerald-500/40"
-                            : `${c.bg} ${c.border}`
-                        }`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border relative transition-all duration-500 ${wasJustPaid ? "bg-emerald-500/20 border-emerald-500/40" : `${c.bg} ${c.border}`}`}
                       >
                         {wasJustPaid ? (
                           <>
@@ -2005,14 +1997,10 @@ export default function POS({ slug }: POSProps) {
                         ) : (
                           <>
                             <div
-                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                occupied ? "bg-amber-500/20" : t.surfaceSoft
-                              }`}
+                              className={`h-8 w-8 rounded-xl flex items-center justify-center flex-shrink-0 ${occupied ? "bg-amber-500/20" : t.surfaceSoft}`}
                             >
                               <User
-                                className={`h-4 w-4 ${
-                                  occupied ? "text-amber-400" : t.textDim
-                                }`}
+                                className={`h-4 w-4 ${occupied ? "text-amber-400" : t.textDim}`}
                               />
                             </div>
                             <div className="flex-1 min-w-0 text-left">
@@ -2070,11 +2058,12 @@ export default function POS({ slug }: POSProps) {
             </div>
 
             {/* Status legend */}
-            <div className="flex items-center gap-4 px-1">
+            <div className="flex items-center gap-4 px-1 flex-wrap">
               {[
                 { dot: dotColors.fresh, label: "< 15min" },
                 { dot: dotColors.mid, label: "15–30min" },
                 { dot: dotColors.late, label: "30min+" },
+                { dot: dotColors.unclaimed, label: "Unclaimed" },
               ].map(({ dot, label }) => (
                 <div key={label} className="flex items-center gap-1.5">
                   <div className={`h-2 w-2 rounded-full ${dot}`} />
@@ -2141,9 +2130,7 @@ export default function POS({ slug }: POSProps) {
             >
               {/* MENU PANEL */}
               <div
-                className={`flex-1 flex-col overflow-hidden ${
-                  screen === "order" ? "hidden lg:flex" : "flex"
-                }`}
+                className={`flex-1 flex-col overflow-hidden ${screen === "order" ? "hidden lg:flex" : "flex"}`}
               >
                 <div
                   className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b ${t.borderSoft}`}
@@ -2152,17 +2139,12 @@ export default function POS({ slug }: POSProps) {
                     <button
                       key={cat}
                       onClick={() => setActiveCategory(cat)}
-                      className={`flex-shrink-0 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-semibold transition-all ${
-                        activeCategory === cat
-                          ? "bg-amber-500 text-black"
-                          : t.chipInactive
-                      }`}
+                      className={`flex-shrink-0 px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-xs lg:text-sm font-semibold transition-all ${activeCategory === cat ? "bg-amber-500 text-black" : t.chipInactive}`}
                     >
                       {cat}
                     </button>
                   ))}
                 </div>
-
                 <div className="flex-1 overflow-y-auto p-3 lg:p-5">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-40">
@@ -2186,9 +2168,36 @@ export default function POS({ slug }: POSProps) {
                         return (
                           <motion.button
                             key={item.id}
-                            onClick={() => addItem(item)}
+                            onPointerDown={(e) => {
+                              const rect = (
+                                e.currentTarget as HTMLElement
+                              ).getBoundingClientRect();
+                              longPressTimer.current = setTimeout(() => {
+                                if (navigator.vibrate) navigator.vibrate(40);
+                                setRadialMenu({
+                                  item,
+                                  x: rect.left + rect.width / 2,
+                                  y: rect.top + rect.height / 2,
+                                });
+                              }, 400);
+                            }}
+                            onPointerUp={() => {
+                              if (longPressTimer.current) {
+                                clearTimeout(longPressTimer.current);
+                                // short tap = add ×1 as before (only if no radial showing)
+                                if (!radialMenu) addItem(item);
+                                longPressTimer.current = null;
+                              }
+                            }}
+                            onPointerLeave={() => {
+                              if (longPressTimer.current) {
+                                clearTimeout(longPressTimer.current);
+                                longPressTimer.current = null;
+                              }
+                            }}
+                            onContextMenu={(e) => e.preventDefault()}
                             whileTap={{ scale: 0.95 }}
-                            className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all ${
+                            className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all select-none ${
                               inCart
                                 ? "bg-amber-500/15 border-amber-500/50"
                                 : t.cartItemInactive
@@ -2217,6 +2226,12 @@ export default function POS({ slug }: POSProps) {
                                 DEN
                               </span>
                             </p>
+                            {/* long-press hint dot */}
+                            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-0.5 opacity-20">
+                              <div className="h-0.5 w-0.5 rounded-full bg-current" />
+                              <div className="h-0.5 w-0.5 rounded-full bg-current" />
+                              <div className="h-0.5 w-0.5 rounded-full bg-current" />
+                            </div>
                           </motion.button>
                         );
                       })}
@@ -2227,11 +2242,7 @@ export default function POS({ slug }: POSProps) {
 
               {/* ORDER PANEL */}
               <div
-                className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${
-                  screen === "menu"
-                    ? "hidden lg:flex"
-                    : "flex flex-1 lg:flex-none"
-                }`}
+                className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
               >
                 <div
                   className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}
@@ -2266,11 +2277,7 @@ export default function POS({ slug }: POSProps) {
                       const itemCard = (item: OrderItem, isNew: boolean) => (
                         <div
                           key={item.id}
-                          className={`flex items-center gap-3 p-3 rounded-xl border mb-2 transition-colors ${
-                            isNew
-                              ? "bg-amber-500/5 border-amber-500/25"
-                              : `${t.surface} ${t.border}`
-                          }`}
+                          className={`flex items-center gap-3 p-3 rounded-xl border mb-2 transition-colors ${isNew ? "bg-amber-500/5 border-amber-500/25" : `${t.surface} ${t.border}`}`}
                         >
                           {isNew && (
                             <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
@@ -2324,13 +2331,12 @@ export default function POS({ slug }: POSProps) {
                         );
                       }
 
-                      // Group merged items by the first round they appear in
                       const itemFirstRound = (id: number): number => {
                         for (let i = 0; i < rounds.length; i++) {
                           if (rounds[i].items.some((ri) => ri.id === id))
                             return i;
                         }
-                        return -1; // manually added via POS
+                        return -1;
                       };
 
                       const groups = new Map<number, OrderItem[]>();
@@ -2343,11 +2349,9 @@ export default function POS({ slug }: POSProps) {
 
                       return (
                         <>
-                          {/* Items added manually by staff (not from any customer round) */}
                           {(groups.get(-1) ?? []).map((item) =>
                             itemCard(item, false),
                           )}
-
                           {rounds.map((round, rIdx) => {
                             const items = groups.get(rIdx) ?? [];
                             if (items.length === 0) return null;
@@ -2360,17 +2364,12 @@ export default function POS({ slug }: POSProps) {
                             });
                             return (
                               <div key={rIdx}>
-                                {/* Round divider */}
                                 <div className="flex items-center gap-2 py-2 px-0.5 mb-1">
                                   <div
                                     className={`h-px flex-1 ${t.borderSoft}`}
                                   />
                                   <span
-                                    className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
-                                      isNew
-                                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                        : `${t.surfaceSoft} ${t.textDim}`
-                                    }`}
+                                    className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${isNew ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : `${t.surfaceSoft} ${t.textDim}`}`}
                                     style={{
                                       fontFamily: "'DM Mono', monospace",
                                     }}
@@ -2395,8 +2394,6 @@ export default function POS({ slug }: POSProps) {
                                     className={`h-px flex-1 ${t.borderSoft}`}
                                   />
                                 </div>
-
-                                {/* Items for this round */}
                                 {items.map((item) => itemCard(item, isNew))}
                               </div>
                             );
@@ -2456,7 +2453,6 @@ export default function POS({ slug }: POSProps) {
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2">
-                        {/* Split Bill button — only for tables */}
                         {active?.kind === "table" && (
                           <button
                             onClick={() => openSplitBill(active.idx)}
@@ -2482,11 +2478,9 @@ export default function POS({ slug }: POSProps) {
           )}
       </AnimatePresence>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          MODALS
-      ═══════════════════════════════════════════════════════════════════════ */}
+      {/* ═══════════════════════════ MODALS ════════════════════ p�══════ */}
 
-      {/* ── Split Bill Modal ─────────────────────────────────────────────────── */}
+      {/* Split Bill Modal */}
       <AnimatePresence>
         {showSplitModal &&
           splitTableIdx !== null &&
@@ -2496,7 +2490,6 @@ export default function POS({ slug }: POSProps) {
               splitPersons.length > 0 && splitPersons.every((p) => p.paid);
             const unassigned = unassignedItems();
             const totalUnassigned = unassignedTotal();
-
             return (
               <>
                 <motion.div
@@ -2513,7 +2506,6 @@ export default function POS({ slug }: POSProps) {
                   transition={{ duration: 0.2 }}
                   className={`fixed left-3 right-3 top-14 bottom-4 z-50 ${t.modalBg} rounded-3xl border ${t.border} shadow-2xl flex flex-col overflow-hidden`}
                 >
-                  {/* Header */}
                   <div
                     className={`flex-shrink-0 flex items-center justify-between px-5 py-4 border-b ${t.border}`}
                   >
@@ -2546,10 +2538,7 @@ export default function POS({ slug }: POSProps) {
                       </button>
                     </div>
                   </div>
-
-                  {/* Body: two columns */}
                   <div className="flex-1 flex overflow-hidden min-h-0">
-                    {/* LEFT — item list with person assignment */}
                     <div
                       className={`flex-1 overflow-y-auto p-4 space-y-2 border-r ${t.border}`}
                     >
@@ -2571,13 +2560,8 @@ export default function POS({ slug }: POSProps) {
                         return (
                           <div
                             key={`${item.id}-${itemIdx}`}
-                            className={`rounded-xl border p-3 transition-all ${
-                              pc
-                                ? `${pc.bg} ${pc.border}`
-                                : `${t.surface} ${t.border}`
-                            }`}
+                            className={`rounded-xl border p-3 transition-all ${pc ? `${pc.bg} ${pc.border}` : `${t.surface} ${t.border}`}`}
                           >
-                            {/* Item info row */}
                             <div className="flex items-center justify-between mb-2.5">
                               <div className="min-w-0 flex-1">
                                 <p
@@ -2604,17 +2588,10 @@ export default function POS({ slug }: POSProps) {
                                 </div>
                               )}
                             </div>
-
-                            {/* Person chip row */}
                             <div className="flex flex-wrap gap-1.5">
-                              {/* Unassign chip */}
                               <button
                                 onClick={() => assignItem(itemIdx, null)}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                                  assignedPerson === null
-                                    ? "bg-amber-500 text-black"
-                                    : `${t.surfaceSoft} ${t.textMuted} hover:${t.surfaceHover}`
-                                }`}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${assignedPerson === null ? "bg-amber-500 text-black" : `${t.surfaceSoft} ${t.textMuted}`}`}
                               >
                                 —
                               </button>
@@ -2628,11 +2605,7 @@ export default function POS({ slug }: POSProps) {
                                   <button
                                     key={pIdx}
                                     onClick={() => assignItem(itemIdx, pIdx)}
-                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border ${
-                                      isSelected
-                                        ? `${pColor.bg} ${pColor.border} ${pColor.text}`
-                                        : `${t.surfaceSoft} ${t.border} ${t.textMuted}`
-                                    }`}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all border ${isSelected ? `${pColor.bg} ${pColor.border} ${pColor.text}` : `${t.surfaceSoft} ${t.border} ${t.textMuted}`}`}
                                   >
                                     {person.name}
                                   </button>
@@ -2642,8 +2615,6 @@ export default function POS({ slug }: POSProps) {
                           </div>
                         );
                       })}
-
-                      {/* Unassigned total warning */}
                       {totalUnassigned > 0 && (
                         <div
                           className={`rounded-xl border border-dashed ${t.borderDashed} p-3 text-center`}
@@ -2659,8 +2630,6 @@ export default function POS({ slug }: POSProps) {
                         </div>
                       )}
                     </div>
-
-                    {/* RIGHT — persons + pay */}
                     <div className="w-48 lg:w-56 flex-shrink-0 overflow-y-auto p-3 space-y-2">
                       <p
                         className={`text-[10px] ${t.textFaint} mb-3`}
@@ -2668,7 +2637,6 @@ export default function POS({ slug }: POSProps) {
                       >
                         CHECKOUT
                       </p>
-
                       {splitPersons.map((person, pIdx) => {
                         const pc =
                           SPLIT_COLORS[person.colorIdx % SPLIT_COLORS.length];
@@ -2676,13 +2644,8 @@ export default function POS({ slug }: POSProps) {
                         return (
                           <div
                             key={pIdx}
-                            className={`rounded-xl border p-3 transition-all ${
-                              person.paid
-                                ? "bg-emerald-500/15 border-emerald-500/40"
-                                : `${pc.bg} ${pc.border}`
-                            }`}
+                            className={`rounded-xl border p-3 transition-all ${person.paid ? "bg-emerald-500/15 border-emerald-500/40" : `${pc.bg} ${pc.border}`}`}
                           >
-                            {/* Person label */}
                             <div className="flex items-center gap-2 mb-2">
                               <div
                                 className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${pc.dot}`}
@@ -2695,12 +2658,8 @@ export default function POS({ slug }: POSProps) {
                                 {person.name}
                               </p>
                             </div>
-
-                            {/* Amount */}
                             <p
-                              className={`text-lg font-bold mb-2 ${
-                                person.paid ? "text-emerald-400" : t.text
-                              }`}
+                              className={`text-lg font-bold mb-2 ${person.paid ? "text-emerald-400" : t.text}`}
                               style={{ fontFamily: "'DM Mono', monospace" }}
                             >
                               {total}{" "}
@@ -2710,8 +2669,6 @@ export default function POS({ slug }: POSProps) {
                                 DEN
                               </span>
                             </p>
-
-                            {/* Pay buttons or paid state */}
                             {person.paid ? (
                               <div className="flex items-center gap-1.5 text-emerald-400">
                                 <CheckCircle className="h-3.5 w-3.5" />
@@ -2744,8 +2701,6 @@ export default function POS({ slug }: POSProps) {
                           </div>
                         );
                       })}
-
-                      {/* All paid banner */}
                       {allPersonsPaid && (
                         <div className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 p-3 text-center">
                           <CheckCircle className="h-5 w-5 text-emerald-400 mx-auto mb-1" />
@@ -2765,7 +2720,7 @@ export default function POS({ slug }: POSProps) {
           })()}
       </AnimatePresence>
 
-      {/* ── Transfer Modal ───────────────────────────────────────────────────── */}
+      {/* Transfer Modal */}
       <AnimatePresence>
         {showTransferModal && (
           <>
@@ -2812,13 +2767,7 @@ export default function POS({ slug }: POSProps) {
                           handleTransfer(transferSource, idx);
                         }
                       }}
-                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${
-                        isSource
-                          ? "bg-blue-500/20 border-blue-500/50"
-                          : !canSelect
-                            ? `${t.surface} ${t.border} opacity-30`
-                            : `${t.surface} ${t.border} hover:bg-blue-500/10`
-                      }`}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${isSource ? "bg-blue-500/20 border-blue-500/50" : !canSelect ? `${t.surface} ${t.border} opacity-30` : `${t.surface} ${t.border} hover:bg-blue-500/10`}`}
                     >
                       <span className="text-sm font-bold">T{idx + 1}</span>
                       {hasItems && (
@@ -2844,7 +2793,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* ── Merge Modal ──────────────────────────────────────────────────────── */}
+      {/* Merge Modal */}
       <AnimatePresence>
         {showMergeModal && (
           <>
@@ -2891,13 +2840,7 @@ export default function POS({ slug }: POSProps) {
                           handleMerge(mergeSource, idx);
                         }
                       }}
-                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${
-                        isSource
-                          ? "bg-purple-500/20 border-purple-500/50"
-                          : !canSelect
-                            ? `${t.surface} ${t.border} opacity-30`
-                            : `${t.surface} ${t.border} hover:bg-purple-500/10`
-                      }`}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${isSource ? "bg-purple-500/20 border-purple-500/50" : !canSelect ? `${t.surface} ${t.border} opacity-30` : `${t.surface} ${t.border} hover:bg-purple-500/10`}`}
                     >
                       <span className="text-sm font-bold">T{idx + 1}</span>
                       {hasItems && (
@@ -2923,7 +2866,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* ── Sections Manager Modal ───────────────────────────────────────────── */}
+      {/* Sections Manager Modal */}
       <AnimatePresence>
         {showSectionsModal && (
           <>
@@ -2948,8 +2891,6 @@ export default function POS({ slug }: POSProps) {
               <p className={`text-xs ${t.textDim} mb-4`}>
                 Select a section, then tap tables to assign them
               </p>
-
-              {/* Section tabs */}
               <div className="flex gap-2 mb-4">
                 {draftSections.map((section) => (
                   <button
@@ -2972,8 +2913,6 @@ export default function POS({ slug }: POSProps) {
                   </button>
                 ))}
               </div>
-
-              {/* Table grid */}
               <div className="grid grid-cols-5 gap-2 mb-5">
                 {Array.from({ length: TABLE_COUNT }, (_, idx) => {
                   const ownerSection = draftSections.find((s) =>
@@ -2983,21 +2922,18 @@ export default function POS({ slug }: POSProps) {
                     ownerSection?.name === activeDraftSection;
                   const isAssignedElsewhere =
                     ownerSection && ownerSection.name !== activeDraftSection;
-
                   const sectionColor =
                     activeDraftSection === "Indoor"
                       ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
                       : activeDraftSection === "Outdoor"
                         ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
                         : "bg-purple-500/20 border-purple-500/50 text-purple-400";
-
                   const elseColor =
                     ownerSection?.name === "Indoor"
                       ? "border-blue-500/30 text-blue-400/50"
                       : ownerSection?.name === "Outdoor"
                         ? "border-emerald-500/30 text-emerald-400/50"
                         : "border-purple-500/30 text-purple-400/50";
-
                   return (
                     <button
                       key={idx}
@@ -3028,13 +2964,7 @@ export default function POS({ slug }: POSProps) {
                           }),
                         );
                       }}
-                      className={`aspect-square rounded-xl flex flex-col items-center justify-center border transition-all text-xs font-bold ${
-                        isAssignedHere
-                          ? sectionColor
-                          : isAssignedElsewhere
-                            ? `${t.surface} ${elseColor} opacity-50`
-                            : `${t.surface} ${t.border} ${t.textMuted}`
-                      }`}
+                      className={`aspect-square rounded-xl flex flex-col items-center justify-center border transition-all text-xs font-bold ${isAssignedHere ? sectionColor : isAssignedElsewhere ? `${t.surface} ${elseColor} opacity-50` : `${t.surface} ${t.border} ${t.textMuted}`}`}
                     >
                       T{idx + 1}
                       {isAssignedElsewhere && (
@@ -3046,19 +2976,11 @@ export default function POS({ slug }: POSProps) {
                   );
                 })}
               </div>
-
-              {/* Legend */}
               <div className="flex gap-3 mb-5 flex-wrap">
                 {draftSections.map((s) => (
                   <div key={s.name} className="flex items-center gap-1.5">
                     <div
-                      className={`h-2 w-2 rounded-full ${
-                        s.name === "Indoor"
-                          ? "bg-blue-400"
-                          : s.name === "Outdoor"
-                            ? "bg-emerald-400"
-                            : "bg-purple-400"
-                      }`}
+                      className={`h-2 w-2 rounded-full ${s.name === "Indoor" ? "bg-blue-400" : s.name === "Outdoor" ? "bg-emerald-400" : "bg-purple-400"}`}
                     />
                     <span
                       className={`text-[10px] ${t.textDim}`}
@@ -3085,8 +3007,6 @@ export default function POS({ slug }: POSProps) {
                   </span>
                 </div>
               </div>
-
-              {/* Footer */}
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSectionsModal(false)}
@@ -3109,7 +3029,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* ── New Person Modal ─────────────────────────────────────────────────── */}
+      {/* New Person Modal */}
       <AnimatePresence>
         {showNewPerson && (
           <>
@@ -3170,7 +3090,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* ── Table Waiter PIN Modal ───────────────────────────────────────────── */}
+      {/* Table Waiter PIN Modal */}
       <AnimatePresence>
         {showTablePinModal && tablePinSlot?.kind === "table" && (
           <>
@@ -3253,7 +3173,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* ─── Incoming Order Claim Modal (full-screen numpad) ─────────────── */}
+      {/* Incoming Order Claim Modal (full-screen numpad) */}
       <AnimatePresence>
         {showClaimModal &&
           claimModalOrder &&
@@ -3264,7 +3184,6 @@ export default function POS({ slug }: POSProps) {
               0,
             );
             const tableNum = Number(order.tableNumber);
-
             const numpadKeys = [
               "1",
               "2",
@@ -3290,6 +3209,7 @@ export default function POS({ slug }: POSProps) {
               }
             };
 
+            // FIX [7]: After claim success, assign waiter to table locally and navigate directly
             const handleConfirmClaim = async () => {
               if (pinDigits.length !== 3 || claimLoading) return;
               setClaimLoading(true);
@@ -3303,48 +3223,27 @@ export default function POS({ slug }: POSProps) {
                 if (res.ok) {
                   const claimed = await res.json();
                   const tableIdx = tableNum - 1;
+
+                  // Assign waiter to local table state
                   if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
-                    // Add the claimed order items into the table AND assign the waiter
-                    const incomingItems: OrderItem[] = (claimed.cart ?? []).map(
-                      (ci: any) => ({
-                        id: ci.id,
-                        name: ci.name,
-                        price: ci.price,
-                        qty: ci.qty,
-                      }),
-                    );
                     setTables((prev) => {
                       const next = [...prev];
-                      const existing = next[tableIdx];
-                      // Merge incoming items into existing table items
-                      const merged = [...existing.items];
-                      incomingItems.forEach((incoming) => {
-                        const idx = merged.findIndex(
-                          (i) => i.id === incoming.id,
-                        );
-                        if (idx >= 0)
-                          merged[idx] = {
-                            ...merged[idx],
-                            qty: merged[idx].qty + incoming.qty,
-                          };
-                        else merged.push({ ...incoming });
-                      });
                       next[tableIdx] = {
-                        ...existing,
-                        items: merged,
-                        startedAt: existing.startedAt ?? new Date(),
+                        ...next[tableIdx],
                         waiterId: claimed.waiterId,
                         waiterName: claimed.waiterName,
                       };
                       return next;
                     });
                   }
+
                   setShowClaimModal(false);
                   setClaimModalOrder(null);
                   setClaimTarget(null);
                   setPinDigits("");
                   refetchOrders();
-                  // Navigate directly to the table — waiter already proved identity via claim PIN
+
+                  // Navigate directly — PIN already verified, skip openSlot()
                   if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
                     setActive({ kind: "table", idx: tableIdx });
                     setScreen("menu");
@@ -3386,7 +3285,6 @@ export default function POS({ slug }: POSProps) {
                       "max(20px, env(safe-area-inset-bottom, 20px))",
                   }}
                 >
-                  {/* Header */}
                   <div
                     className={`flex items-center justify-between px-5 py-4 border-b ${t.border}`}
                   >
@@ -3418,8 +3316,6 @@ export default function POS({ slug }: POSProps) {
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-
-                  {/* Order items summary */}
                   <div
                     className={`mx-4 mt-3 rounded-2xl ${t.surface} border ${t.border} px-4 py-3 max-h-28 overflow-y-auto`}
                   >
@@ -3437,8 +3333,6 @@ export default function POS({ slug }: POSProps) {
                       </div>
                     ))}
                   </div>
-
-                  {/* PIN display */}
                   <div className="px-5 pt-4 pb-2">
                     <p
                       className={`text-[10px] font-bold ${t.textDim} mb-2 text-center`}
@@ -3450,11 +3344,7 @@ export default function POS({ slug }: POSProps) {
                       {[0, 1, 2].map((i) => (
                         <div
                           key={i}
-                          className={`h-12 w-12 rounded-2xl border-2 flex items-center justify-center text-xl font-bold transition-all ${
-                            pinDigits.length > i
-                              ? "border-amber-500 bg-amber-500/15 text-amber-400"
-                              : `${t.border} ${t.surface} ${t.textFaint}`
-                          }`}
+                          className={`h-12 w-12 rounded-2xl border-2 flex items-center justify-center text-xl font-bold transition-all ${pinDigits.length > i ? "border-amber-500 bg-amber-500/15 text-amber-400" : `${t.border} ${t.surface} ${t.textFaint}`}`}
                         >
                           {pinDigits.length > i ? "●" : ""}
                         </div>
@@ -3470,21 +3360,13 @@ export default function POS({ slug }: POSProps) {
                       </motion.p>
                     )}
                   </div>
-
-                  {/* Numpad */}
                   <div className="grid grid-cols-3 gap-2 px-5 pb-1">
                     {numpadKeys.map((key, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleNumpad(key)}
                         disabled={key === ""}
-                        className={`h-14 rounded-2xl text-xl font-bold transition-all select-none ${
-                          key === ""
-                            ? "opacity-0 pointer-events-none"
-                            : key === "⌫"
-                              ? `${t.surfaceSoft} ${t.textMuted} active:scale-95`
-                              : `${t.surface} ${t.text} active:bg-amber-500/20 active:scale-95 hover:${t.surfaceSoft}`
-                        }`}
+                        className={`h-14 rounded-2xl text-xl font-bold transition-all select-none ${key === "" ? "opacity-0 pointer-events-none" : key === "⌫" ? `${t.surfaceSoft} ${t.textMuted} active:scale-95` : `${t.surface} ${t.text} active:bg-amber-500/20 active:scale-95`}`}
                         style={{
                           fontFamily:
                             key === "⌫" ? "system-ui" : "'DM Mono', monospace",
@@ -3494,8 +3376,6 @@ export default function POS({ slug }: POSProps) {
                       </button>
                     ))}
                   </div>
-
-                  {/* Confirm button */}
                   <div className="px-5 pt-2">
                     <button
                       onClick={handleConfirmClaim}
@@ -3528,7 +3408,7 @@ export default function POS({ slug }: POSProps) {
           })()}
       </AnimatePresence>
 
-      {/* ─── Orders Panel ───────────────────────────────────────────────────── */}
+      {/* Orders Panel */}
       <AnimatePresence>
         {showOrdersPanel && (
           <>
@@ -3552,7 +3432,6 @@ export default function POS({ slug }: POSProps) {
               className="absolute inset-y-0 right-0 z-50 w-full max-w-sm flex flex-col"
               style={{ background: isLight ? "#fff" : "#1c1917" }}
             >
-              {/* Header */}
               <div
                 className="flex items-center justify-between px-5 py-4 border-b"
                 style={{ borderColor: isLight ? "#e5e7eb" : "#292524" }}
@@ -3579,8 +3458,6 @@ export default function POS({ slug }: POSProps) {
                   <X className="h-4 w-4" />
                 </button>
               </div>
-
-              {/* List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {dbOrders.length === 0 && (
                   <div className={`text-center py-12 ${t.textMuted} text-sm`}>
@@ -3588,6 +3465,7 @@ export default function POS({ slug }: POSProps) {
                   </div>
                 )}
                 {[...dbOrders]
+                  .filter((o: any) => o.status !== "completed")
                   .sort(
                     (a: any, b: any) =>
                       new Date(b.createdAt).getTime() -
@@ -3613,7 +3491,6 @@ export default function POS({ slug }: POSProps) {
                               label: "Kryer",
                               color: "bg-emerald-500/20 text-emerald-400",
                             };
-
                     return (
                       <div
                         key={order.id}
@@ -3642,7 +3519,6 @@ export default function POS({ slug }: POSProps) {
                             {statusCfg.label}
                           </span>
                         </div>
-
                         <div className="space-y-1">
                           {order.cart.map((item: any, idx: number) => (
                             <div
@@ -3665,7 +3541,7 @@ export default function POS({ slug }: POSProps) {
                           </div>
                         </div>
 
-                        {/* Actions */}
+                        {/* FIX [8]: Orders Panel claim — navigate directly after success */}
                         {order.status === "pending" &&
                           (claimTarget === order.id ? (
                             <div className="space-y-2">
@@ -3726,9 +3602,43 @@ export default function POS({ slug }: POSProps) {
                                         },
                                       );
                                       if (res.ok) {
+                                        const claimed = await res.json();
+                                        const tableIdx =
+                                          Number(order.tableNumber) - 1;
+
+                                        // Assign waiter to local table state
+                                        if (
+                                          tableIdx >= 0 &&
+                                          tableIdx < TABLE_COUNT
+                                        ) {
+                                          setTables((prev) => {
+                                            const next = [...prev];
+                                            next[tableIdx] = {
+                                              ...next[tableIdx],
+                                              waiterId: claimed.waiterId,
+                                              waiterName: claimed.waiterName,
+                                            };
+                                            return next;
+                                          });
+                                        }
+
                                         setClaimTarget(null);
                                         setPinDigits("");
                                         refetchOrders();
+
+                                        // Navigate directly — no second PIN
+                                        if (
+                                          tableIdx >= 0 &&
+                                          tableIdx < TABLE_COUNT
+                                        ) {
+                                          setShowOrdersPanel(false);
+                                          setActive({
+                                            kind: "table",
+                                            idx: tableIdx,
+                                          });
+                                          setScreen("menu");
+                                          setActiveCategory("All");
+                                        }
                                       } else {
                                         const d = await res.json();
                                         setClaimError(d.message || "Gabim");
@@ -3782,6 +3692,19 @@ export default function POS({ slug }: POSProps) {
           </>
         )}
       </AnimatePresence>
+      {/* Radial Quick-Add Menu */}
+      {radialMenu && (
+        <RadialMenu
+          x={radialMenu.x}
+          y={radialMenu.y}
+          isLight={isLight}
+          onClose={() => setRadialMenu(null)}
+          onSelect={(qty) => {
+            for (let i = 0; i < qty; i++) addItem(radialMenu.item);
+            setRadialMenu(null);
+          }}
+        />
+      )}
     </div>
   );
 }
