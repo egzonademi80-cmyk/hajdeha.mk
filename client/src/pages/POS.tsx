@@ -24,6 +24,8 @@ import {
   Printer,
   ClipboardList,
   KeyRound,
+  Banknote,
+  CreditCard,
 } from "lucide-react";
 
 interface MenuItem {
@@ -259,6 +261,43 @@ async function sendToUsbPrinter(device: USBDevice, data: Uint8Array): Promise<vo
   await device.transferOut(endpointNum, data);
 }
 
+const RECEIPT_STYLE = `
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    width: 72mm;
+    max-width: 72mm;
+    padding: 6px 6px 16px;
+    color: #000;
+    background: #fff;
+  }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .bold { font-weight: bold; }
+  .name { font-size: 13px; font-weight: bold; letter-spacing: 0.5px; }
+  .dash { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+  .solid { border: none; border-top: 1px solid #000; margin: 5px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  td { vertical-align: top; padding: 1px 0; }
+  .meta { display: flex; justify-content: space-between; font-size: 10px; color: #333; }
+  .total-row td { font-weight: bold; font-size: 13px; padding-top: 4px; }
+  .method { font-size: 10px; color: #444; padding-top: 1px; }
+  .footer { margin-top: 8px; font-size: 10px; text-align: center; color: #555; }
+  .small { font-size: 9px; color: #555; }
+  @page { margin: 0; size: auto; }
+  @media print { html, body { width: 72mm; } }
+`;
+
+function openPrintWin(): Window | null {
+  return window.open("", "_blank", "width=320,height=600,toolbar=0,scrollbars=0,status=0,menubar=0");
+}
+function closePrintWin(win: Window) {
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); win.onafterprint = () => win.close(); setTimeout(() => win.close(), 4000); }, 300);
+}
+
 function printReceiptWindow({
   restaurantName,
   tableLabel,
@@ -270,98 +309,88 @@ function printReceiptWindow({
   items: OrderItem[];
   payMethod?: "cash" | "card";
 }) {
-  const win = window.open(
-    "",
-    "_blank",
-    "width=340,height=700,toolbar=0,scrollbars=0,status=0,menubar=0",
-  );
+  const win = openPrintWin();
   if (!win) return;
-
-  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
   const now = new Date();
-  const dateStr = now.toLocaleDateString("sq-MK", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-  const timeStr = now.toLocaleTimeString("sq-MK", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const methodLabel =
-    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
-
-  const rows = items
-    .map(
-      (item) =>
-        `<tr>
-          <td style="padding:3px 0">${item.qty}x ${item.name}</td>
-          <td style="text-align:right;padding:3px 0;white-space:nowrap">${(item.price * item.qty).toFixed(0)} DEN</td>
-        </tr>`,
-    )
-    .join("");
-
-  win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    width: 80mm;
-    padding: 10px 8px 20px;
-    color: #000;
-    background: #fff;
-  }
-  .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .name { font-size: 17px; font-weight: bold; letter-spacing: 1px; }
-  .dash { border: none; border-top: 1px dashed #000; margin: 7px 0; }
-  table { width: 100%; border-collapse: collapse; }
-  td { vertical-align: top; }
-  .meta { display: flex; justify-content: space-between; font-size: 11px; color: #333; }
-  .total-row td { font-weight: bold; font-size: 15px; padding-top: 5px; border-top: 1px solid #000; }
-  .method { font-size: 11px; color: #444; padding-top: 2px; }
-  .footer { margin-top: 12px; font-size: 11px; text-align: center; color: #555; }
-  @page { margin: 0; size: 80mm auto; }
-  @media print { body { width: 80mm; } }
-</style>
-</head>
-<body>
+  const dateStr = now.toLocaleDateString("sq-MK", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("sq-MK", { hour: "2-digit", minute: "2-digit" });
+  const methodLabel = payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
+  const rows = items.map(i =>
+    `<tr><td>${i.qty}x ${i.name}</td><td style="text-align:right;white-space:nowrap">${(i.price * i.qty).toFixed(0)} DEN</td></tr>`
+  ).join("");
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><style>${RECEIPT_STYLE}</style></head><body>
   <div class="center name">${restaurantName}</div>
   <div class="dash"></div>
-  <div class="meta">
-    <span>${dateStr} &nbsp; ${timeStr}</span>
-    <span>${tableLabel}</span>
-  </div>
+  <div class="meta"><span>${dateStr} ${timeStr}</span><span>${tableLabel}</span></div>
   <div class="dash"></div>
-  <table>
-    ${rows}
-  </table>
+  <table>${rows}</table>
+  <div class="solid"></div>
+  <table><tr class="total-row"><td>TOTAL</td><td class="right">${total.toFixed(0)} DEN</td></tr>
+  <tr><td class="method" colspan="2">${methodLabel}</td></tr></table>
   <div class="dash"></div>
-  <table>
-    <tr class="total-row">
-      <td>TOTAL</td>
-      <td style="text-align:right">${total.toFixed(0)} DEN</td>
-    </tr>
-    <tr>
-      <td class="method" colspan="2">${methodLabel}</td>
-    </tr>
-  </table>
-  <div class="dash"></div>
-  <div class="footer">Faleminderit! &nbsp;•&nbsp; Hvala! &nbsp;•&nbsp; Thank you!</div>
-</body>
-</html>`);
+  <div class="footer">Faleminderit! • Hvala! • Thank you!</div>
+</body></html>`);
+  closePrintWin(win);
+}
 
-  win.document.close();
-  win.focus();
-  setTimeout(() => {
-    win.print();
-    win.onafterprint = () => win.close();
-    setTimeout(() => win.close(), 4000);
-  }, 350);
+function printFiscalReceiptWindow({
+  restaurantName,
+  restaurantLocation,
+  taxId,
+  tableLabel,
+  items,
+  payMethod,
+  fiscalNumber,
+}: {
+  restaurantName: string;
+  restaurantLocation?: string;
+  taxId?: string;
+  tableLabel: string;
+  items: OrderItem[];
+  payMethod: "cash" | "card";
+  fiscalNumber: number;
+}) {
+  const win = openPrintWin();
+  if (!win) return;
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const vatRate = 0.18;
+  const baseAmount = total / (1 + vatRate);
+  const vatAmount = total - baseAmount;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("sq-MK", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const timeStr = now.toLocaleTimeString("sq-MK", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const methodLabel = payMethod === "cash" ? "KESH / ГОТОВО" : "КАРТИЧКА / КАРТИЧКА";
+  const fiscalNo = String(fiscalNumber).padStart(8, "0");
+  const rows = items.map(i =>
+    `<tr><td>${i.qty}x ${i.name}</td><td style="text-align:right;white-space:nowrap">${(i.price * i.qty).toFixed(0)} DEN</td></tr>`
+  ).join("");
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><style>${RECEIPT_STYLE}</style></head><body>
+  <div class="center bold" style="font-size:12px;letter-spacing:1px">★ ФИСКАЛНА СМЕТКА ★</div>
+  <div class="center small">FATURË FISKALE</div>
+  <div class="dash"></div>
+  <div class="center bold" style="font-size:12px">${restaurantName}</div>
+  ${restaurantLocation ? `<div class="center small">${restaurantLocation}</div>` : ""}
+  ${taxId ? `<div class="center small">ЕДБ / EDB: ${taxId}</div>` : ""}
+  <div class="dash"></div>
+  <div class="meta"><span>${dateStr} ${timeStr}</span><span>${tableLabel}</span></div>
+  <div class="small center">Бр. сметка / Nr. faturës: ${fiscalNo}</div>
+  <div class="dash"></div>
+  <table>${rows}</table>
+  <div class="solid"></div>
+  <table>
+    <tr><td class="small">Основица / Baza (18% ДДВ)</td><td class="right small">${baseAmount.toFixed(0)} DEN</td></tr>
+    <tr><td class="small">ДДВ 18% / TVSH 18%</td><td class="right small">${vatAmount.toFixed(0)} DEN</td></tr>
+    <tr class="total-row"><td>ВКУПНО / GJITHSEJ</td><td class="right">${total.toFixed(0)} DEN</td></tr>
+    <tr><td class="method" colspan="2">${methodLabel}</td></tr>
+  </table>
+  <div class="solid"></div>
+  <div class="small center" style="margin-top:4px">Оператор / Operatori: 001</div>
+  <div class="dash"></div>
+  <div class="footer">Faleminderit! • Hvala! • Thank you!</div>
+  <div class="small center" style="margin-top:4px">Чувај ја сметката / Ruaje faturën</div>
+</body></html>`);
+  closePrintWin(win);
 }
 
 function playWaiterChime(type: WaiterSignal["type"]) {
@@ -901,6 +930,7 @@ export default function POS({ slug }: POSProps) {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [screen, setScreen] = useState<Screen>("tables");
   const [payConfirm, setPayConfirm] = useState(false);
+  const [showBillTypeModal, setShowBillTypeModal] = useState(false);
   const [justPaid, setJustPaid] = useState<ActiveSlot>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
@@ -1067,7 +1097,17 @@ export default function POS({ slug }: POSProps) {
     }
   };
 
-  const payOrder = () => {
+  const FISCAL_KEY = `pos-${RESTAURANT_SLUG}-fiscal-counter`;
+  const nextFiscalNumber = (): number => {
+    try {
+      const n = parseInt(localStorage.getItem(FISCAL_KEY) || "0", 10);
+      const next = n + 1;
+      localStorage.setItem(FISCAL_KEY, String(next));
+      return next;
+    } catch { return 1; }
+  };
+
+  const payOrder = (payMethod: "cash" | "card" = "cash", fiscal = false) => {
     if (!active) return;
     const slot = active;
     const receiptItems =
@@ -1079,11 +1119,19 @@ export default function POS({ slug }: POSProps) {
         ? `Tavolina ${slot.idx + 1}`
         : (personTabs[slot.idx]?.name ?? "Tab");
     if (receiptItems.length > 0) {
-      handlePrint({
-        restaurantName: restaurant?.name ?? "Restaurant",
-        tableLabel,
-        items: receiptItems,
-      });
+      if (fiscal) {
+        printFiscalReceiptWindow({
+          restaurantName: restaurant?.name ?? "Restaurant",
+          restaurantLocation: (restaurant as any)?.location || "",
+          taxId: (restaurant as any)?.taxId || "",
+          tableLabel,
+          items: receiptItems,
+          payMethod,
+          fiscalNumber: nextFiscalNumber(),
+        });
+      } else {
+        handlePrint({ restaurantName: restaurant?.name ?? "Restaurant", tableLabel, items: receiptItems, payMethod });
+      }
     }
     if (slot.kind === "table") {
       setTables((prev) => {
@@ -1094,15 +1142,14 @@ export default function POS({ slug }: POSProps) {
       fetch("/api/table/cart-cleared", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
-        }),
+        body: JSON.stringify({ channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}` }),
       }).catch(() => {});
     } else {
       setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
     }
     setJustPaid(slot);
     setPayConfirm(false);
+    setShowBillTypeModal(false);
     setActive(null);
     setScreen("tables");
     setTimeout(() => setJustPaid(null), 2500);
@@ -2119,42 +2166,24 @@ export default function POS({ slug }: POSProps) {
                       </div>
                     </div>
 
-                    {payConfirm ? (
-                      <div className="flex gap-2">
+                    <div className="flex flex-col gap-2">
+                      {active?.kind === "table" && (
                         <button
-                          onClick={() => setPayConfirm(false)}
-                          className={`flex-1 h-12 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold hover:bg-white/12`}
+                          onClick={() => openSplitBill(active.idx)}
+                          className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-amber-500/40 transition-colors`}
                         >
-                          Anulo
+                          <Divide className="h-4 w-4" />
+                          Split Bill
                         </button>
-                        <button
-                          onClick={payOrder}
-                          className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-400"
-                        >
-                          ✓ Paguar
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        {/* Split Bill button — only for tables */}
-                        {active?.kind === "table" && (
-                          <button
-                            onClick={() => openSplitBill(active.idx)}
-                            className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-amber-500/40 transition-colors`}
-                          >
-                            <Divide className="h-4 w-4" />
-                            Split Bill
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setPayConfirm(true)}
-                          className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
-                        >
-                          <Receipt className="h-4 w-4" />
-                          Paguaj {orderTotal(currentOrder)} DEN
-                        </button>
-                      </div>
-                    )}
+                      )}
+                      <button
+                        onClick={() => setShowBillTypeModal(true)}
+                        className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
+                      >
+                        <Receipt className="h-4 w-4" />
+                        Paguaj {orderTotal(currentOrder)} DEN
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2165,6 +2194,89 @@ export default function POS({ slug }: POSProps) {
       {/* ═══════════════════════════════════════════════════════════════════════
           MODALS
       ═══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── Bill Type Modal ──────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showBillTypeModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className={`fixed inset-0 ${t.modalOverlay} z-50`}
+              onClick={() => setShowBillTypeModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: "100%" }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: "100%" }}
+              transition={{ type: "spring", stiffness: 340, damping: 34 }}
+              className={`fixed left-0 right-0 bottom-0 z-50 ${t.modalBg} rounded-t-3xl border-t border-l border-r ${t.border} shadow-2xl`}
+              style={{ paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))" }}
+            >
+              <div className={`flex items-center justify-between px-5 py-4 border-b ${t.border}`}>
+                <div>
+                  <p className={`text-sm font-bold ${t.text}`}>Si dëshironi të paguani?</p>
+                  <p className={`text-[11px] ${t.textMuted}`} style={{ fontFamily: "'DM Mono', monospace" }}>
+                    {orderTotal(active?.kind === "table" ? tables[active.idx] : active?.kind === "person" ? { items: personTabs[active.idx]?.items ?? [] } as any : { items: [] } as any)} DEN
+                  </p>
+                </div>
+                <button onClick={() => setShowBillTypeModal(false)} className={`h-8 w-8 rounded-full ${t.surfaceSoft} flex items-center justify-center ${t.textMuted}`}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="px-4 py-4 space-y-3">
+                {/* Normal Bill */}
+                <div className={`rounded-2xl border ${t.border} ${t.surface} p-3`}>
+                  <p className={`text-xs font-bold ${t.textMuted} mb-2 uppercase tracking-wide`}>Faturë Normale</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => payOrder("cash", false)}
+                      className={`h-12 rounded-xl ${t.surfaceSoft} border ${t.border} flex items-center justify-center gap-2 text-sm font-semibold ${t.textSoft} hover:border-emerald-500/40 active:scale-95 transition-all`}
+                    >
+                      <Banknote className="h-4 w-4 text-emerald-500" />
+                      Kesh
+                    </button>
+                    <button
+                      onClick={() => payOrder("card", false)}
+                      className={`h-12 rounded-xl ${t.surfaceSoft} border ${t.border} flex items-center justify-center gap-2 text-sm font-semibold ${t.textSoft} hover:border-blue-500/40 active:scale-95 transition-all`}
+                    >
+                      <CreditCard className="h-4 w-4 text-blue-500" />
+                      Kartë
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fiscal Bill */}
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+                  <p className="text-xs font-bold text-amber-500 mb-2 uppercase tracking-wide">Faturë Fiskale</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => payOrder("cash", true)}
+                      className="h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-sm font-semibold text-amber-600 hover:bg-amber-500/20 active:scale-95 transition-all"
+                    >
+                      <Banknote className="h-4 w-4" />
+                      Kesh
+                    </button>
+                    <button
+                      onClick={() => payOrder("card", true)}
+                      className="h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-sm font-semibold text-amber-600 hover:bg-amber-500/20 active:scale-95 transition-all"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      Kartë
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowBillTypeModal(false)}
+                  className={`w-full h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
+                >
+                  Anulo
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Split Bill Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>
