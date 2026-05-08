@@ -706,7 +706,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
     tableCount: restaurant.tableCount || 0,
     wifiPassword: restaurant.wifiPassword || "",
     orderMode: (restaurant as any).orderMode || "whatsapp",
-    taxId: (restaurant as any).taxId || "",
   });
 
   useEffect(() => {
@@ -728,7 +727,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
       tableCount: restaurant.tableCount || 0,
       wifiPassword: restaurant.wifiPassword || "",
       orderMode: (restaurant as any).orderMode || "whatsapp",
-      taxId: (restaurant as any).taxId || "",
     });
   }, [restaurant]);
 
@@ -816,12 +814,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
                 <p className="text-sm text-muted-foreground">—</p>
               )}
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">EDB (Numri Fiskal)</p>
-              <p className="text-sm font-mono text-foreground">
-                {(restaurant as any).taxId || "—"}
-              </p>
-            </div>
           </div>
           {restaurant.photoUrl && (
             <img
@@ -879,17 +871,6 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
               setFormData((p) => ({ ...p, wifiPassword: e.target.value }))
             }
             className="h-9 bg-background text-foreground border-border"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <Label className="text-sm text-foreground">EDB — Numri Fiskal</Label>
-          <Input
-            value={formData.taxId}
-            placeholder="p.sh. MK1234567890"
-            onChange={(e) =>
-              setFormData((p) => ({ ...p, taxId: e.target.value }))
-            }
-            className="h-9 bg-background text-foreground border-border font-mono"
           />
         </div>
         <div className="sm:col-span-2">

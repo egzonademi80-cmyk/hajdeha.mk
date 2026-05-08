@@ -43,7 +43,6 @@ export const restaurants = pgTable(
     tableCount: integer("table_count").default(0).notNull(),
     wifiPassword: text("wifi_password"),
     orderMode: text("order_mode").default("whatsapp").notNull(),
-    taxId: text("tax_id"),
   },
   (table) => ({ slugIdx: index("slug_idx").on(table.slug) }),
 );
