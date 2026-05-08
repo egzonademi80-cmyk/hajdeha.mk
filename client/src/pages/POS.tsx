@@ -121,7 +121,11 @@ const SPLIT_COLORS = [
   },
 ];
 
-const emptyTable = (): TableOrder => ({ items: [], rounds: [], startedAt: null });
+const emptyTable = (): TableOrder => ({
+  items: [],
+  rounds: [],
+  startedAt: null,
+});
 
 function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
@@ -170,67 +174,115 @@ function buildEscPosBytes({
   items: OrderItem[];
   payMethod?: "cash" | "card";
 }): Uint8Array {
-  const COL = 42;
+  // Use 32 cols for 58mm compatibility (works on 80mm too)
+  const COL = 32;
   const enc = new TextEncoder();
   const bytes: number[] = [];
 
   const push = (...vals: number[]) => bytes.push(...vals);
   const text = (s: string) => bytes.push(...enc.encode(s));
   const lf = () => bytes.push(0x0a);
-  const dashes = () => { text("-".repeat(COL)); lf(); };
+  const dashes = () => {
+    text("─".repeat ? "-".repeat(COL) : "-".repeat(COL));
+    lf();
+  };
   const center = (s: string) => {
     const pad = Math.max(0, Math.floor((COL - s.length) / 2));
-    text(" ".repeat(pad) + s); lf();
+    text(" ".repeat(pad) + s.slice(0, COL));
+    lf();
   };
   const cols = (left: string, right: string) => {
     const max = COL - right.length - 1;
-    const l = left.length > max ? left.slice(0, max - 1) + "…" : left;
-    text(l + " ".repeat(COL - l.length - right.length) + right); lf();
+    const l = left.length > max ? left.slice(0, max - 1) + "." : left;
+    text(l + " ".repeat(Math.max(1, COL - l.length - right.length)) + right);
+    lf();
   };
 
-  // Init
+  // Init + charset
   push(0x1b, 0x40);
-  // Align center
-  push(0x1b, 0x61, 0x01);
-  // Bold + double height/width for restaurant name
+  push(0x1b, 0x74, 0x10); // PC737 or nearest
+
+  // ── Restaurant name: large + bold + centered
+  push(0x1b, 0x61, 0x01); // center
+  push(0x1b, 0x45, 0x01); // bold on
+  push(0x1d, 0x21, 0x11); // double width + height
+  text(restaurantName.slice(0, 16));
+  lf();
+  push(0x1d, 0x21, 0x00); // normal size
+  push(0x1b, 0x45, 0x00); // bold off
+  lf();
+
+  // ── Date / table
+  push(0x1b, 0x61, 0x00); // left
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("sq-MK", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("sq-MK", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  cols(`${dateStr} ${timeStr}`, tableLabel.slice(0, 10));
+  dashes();
+
+  // ── Items (normal size, bold name)
+  for (const item of items) {
+    const price = `${item.price * item.qty} DEN`;
+    // qty prefix
+    const qty = `${item.qty}x `;
+    const maxName = COL - price.length - qty.length - 1;
+    const name =
+      item.name.length > maxName
+        ? item.name.slice(0, maxName - 1) + "."
+        : item.name;
+    push(0x1b, 0x45, 0x01); // bold
+    text(qty + name);
+    push(0x1b, 0x45, 0x00);
+    text(
+      " ".repeat(Math.max(1, COL - qty.length - name.length - price.length)) +
+        price,
+    );
+    lf();
+  }
+
+  dashes();
+
+  // ── Total: large
+  push(0x1b, 0x61, 0x02); // right align
   push(0x1b, 0x45, 0x01);
-  push(0x1d, 0x21, 0x01);
-  text(restaurantName); lf();
-  // Reset size + bold off
+  push(0x1d, 0x21, 0x01); // double height
+  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+  text(`${total} DEN`);
+  lf();
   push(0x1d, 0x21, 0x00);
   push(0x1b, 0x45, 0x00);
-  // Align left
-  push(0x1b, 0x61, 0x00);
-  lf();
-  dashes();
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("sq-MK", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const timeStr = now.toLocaleTimeString("sq-MK", { hour: "2-digit", minute: "2-digit" });
-  cols(`${dateStr}  ${timeStr}`, tableLabel);
-  dashes();
-
-  // Items
-  for (const item of items) {
-    const price = `${(item.price * item.qty).toFixed(0)} DEN`;
-    cols(`${item.qty}x ${item.name}`, price);
-  }
-  dashes();
-
-  // Total — bold
+  // ── Payment method
+  push(0x1b, 0x61, 0x00); // left
+  const methodLabel =
+    payMethod === "cash"
+      ? "[ KESH ]"
+      : payMethod === "card"
+        ? "[ KARTE ]"
+        : "[ PAGUAR ]";
   push(0x1b, 0x45, 0x01);
-  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
-  cols("TOTAL", `${total.toFixed(0)} DEN`);
+  text(methodLabel);
+  lf();
   push(0x1b, 0x45, 0x00);
 
-  const methodLabel = payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Karte" : "Paguar";
-  text(methodLabel); lf();
   dashes();
 
-  // Footer centered
+  // ── Footer centered
   push(0x1b, 0x61, 0x01);
-  text("Faleminderit! Hvala! Thank you!"); lf();
-  lf(); lf(); lf();
+  text("Faleminderit!");
+  lf();
+  text("Hvala! / Thank you!");
+  lf();
+  lf();
+  lf();
+  lf();
 
   // Partial cut
   push(0x1d, 0x56, 0x42, 0x03);
@@ -238,8 +290,15 @@ function buildEscPosBytes({
   return new Uint8Array(bytes);
 }
 
-async function sendToUsbPrinter(device: USBDevice, data: Uint8Array): Promise<void> {
-  try { await device.open(); } catch { /* already open */ }
+async function sendToUsbPrinter(
+  device: USBDevice,
+  data: Uint8Array,
+): Promise<void> {
+  try {
+    await device.open();
+  } catch {
+    /* already open */
+  }
   if (device.configuration === null) await device.selectConfiguration(1);
 
   let interfaceNum = -1;
@@ -255,7 +314,11 @@ async function sendToUsbPrinter(device: USBDevice, data: Uint8Array): Promise<vo
     if (interfaceNum !== -1) break;
   }
   if (interfaceNum === -1) throw new Error("No bulk OUT endpoint found");
-  try { await device.claimInterface(interfaceNum); } catch { /* already claimed */ }
+  try {
+    await device.claimInterface(interfaceNum);
+  } catch {
+    /* already claimed */
+  }
   await device.transferOut(endpointNum, data);
 }
 
@@ -273,7 +336,7 @@ function printReceiptWindow({
   const win = window.open(
     "",
     "_blank",
-    "width=340,height=700,toolbar=0,scrollbars=0,status=0,menubar=0",
+    "width=360,height=800,toolbar=0,scrollbars=0,status=0,menubar=0",
   );
   if (!win) return;
 
@@ -289,14 +352,17 @@ function printReceiptWindow({
     minute: "2-digit",
   });
   const methodLabel =
-    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
+    payMethod === "cash" ? "KESH" : payMethod === "card" ? "KARTË" : "PAGUAR";
+  const methodIcon =
+    payMethod === "cash" ? "💵" : payMethod === "card" ? "💳" : "✓";
 
   const rows = items
     .map(
       (item) =>
         `<tr>
-          <td style="padding:3px 0">${item.qty}x ${item.name}</td>
-          <td style="text-align:right;padding:3px 0;white-space:nowrap">${(item.price * item.qty).toFixed(0)} DEN</td>
+          <td class="item-qty">${item.qty}×</td>
+          <td class="item-name">${item.name}</td>
+          <td class="item-price">${(item.price * item.qty).toFixed(0)}</td>
         </tr>`,
     )
     .join("");
@@ -305,53 +371,181 @@ function printReceiptWindow({
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width"/>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 13px;
-    width: 80mm;
-    padding: 10px 8px 20px;
-    color: #000;
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #111;
     background: #fff;
+    padding: 16px 14px 32px;
+    width: 80mm;
+    max-width: 100%;
   }
-  .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .name { font-size: 17px; font-weight: bold; letter-spacing: 1px; }
-  .dash { border: none; border-top: 1px dashed #000; margin: 7px 0; }
-  table { width: 100%; border-collapse: collapse; }
-  td { vertical-align: top; }
-  .meta { display: flex; justify-content: space-between; font-size: 11px; color: #333; }
-  .total-row td { font-weight: bold; font-size: 15px; padding-top: 5px; border-top: 1px solid #000; }
-  .method { font-size: 11px; color: #444; padding-top: 2px; }
-  .footer { margin-top: 12px; font-size: 11px; text-align: center; color: #555; }
+
+  /* ── Restaurant Name ── */
+  .restaurant {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-align: center;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #111;
+    margin-bottom: 10px;
+  }
+
+  /* ── Meta row ── */
+  .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 4px;
+  }
+  .table-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111;
+    background: #f0f0f0;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── Divider ── */
+  .div-solid { border: none; border-top: 1.5px solid #111; margin: 10px 0; }
+  .div-dashed { border: none; border-top: 1.5px dashed #999; margin: 10px 0; }
+
+  /* ── Items table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 4px;
+  }
+  .item-qty {
+    width: 24px;
+    font-size: 13px;
+    color: #777;
+    vertical-align: top;
+    padding: 4px 6px 4px 0;
+    white-space: nowrap;
+  }
+  .item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111;
+    padding: 4px 8px 4px 0;
+    vertical-align: top;
+  }
+  .item-price {
+    text-align: right;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: top;
+    padding: 4px 0;
+  }
+  .item-price::after { content: " DEN"; font-size: 11px; font-weight: 400; color: #888; }
+
+  /* ── Total block ── */
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0 2px;
+  }
+  .total-label {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #555;
+  }
+  .total-amount {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: #111;
+  }
+  .total-currency {
+    font-size: 14px;
+    font-weight: 400;
+    color: #888;
+    margin-left: 3px;
+  }
+
+  /* ── Payment method ── */
+  .pay-method {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    background: #111;
+    color: #fff;
+    border-radius: 20px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    letter-spacing: 0.3px;
+    line-height: 1.8;
+  }
+  .footer strong {
+    display: block;
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 2px;
+  }
+
   @page { margin: 0; size: 80mm auto; }
-  @media print { body { width: 80mm; } }
+  @media print {
+    body { width: 80mm; padding: 10px 12px 24px; }
+    .restaurant { font-size: 20px; }
+  }
 </style>
 </head>
 <body>
-  <div class="center name">${restaurantName}</div>
-  <div class="dash"></div>
+  <div class="restaurant">${restaurantName}</div>
+
   <div class="meta">
     <span>${dateStr} &nbsp; ${timeStr}</span>
-    <span>${tableLabel}</span>
+    <span class="table-label">${tableLabel}</span>
   </div>
-  <div class="dash"></div>
-  <table>
-    ${rows}
-  </table>
-  <div class="dash"></div>
-  <table>
-    <tr class="total-row">
-      <td>TOTAL</td>
-      <td style="text-align:right">${total.toFixed(0)} DEN</td>
-    </tr>
-    <tr>
-      <td class="method" colspan="2">${methodLabel}</td>
-    </tr>
-  </table>
-  <div class="dash"></div>
-  <div class="footer">Faleminderit! &nbsp;•&nbsp; Hvala! &nbsp;•&nbsp; Thank you!</div>
+
+  <hr class="div-dashed"/>
+
+  <table>${rows}</table>
+
+  <hr class="div-solid"/>
+
+  <div class="total-row">
+    <span class="total-label">TOTAL</span>
+    <span>
+      <span class="total-amount">${total.toFixed(0)}</span>
+      <span class="total-currency">DEN</span>
+    </span>
+  </div>
+
+  <hr class="div-dashed"/>
+
+  <div class="footer">
+    <strong>Faleminderit!</strong>
+    Hvala! &nbsp;•&nbsp; Thank you!
+  </div>
 </body>
 </html>`);
 
@@ -361,22 +555,34 @@ function printReceiptWindow({
     win.print();
     win.onafterprint = () => win.close();
     setTimeout(() => win.close(), 4000);
-  }, 350);
+  }, 500);
 }
-
 function playWaiterChime(type: WaiterSignal["type"]) {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const ctx = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.55, ctx.currentTime);
     master.connect(ctx.destination);
 
     const notes: [number, number, number][] =
       type === "help"
-        ? [[880, 0, 0.18], [660, 0.2, 0.28], [660, 0.42, 0.28]]
+        ? [
+            [880, 0, 0.18],
+            [660, 0.2, 0.28],
+            [660, 0.42, 0.28],
+          ]
         : type === "bill-cash"
-          ? [[660, 0, 0.16], [880, 0.18, 0.16], [1108, 0.36, 0.28]]
-          : [[660, 0, 0.16], [990, 0.18, 0.16], [1320, 0.36, 0.28]];
+          ? [
+              [660, 0, 0.16],
+              [880, 0.18, 0.16],
+              [1108, 0.36, 0.28],
+            ]
+          : [
+              [660, 0, 0.16],
+              [990, 0.18, 0.16],
+              [1320, 0.36, 0.28],
+            ];
 
     notes.forEach(([freq, start, dur]) => {
       const osc = ctx.createOscillator();
@@ -385,7 +591,10 @@ function playWaiterChime(type: WaiterSignal["type"]) {
       osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
       gain.gain.setValueAtTime(0, ctx.currentTime + start);
       gain.gain.linearRampToValueAtTime(1, ctx.currentTime + start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        ctx.currentTime + start + dur,
+      );
       osc.connect(gain);
       gain.connect(master);
       osc.start(ctx.currentTime + start);
@@ -437,7 +646,9 @@ export default function POS({ slug }: POSProps) {
     return Array.from({ length: TABLE_COUNT }, emptyTable);
   });
   const tablesRef = useRef(tables);
-  useEffect(() => { tablesRef.current = tables; }, [tables]);
+  useEffect(() => {
+    tablesRef.current = tables;
+  }, [tables]);
 
   useEffect(() => {
     setTables((prev) => {
@@ -460,13 +671,16 @@ export default function POS({ slug }: POSProps) {
     return [];
   });
 
-  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(null);
+  const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(
+    null,
+  );
   const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
 
   const playChime = () => {
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const ctx = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.connect(g);
@@ -501,11 +715,15 @@ export default function POS({ slug }: POSProps) {
 
   const restaurantId = restaurant?.id;
 
-  const { data: waiters = [] } = useQuery<{ id: number; name: string; pinCode: string }[]>({
+  const { data: waiters = [] } = useQuery<
+    { id: number; name: string; pinCode: string }[]
+  >({
     queryKey: ["/api/admin/waiters", restaurantId],
     queryFn: async () => {
       if (!restaurantId) return [];
-      const res = await fetch(`/api/admin/waiters?action=list&restaurantId=${restaurantId}`);
+      const res = await fetch(
+        `/api/admin/waiters?action=list&restaurantId=${restaurantId}`,
+      );
       if (!res.ok) return [];
       return res.json();
     },
@@ -524,7 +742,9 @@ export default function POS({ slug }: POSProps) {
     refetchInterval: 3000,
   });
 
-  const pendingCount = dbOrders.filter((o: any) => o.status === "pending").length;
+  const pendingCount = dbOrders.filter(
+    (o: any) => o.status === "pending",
+  ).length;
 
   // Track which DB order IDs have already been processed so polling never duplicates
   const seenOrderIds = useRef<Set<number>>(new Set());
@@ -541,12 +761,14 @@ export default function POS({ slug }: POSProps) {
 
     // Subsequent polls: find brand-new pending orders we haven't processed yet
     const newPending = dbOrders.filter(
-      (o: any) => o.status === "pending" && !seenOrderIds.current.has(o.id)
+      (o: any) => o.status === "pending" && !seenOrderIds.current.has(o.id),
     );
 
     newPending.forEach((order: any) => {
       seenOrderIds.current.add(order.id);
-      const cart: OrderItem[] = Array.isArray(order.cart) ? order.cart : JSON.parse(order.cart);
+      const cart: OrderItem[] = Array.isArray(order.cart)
+        ? order.cart
+        : JSON.parse(order.cart);
       const tableNum = Number(order.tableNumber);
       const tableIdx = tableNum - 1;
 
@@ -558,7 +780,8 @@ export default function POS({ slug }: POSProps) {
           const merged = [...existing.items];
           cart.forEach((item) => {
             const i = merged.findIndex((m) => m.id === item.id);
-            if (i >= 0) merged[i] = { ...merged[i], qty: merged[i].qty + item.qty };
+            if (i >= 0)
+              merged[i] = { ...merged[i], qty: merged[i].qty + item.qty };
             else merged.push({ ...item });
           });
           const prevRounds = existing.rounds ?? [];
@@ -575,7 +798,8 @@ export default function POS({ slug }: POSProps) {
       }
 
       // 2. Show the incoming banner + claim popup
-      const roundNumber = (tablesRef.current[tableIdx]?.rounds?.length ?? 0) + 1;
+      const roundNumber =
+        (tablesRef.current[tableIdx]?.rounds?.length ?? 0) + 1;
       setIncomingBanner({
         id: `${Date.now()}-${Math.random()}`,
         tableNumber: tableNum,
@@ -586,7 +810,8 @@ export default function POS({ slug }: POSProps) {
       playChime();
       if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
       setTimeout(
-        () => setIncomingBanner((b) => (b?.tableNumber === tableNum ? null : b)),
+        () =>
+          setIncomingBanner((b) => (b?.tableNumber === tableNum ? null : b)),
         12000,
       );
     });
@@ -698,7 +923,7 @@ export default function POS({ slug }: POSProps) {
       return next;
     });
   };
-  // ───────────────────────────────────────────er�─────────────────────────────────
+  // ───l��───────────────────────────────────────er�─────────────────────────────────
 
   const THEME_KEY = `pos-${slug}-theme`;
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -716,13 +941,18 @@ export default function POS({ slug }: POSProps) {
   const isLight = theme === "light";
 
   const [usbDevice, setUsbDevice] = useState<USBDevice | null>(null);
-  const [printerStatus, setPrinterStatus] = useState<"idle" | "printing" | "error">("idle");
+  const [printerStatus, setPrinterStatus] = useState<
+    "idle" | "printing" | "error"
+  >("idle");
 
   useEffect(() => {
     if (!("usb" in navigator)) return;
-    (navigator as any).usb.getDevices().then((devices: USBDevice[]) => {
-      if (devices.length > 0) setUsbDevice(devices[0]);
-    }).catch(() => {});
+    (navigator as any).usb
+      .getDevices()
+      .then((devices: USBDevice[]) => {
+        if (devices.length > 0) setUsbDevice(devices[0]);
+      })
+      .catch(() => {});
   }, []);
 
   const connectPrinter = async () => {
@@ -731,7 +961,9 @@ export default function POS({ slug }: POSProps) {
       return;
     }
     try {
-      const device = await (navigator as any).usb.requestDevice({ filters: [] });
+      const device = await (navigator as any).usb.requestDevice({
+        filters: [],
+      });
       setUsbDevice(device);
     } catch (err: any) {
       if (err.name !== "NotFoundError") {
@@ -1160,7 +1392,11 @@ export default function POS({ slug }: POSProps) {
       }
       setTables((prev) => {
         const next = [...prev];
-        next[tableIdx] = { ...next[tableIdx], waiterId: waiter.id, waiterName: waiter.name };
+        next[tableIdx] = {
+          ...next[tableIdx],
+          waiterId: waiter.id,
+          waiterName: waiter.name,
+        };
         return next;
       });
       setShowTablePinModal(false);
@@ -1246,19 +1482,24 @@ export default function POS({ slug }: POSProps) {
         pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
         const channel = pusher.subscribe(`pos-${RESTAURANT_SLUG}`);
         channel.bind("incoming-order", handleIncoming);
-        channel.bind("waiter-request", (data: { tableNumber: number | string; type: string }) => {
-          const signal: WaiterSignal = {
-            id: `${Date.now()}-${Math.random()}`,
-            tableNumber: data.tableNumber,
-            type: data.type as WaiterSignal["type"],
-            timestamp: Date.now(),
-          };
-          setWaiterSignals((prev) => [...prev, signal]);
-          setTimeout(() => {
-            setWaiterSignals((prev) => prev.filter((s) => s.id !== signal.id));
-          }, 30000);
-          playWaiterChime(data.type as WaiterSignal["type"]);
-        });
+        channel.bind(
+          "waiter-request",
+          (data: { tableNumber: number | string; type: string }) => {
+            const signal: WaiterSignal = {
+              id: `${Date.now()}-${Math.random()}`,
+              tableNumber: data.tableNumber,
+              type: data.type as WaiterSignal["type"],
+              timestamp: Date.now(),
+            };
+            setWaiterSignals((prev) => [...prev, signal]);
+            setTimeout(() => {
+              setWaiterSignals((prev) =>
+                prev.filter((s) => s.id !== signal.id),
+              );
+            }, 30000);
+            playWaiterChime(data.type as WaiterSignal["type"]);
+          },
+        );
       } catch (e) {
         console.error("Pusher subscribe failed:", e);
       }
@@ -1349,10 +1590,16 @@ export default function POS({ slug }: POSProps) {
         </div>
         <button
           onClick={usbDevice ? () => setUsbDevice(null) : connectPrinter}
-          title={usbDevice ? "Printer connected — click to disconnect" : "Connect thermal printer"}
+          title={
+            usbDevice
+              ? "Printer connected — click to disconnect"
+              : "Connect thermal printer"
+          }
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors relative ${t.backBtn}`}
         >
-          <Printer className={`h-4 w-4 lg:h-5 lg:w-5 ${printerStatus === "error" ? "text-red-400" : usbDevice ? "text-emerald-400" : t.textMuted.replace("text-","text-")}`} />
+          <Printer
+            className={`h-4 w-4 lg:h-5 lg:w-5 ${printerStatus === "error" ? "text-red-400" : usbDevice ? "text-emerald-400" : t.textMuted.replace("text-", "text-")}`}
+          />
           {usbDevice && printerStatus === "idle" && (
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />
           )}
@@ -1404,22 +1651,46 @@ export default function POS({ slug }: POSProps) {
       {/* Waiter signal banners */}
       <AnimatePresence>
         {waiterSignals.length > 0 && (
-          <div className="absolute left-3 right-3 z-30 flex flex-col gap-2" style={{ top: 64 }}>
+          <div
+            className="absolute left-3 right-3 z-30 flex flex-col gap-2"
+            style={{ top: 64 }}
+          >
             {waiterSignals.map((signal, i) => {
               const cfg =
                 signal.type === "bill-cash"
-                  ? { grad: "from-emerald-600 to-emerald-500", icon: "💵", label: `Fatura Kesh — Tavolina ${signal.tableNumber}` }
+                  ? {
+                      grad: "from-emerald-600 to-emerald-500",
+                      icon: "💵",
+                      label: `Fatura Kesh — Tavolina ${signal.tableNumber}`,
+                    }
                   : signal.type === "bill-card"
-                    ? { grad: "from-blue-600 to-blue-500", icon: "💳", label: `Fatura Kartë — Tavolina ${signal.tableNumber}` }
-                    : { grad: "from-amber-500 to-amber-400", icon: "🔔", label: `Keni nevojë — Tavolina ${signal.tableNumber}` };
+                    ? {
+                        grad: "from-blue-600 to-blue-500",
+                        icon: "💳",
+                        label: `Fatura Kartë — Tavolina ${signal.tableNumber}`,
+                      }
+                    : {
+                        grad: "from-amber-500 to-amber-400",
+                        icon: "🔔",
+                        label: `Keni nevojë — Tavolina ${signal.tableNumber}`,
+                      };
               return (
                 <motion.button
                   key={signal.id}
                   initial={{ y: -60, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: -60, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 380, damping: 28, delay: i * 0.05 }}
-                  onClick={() => setWaiterSignals((prev) => prev.filter((s) => s.id !== signal.id))}
+                  transition={{
+                    type: "spring",
+                    stiffness: 380,
+                    damping: 28,
+                    delay: i * 0.05,
+                  }}
+                  onClick={() =>
+                    setWaiterSignals((prev) =>
+                      prev.filter((s) => s.id !== signal.id),
+                    )
+                  }
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r ${cfg.grad} text-white shadow-2xl`}
                 >
                   <motion.span
@@ -1429,8 +1700,13 @@ export default function POS({ slug }: POSProps) {
                   >
                     {cfg.icon}
                   </motion.span>
-                  <p className="flex-1 text-sm font-bold text-left leading-tight">{cfg.label}</p>
-                  <span className="text-[10px] font-bold opacity-70 flex-shrink-0" style={{ fontFamily: "'DM Mono', monospace" }}>
+                  <p className="flex-1 text-sm font-bold text-left leading-tight">
+                    {cfg.label}
+                  </p>
+                  <span
+                    className="text-[10px] font-bold opacity-70 flex-shrink-0"
+                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  >
                     TAP ✕
                   </span>
                 </motion.button>
@@ -1446,15 +1722,20 @@ export default function POS({ slug }: POSProps) {
           <motion.button
             key={incomingBanner.id}
             onClick={() => {
-              const tableNum = parseInt(String(incomingBanner.tableNumber).replace(/\D/g, ""), 10);
+              const tableNum = parseInt(
+                String(incomingBanner.tableNumber).replace(/\D/g, ""),
+                10,
+              );
               const pendingOrder = [...dbOrders].find(
-                (o: any) => o.status === "pending" && Number(o.tableNumber) === tableNum
+                (o: any) =>
+                  o.status === "pending" && Number(o.tableNumber) === tableNum,
               );
               if (pendingOrder && waiters.length > 0) {
                 openIncomingClaim(pendingOrder);
               } else {
                 const idx = tableNum - 1;
-                if (idx >= 0 && idx < TABLE_COUNT) openSlot({ kind: "table", idx });
+                if (idx >= 0 && idx < TABLE_COUNT)
+                  openSlot({ kind: "table", idx });
               }
               setIncomingBanner(null);
             }}
@@ -1636,9 +1917,15 @@ export default function POS({ slug }: POSProps) {
                               {table.waiterName && (
                                 <span
                                   className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/30 text-amber-400 max-w-[90%] truncate"
-                                  style={{ fontFamily: "'DM Sans', sans-serif" }}
+                                  style={{
+                                    fontFamily: "'DM Sans', sans-serif",
+                                  }}
                                 >
-                                  {table.waiterName.split(" ").map((n) => n[0]).join("").toUpperCase()}
+                                  {table.waiterName
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .toUpperCase()}
                                 </span>
                               )}
                               <motion.div
@@ -1968,123 +2255,153 @@ export default function POS({ slug }: POSProps) {
                         Klikoni një artikull nga menyja për ta shtuar
                       </p>
                     </div>
-                  ) : (() => {
-                    const rounds: OrderRound[] = (currentOrder as TableOrder).rounds ?? [];
+                  ) : (
+                    (() => {
+                      const rounds: OrderRound[] =
+                        (currentOrder as TableOrder).rounds ?? [];
 
-                    const itemCard = (item: OrderItem, isNew: boolean) => (
-                      <div
-                        key={item.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl border mb-2 transition-colors ${
-                          isNew
-                            ? "bg-amber-500/5 border-amber-500/25"
-                            : `${t.surface} ${t.border}`
-                        }`}
-                      >
-                        {isNew && (
-                          <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
-                            {item.name}
-                          </p>
-                          <p
-                            className="text-xs text-amber-400 mt-0.5"
-                            style={{ fontFamily: "'DM Mono', monospace" }}
+                      const itemCard = (item: OrderItem, isNew: boolean) => (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-3 p-3 rounded-xl border mb-2 transition-colors ${
+                            isNew
+                              ? "bg-amber-500/5 border-amber-500/25"
+                              : `${t.surface} ${t.border}`
+                          }`}
+                        >
+                          {isNew && (
+                            <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm font-semibold ${t.textSoft} truncate`}
+                            >
+                              {item.name}
+                            </p>
+                            <p
+                              className="text-xs text-amber-400 mt-0.5"
+                              style={{ fontFamily: "'DM Mono', monospace" }}
+                            >
+                              {item.price} × {item.qty} ={" "}
+                              {item.price * item.qty} DEN
+                            </p>
+                          </div>
+                          <div
+                            className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}
                           >
-                            {item.price} × {item.qty} = {item.price * item.qty} DEN
-                          </p>
+                            <button
+                              onClick={() => updateQty(item.id, -1)}
+                              className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span
+                              className="text-sm font-bold text-amber-400 w-5 text-center"
+                              style={{ fontFamily: "'DM Mono', monospace" }}
+                            >
+                              {item.qty}
+                            </span>
+                            <button
+                              onClick={() => updateQty(item.id, 1)}
+                              className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
-                        <div className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}>
-                          <button
-                            onClick={() => updateQty(item.id, -1)}
-                            className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span
-                            className="text-sm font-bold text-amber-400 w-5 text-center"
-                            style={{ fontFamily: "'DM Mono', monospace" }}
-                          >
-                            {item.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(item.id, 1)}
-                            className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                    );
+                      );
 
-                    if (rounds.length <= 1) {
-                      return <>{currentOrder.items.map((item) => itemCard(item, false))}</>;
-                    }
-
-                    // Group merged items by the first round they appear in
-                    const itemFirstRound = (id: number): number => {
-                      for (let i = 0; i < rounds.length; i++) {
-                        if (rounds[i].items.some((ri) => ri.id === id)) return i;
+                      if (rounds.length <= 1) {
+                        return (
+                          <>
+                            {currentOrder.items.map((item) =>
+                              itemCard(item, false),
+                            )}
+                          </>
+                        );
                       }
-                      return -1; // manually added via POS
-                    };
 
-                    const groups = new Map<number, OrderItem[]>();
-                    for (const item of currentOrder.items) {
-                      const r = itemFirstRound(item.id);
-                      const arr = groups.get(r) ?? [];
-                      arr.push(item);
-                      groups.set(r, arr);
-                    }
+                      // Group merged items by the first round they appear in
+                      const itemFirstRound = (id: number): number => {
+                        for (let i = 0; i < rounds.length; i++) {
+                          if (rounds[i].items.some((ri) => ri.id === id))
+                            return i;
+                        }
+                        return -1; // manually added via POS
+                      };
 
-                    return (
-                      <>
-                        {/* Items added manually by staff (not from any customer round) */}
-                        {(groups.get(-1) ?? []).map((item) => itemCard(item, false))}
+                      const groups = new Map<number, OrderItem[]>();
+                      for (const item of currentOrder.items) {
+                        const r = itemFirstRound(item.id);
+                        const arr = groups.get(r) ?? [];
+                        arr.push(item);
+                        groups.set(r, arr);
+                      }
 
-                        {rounds.map((round, rIdx) => {
-                          const items = groups.get(rIdx) ?? [];
-                          if (items.length === 0) return null;
-                          const isNew = rIdx > 0;
-                          const roundTime = new Date(round.sentAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          });
-                          return (
-                            <div key={rIdx}>
-                              {/* Round divider */}
-                              <div className="flex items-center gap-2 py-2 px-0.5 mb-1">
-                                <div className={`h-px flex-1 ${t.borderSoft}`} />
-                                <span
-                                  className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
-                                    isNew
-                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                      : `${t.surfaceSoft} ${t.textDim}`
-                                  }`}
-                                  style={{ fontFamily: "'DM Mono', monospace" }}
-                                >
-                                  {isNew && (
-                                    <motion.span
-                                      animate={{ opacity: [1, 0.4, 1] }}
-                                      transition={{ duration: 1.4, repeat: Infinity }}
-                                    >
-                                      ⚡
-                                    </motion.span>
-                                  )}
-                                  {isNew ? `POROSI ${rIdx + 1}` : `POROSI 1`}
-                                  <span className="font-normal opacity-60 ml-1">{roundTime}</span>
-                                </span>
-                                <div className={`h-px flex-1 ${t.borderSoft}`} />
+                      return (
+                        <>
+                          {/* Items added manually by staff (not from any customer round) */}
+                          {(groups.get(-1) ?? []).map((item) =>
+                            itemCard(item, false),
+                          )}
+
+                          {rounds.map((round, rIdx) => {
+                            const items = groups.get(rIdx) ?? [];
+                            if (items.length === 0) return null;
+                            const isNew = rIdx > 0;
+                            const roundTime = new Date(
+                              round.sentAt,
+                            ).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+                            return (
+                              <div key={rIdx}>
+                                {/* Round divider */}
+                                <div className="flex items-center gap-2 py-2 px-0.5 mb-1">
+                                  <div
+                                    className={`h-px flex-1 ${t.borderSoft}`}
+                                  />
+                                  <span
+                                    className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                                      isNew
+                                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                        : `${t.surfaceSoft} ${t.textDim}`
+                                    }`}
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                    }}
+                                  >
+                                    {isNew && (
+                                      <motion.span
+                                        animate={{ opacity: [1, 0.4, 1] }}
+                                        transition={{
+                                          duration: 1.4,
+                                          repeat: Infinity,
+                                        }}
+                                      >
+                                        ⚡
+                                      </motion.span>
+                                    )}
+                                    {isNew ? `POROSI ${rIdx + 1}` : `POROSI 1`}
+                                    <span className="font-normal opacity-60 ml-1">
+                                      {roundTime}
+                                    </span>
+                                  </span>
+                                  <div
+                                    className={`h-px flex-1 ${t.borderSoft}`}
+                                  />
+                                </div>
+
+                                {/* Items for this round */}
+                                {items.map((item) => itemCard(item, isNew))}
                               </div>
-
-                              {/* Items for this round */}
-                              {items.map((item) => itemCard(item, isNew))}
-                            </div>
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
+                            );
+                          })}
+                        </>
+                      );
+                    })()
+                  )}
                 </div>
 
                 {currentOrder.items.length > 0 && (
@@ -2897,7 +3214,8 @@ export default function POS({ slug }: POSProps) {
                   setTablePinError("");
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && tablePinDigits.length === 3) confirmTablePin();
+                  if (e.key === "Enter" && tablePinDigits.length === 3)
+                    confirmTablePin();
                 }}
                 className={`w-full h-12 rounded-xl border ${t.inputBorder} px-4 text-sm outline-none focus:border-amber-500/50 mb-2`}
                 style={{ background: t.inputBgStyle, color: t.inputTextStyle }}
@@ -2934,209 +3252,277 @@ export default function POS({ slug }: POSProps) {
 
       {/* ─── Incoming Order Claim Modal (full-screen numpad) ─────────────── */}
       <AnimatePresence>
-        {showClaimModal && claimModalOrder && (() => {
-          const order = claimModalOrder;
-          const cartTotal = order.cart.reduce((s: number, i: any) => s + i.price * i.qty, 0);
-          const tableNum = Number(order.tableNumber);
+        {showClaimModal &&
+          claimModalOrder &&
+          (() => {
+            const order = claimModalOrder;
+            const cartTotal = order.cart.reduce(
+              (s: number, i: any) => s + i.price * i.qty,
+              0,
+            );
+            const tableNum = Number(order.tableNumber);
 
-          const numpadKeys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+            const numpadKeys = [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "",
+              "0",
+              "⌫",
+            ];
 
-          const handleNumpad = (key: string) => {
-            if (key === "⌫") {
-              setPinDigits(prev => prev.slice(0, -1));
-              setClaimError("");
-            } else if (key !== "" && pinDigits.length < 3) {
-              setPinDigits(prev => prev + key);
-              setClaimError("");
-            }
-          };
-
-          const handleConfirmClaim = async () => {
-            if (pinDigits.length !== 3 || claimLoading) return;
-            setClaimLoading(true);
-            setClaimError("");
-            try {
-              const res = await fetch(`/api/orders/${order.id}/claim`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pinCode: pinDigits, restaurantId }),
-              });
-              if (res.ok) {
-                const claimed = await res.json();
-                const tableIdx = tableNum - 1;
-                if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
-                  // Add the claimed order items into the table AND assign the waiter
-                  const incomingItems: OrderItem[] = (claimed.cart ?? []).map((ci: any) => ({
-                    id: ci.id,
-                    name: ci.name,
-                    price: ci.price,
-                    qty: ci.qty,
-                  }));
-                  setTables(prev => {
-                    const next = [...prev];
-                    const existing = next[tableIdx];
-                    // Merge incoming items into existing table items
-                    const merged = [...existing.items];
-                    incomingItems.forEach(incoming => {
-                      const idx = merged.findIndex(i => i.id === incoming.id);
-                      if (idx >= 0) merged[idx] = { ...merged[idx], qty: merged[idx].qty + incoming.qty };
-                      else merged.push({ ...incoming });
-                    });
-                    next[tableIdx] = {
-                      ...existing,
-                      items: merged,
-                      startedAt: existing.startedAt ?? new Date(),
-                      waiterId: claimed.waiterId,
-                      waiterName: claimed.waiterName,
-                    };
-                    return next;
-                  });
-                }
-                setShowClaimModal(false);
-                setClaimModalOrder(null);
-                setClaimTarget(null);
-                setPinDigits("");
-                refetchOrders();
-                // Navigate directly to the table — waiter already proved identity via claim PIN
-                if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
-                  setActive({ kind: "table", idx: tableIdx });
-                  setScreen("menu");
-                  setActiveCategory("All");
-                }
-              } else {
-                const d = await res.json();
-                setClaimError(d.message || "PIN i gabuar");
+            const handleNumpad = (key: string) => {
+              if (key === "⌫") {
+                setPinDigits((prev) => prev.slice(0, -1));
+                setClaimError("");
+              } else if (key !== "" && pinDigits.length < 3) {
+                setPinDigits((prev) => prev + key);
+                setClaimError("");
               }
-            } catch {
-              setClaimError("Gabim rrjeti");
-            } finally {
-              setClaimLoading(false);
-            }
-          };
+            };
 
-          return (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className={`fixed inset-0 ${t.modalOverlay} z-50`}
-                onClick={() => { setShowClaimModal(false); setClaimModalOrder(null); setPinDigits(""); setClaimError(""); }}
-              />
-              <motion.div
-                initial={{ opacity: 0, y: "100%" }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: "100%" }}
-                transition={{ type: "spring", stiffness: 340, damping: 34 }}
-                className={`fixed left-0 right-0 bottom-0 z-50 ${t.modalBg} rounded-t-3xl border-t border-l border-r ${t.border} shadow-2xl overflow-hidden`}
-                style={{ paddingBottom: "max(20px, env(safe-area-inset-bottom, 20px))" }}
-              >
-                {/* Header */}
-                <div className={`flex items-center justify-between px-5 py-4 border-b ${t.border}`}>
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                      <Bell className="h-4 w-4 text-amber-400" />
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold ${t.text}`}>Merr Porosinë</p>
-                      <p className={`text-[11px] ${t.textMuted}`} style={{ fontFamily: "'DM Mono', monospace" }}>
-                        TAVOLINA {tableNum} · {cartTotal} DEN
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => { setShowClaimModal(false); setClaimModalOrder(null); setPinDigits(""); setClaimError(""); }}
-                    className={`h-8 w-8 rounded-full ${t.backBtn} flex items-center justify-center`}
+            const handleConfirmClaim = async () => {
+              if (pinDigits.length !== 3 || claimLoading) return;
+              setClaimLoading(true);
+              setClaimError("");
+              try {
+                const res = await fetch(`/api/orders/${order.id}/claim`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ pinCode: pinDigits, restaurantId }),
+                });
+                if (res.ok) {
+                  const claimed = await res.json();
+                  const tableIdx = tableNum - 1;
+                  if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+                    // Add the claimed order items into the table AND assign the waiter
+                    const incomingItems: OrderItem[] = (claimed.cart ?? []).map(
+                      (ci: any) => ({
+                        id: ci.id,
+                        name: ci.name,
+                        price: ci.price,
+                        qty: ci.qty,
+                      }),
+                    );
+                    setTables((prev) => {
+                      const next = [...prev];
+                      const existing = next[tableIdx];
+                      // Merge incoming items into existing table items
+                      const merged = [...existing.items];
+                      incomingItems.forEach((incoming) => {
+                        const idx = merged.findIndex(
+                          (i) => i.id === incoming.id,
+                        );
+                        if (idx >= 0)
+                          merged[idx] = {
+                            ...merged[idx],
+                            qty: merged[idx].qty + incoming.qty,
+                          };
+                        else merged.push({ ...incoming });
+                      });
+                      next[tableIdx] = {
+                        ...existing,
+                        items: merged,
+                        startedAt: existing.startedAt ?? new Date(),
+                        waiterId: claimed.waiterId,
+                        waiterName: claimed.waiterName,
+                      };
+                      return next;
+                    });
+                  }
+                  setShowClaimModal(false);
+                  setClaimModalOrder(null);
+                  setClaimTarget(null);
+                  setPinDigits("");
+                  refetchOrders();
+                  // Navigate directly to the table — waiter already proved identity via claim PIN
+                  if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+                    setActive({ kind: "table", idx: tableIdx });
+                    setScreen("menu");
+                    setActiveCategory("All");
+                  }
+                } else {
+                  const d = await res.json();
+                  setClaimError(d.message || "PIN i gabuar");
+                }
+              } catch {
+                setClaimError("Gabim rrjeti");
+              } finally {
+                setClaimLoading(false);
+              }
+            };
+
+            return (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className={`fixed inset-0 ${t.modalOverlay} z-50`}
+                  onClick={() => {
+                    setShowClaimModal(false);
+                    setClaimModalOrder(null);
+                    setPinDigits("");
+                    setClaimError("");
+                  }}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: "100%" }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: "100%" }}
+                  transition={{ type: "spring", stiffness: 340, damping: 34 }}
+                  className={`fixed left-0 right-0 bottom-0 z-50 ${t.modalBg} rounded-t-3xl border-t border-l border-r ${t.border} shadow-2xl overflow-hidden`}
+                  style={{
+                    paddingBottom:
+                      "max(20px, env(safe-area-inset-bottom, 20px))",
+                  }}
+                >
+                  {/* Header */}
+                  <div
+                    className={`flex items-center justify-between px-5 py-4 border-b ${t.border}`}
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Order items summary */}
-                <div className={`mx-4 mt-3 rounded-2xl ${t.surface} border ${t.border} px-4 py-3 max-h-28 overflow-y-auto`}>
-                  {order.cart.map((item: any, idx: number) => (
-                    <div key={idx} className="flex justify-between text-xs py-0.5">
-                      <span className={t.textMuted}>{item.qty}× {item.name}</span>
-                      <span className={`font-semibold ${t.text}`}>{item.price * item.qty} DEN</span>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                        <Bell className="h-4 w-4 text-amber-400" />
+                      </div>
+                      <div>
+                        <p className={`text-sm font-bold ${t.text}`}>
+                          Merr Porosinë
+                        </p>
+                        <p
+                          className={`text-[11px] ${t.textMuted}`}
+                          style={{ fontFamily: "'DM Mono', monospace" }}
+                        >
+                          TAVOLINA {tableNum} · {cartTotal} DEN
+                        </p>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                    <button
+                      onClick={() => {
+                        setShowClaimModal(false);
+                        setClaimModalOrder(null);
+                        setPinDigits("");
+                        setClaimError("");
+                      }}
+                      className={`h-8 w-8 rounded-full ${t.backBtn} flex items-center justify-center`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
 
-                {/* PIN display */}
-                <div className="px-5 pt-4 pb-2">
-                  <p className={`text-[10px] font-bold ${t.textDim} mb-2 text-center`} style={{ fontFamily: "'DM Mono', monospace" }}>
-                    FUTNI PIN-IN TUAJ
-                  </p>
-                  <div className="flex items-center justify-center gap-4 mb-2">
-                    {[0,1,2].map(i => (
+                  {/* Order items summary */}
+                  <div
+                    className={`mx-4 mt-3 rounded-2xl ${t.surface} border ${t.border} px-4 py-3 max-h-28 overflow-y-auto`}
+                  >
+                    {order.cart.map((item: any, idx: number) => (
                       <div
-                        key={i}
-                        className={`h-12 w-12 rounded-2xl border-2 flex items-center justify-center text-xl font-bold transition-all ${
-                          pinDigits.length > i
-                            ? "border-amber-500 bg-amber-500/15 text-amber-400"
-                            : `${t.border} ${t.surface} ${t.textFaint}`
-                        }`}
+                        key={idx}
+                        className="flex justify-between text-xs py-0.5"
                       >
-                        {pinDigits.length > i ? "●" : ""}
+                        <span className={t.textMuted}>
+                          {item.qty}× {item.name}
+                        </span>
+                        <span className={`font-semibold ${t.text}`}>
+                          {item.price * item.qty} DEN
+                        </span>
                       </div>
                     ))}
                   </div>
-                  {claimError && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-xs text-red-400 text-center mb-1"
-                    >
-                      {claimError}
-                    </motion.p>
-                  )}
-                </div>
 
-                {/* Numpad */}
-                <div className="grid grid-cols-3 gap-2 px-5 pb-1">
-                  {numpadKeys.map((key, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleNumpad(key)}
-                      disabled={key === ""}
-                      className={`h-14 rounded-2xl text-xl font-bold transition-all select-none ${
-                        key === ""
-                          ? "opacity-0 pointer-events-none"
-                          : key === "⌫"
-                            ? `${t.surfaceSoft} ${t.textMuted} active:scale-95`
-                            : `${t.surface} ${t.text} active:bg-amber-500/20 active:scale-95 hover:${t.surfaceSoft}`
-                      }`}
-                      style={{ fontFamily: key === "⌫" ? "system-ui" : "'DM Mono', monospace" }}
+                  {/* PIN display */}
+                  <div className="px-5 pt-4 pb-2">
+                    <p
+                      className={`text-[10px] font-bold ${t.textDim} mb-2 text-center`}
+                      style={{ fontFamily: "'DM Mono', monospace" }}
                     >
-                      {key}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Confirm button */}
-                <div className="px-5 pt-2">
-                  <button
-                    onClick={handleConfirmClaim}
-                    disabled={pinDigits.length !== 3 || claimLoading}
-                    className="w-full h-14 rounded-2xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                    data-testid="button-confirm-incoming-claim"
-                  >
-                    {claimLoading ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}>
-                        <Coffee className="h-4 w-4" />
-                      </motion.div>
-                    ) : (
-                      <>
-                        <KeyRound className="h-4 w-4" />
-                        Konfirmo dhe Merr Porosinë
-                      </>
+                      FUTNI PIN-IN TUAJ
+                    </p>
+                    <div className="flex items-center justify-center gap-4 mb-2">
+                      {[0, 1, 2].map((i) => (
+                        <div
+                          key={i}
+                          className={`h-12 w-12 rounded-2xl border-2 flex items-center justify-center text-xl font-bold transition-all ${
+                            pinDigits.length > i
+                              ? "border-amber-500 bg-amber-500/15 text-amber-400"
+                              : `${t.border} ${t.surface} ${t.textFaint}`
+                          }`}
+                        >
+                          {pinDigits.length > i ? "●" : ""}
+                        </div>
+                      ))}
+                    </div>
+                    {claimError && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-red-400 text-center mb-1"
+                      >
+                        {claimError}
+                      </motion.p>
                     )}
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          );
-        })()}
+                  </div>
+
+                  {/* Numpad */}
+                  <div className="grid grid-cols-3 gap-2 px-5 pb-1">
+                    {numpadKeys.map((key, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleNumpad(key)}
+                        disabled={key === ""}
+                        className={`h-14 rounded-2xl text-xl font-bold transition-all select-none ${
+                          key === ""
+                            ? "opacity-0 pointer-events-none"
+                            : key === "⌫"
+                              ? `${t.surfaceSoft} ${t.textMuted} active:scale-95`
+                              : `${t.surface} ${t.text} active:bg-amber-500/20 active:scale-95 hover:${t.surfaceSoft}`
+                        }`}
+                        style={{
+                          fontFamily:
+                            key === "⌫" ? "system-ui" : "'DM Mono', monospace",
+                        }}
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Confirm button */}
+                  <div className="px-5 pt-2">
+                    <button
+                      onClick={handleConfirmClaim}
+                      disabled={pinDigits.length !== 3 || claimLoading}
+                      className="w-full h-14 rounded-2xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                      data-testid="button-confirm-incoming-claim"
+                    >
+                      {claimLoading ? (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{
+                            duration: 0.8,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                        >
+                          <Coffee className="h-4 w-4" />
+                        </motion.div>
+                      ) : (
+                        <>
+                          <KeyRound className="h-4 w-4" />
+                          Konfirmo dhe Merr Porosinë
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
+              </>
+            );
+          })()}
       </AnimatePresence>
 
       {/* ─── Orders Panel ───────────────────────────────────────────────────── */}
@@ -3148,7 +3534,12 @@ export default function POS({ slug }: POSProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 z-50 bg-black/60"
-              onClick={() => { setShowOrdersPanel(false); setClaimTarget(null); setPinDigits(""); setClaimError(""); }}
+              onClick={() => {
+                setShowOrdersPanel(false);
+                setClaimTarget(null);
+                setPinDigits("");
+                setClaimError("");
+              }}
             />
             <motion.div
               initial={{ x: "100%" }}
@@ -3159,12 +3550,29 @@ export default function POS({ slug }: POSProps) {
               style={{ background: isLight ? "#fff" : "#1c1917" }}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: isLight ? "#e5e7eb" : "#292524" }}>
+              <div
+                className="flex items-center justify-between px-5 py-4 border-b"
+                style={{ borderColor: isLight ? "#e5e7eb" : "#292524" }}
+              >
                 <div>
                   <h2 className={`text-base font-bold ${t.text}`}>Porositë</h2>
-                  <p className={`text-xs ${t.textMuted}`}>{dbOrders.filter((o: any) => o.status !== "completed").length} aktive</p>
+                  <p className={`text-xs ${t.textMuted}`}>
+                    {
+                      dbOrders.filter((o: any) => o.status !== "completed")
+                        .length
+                    }{" "}
+                    aktive
+                  </p>
                 </div>
-                <button onClick={() => { setShowOrdersPanel(false); setClaimTarget(null); setPinDigits(""); setClaimError(""); }} className={`h-8 w-8 rounded-full flex items-center justify-center ${t.backBtn}`}>
+                <button
+                  onClick={() => {
+                    setShowOrdersPanel(false);
+                    setClaimTarget(null);
+                    setPinDigits("");
+                    setClaimError("");
+                  }}
+                  className={`h-8 w-8 rounded-full flex items-center justify-center ${t.backBtn}`}
+                >
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -3172,119 +3580,200 @@ export default function POS({ slug }: POSProps) {
               {/* List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {dbOrders.length === 0 && (
-                  <div className={`text-center py-12 ${t.textMuted} text-sm`}>Nuk ka porosi ende</div>
+                  <div className={`text-center py-12 ${t.textMuted} text-sm`}>
+                    Nuk ka porosi ende
+                  </div>
                 )}
-                {[...dbOrders].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((order: any) => {
-                  const total = order.cart.reduce((s: number, i: any) => s + i.price * i.qty, 0);
-                  const statusCfg =
-                    order.status === "pending"
-                      ? { label: "Pret", color: "bg-amber-500/20 text-amber-500" }
-                      : order.status === "claimed"
-                        ? { label: "Marrë", color: "bg-blue-500/20 text-blue-400" }
-                        : { label: "Kryer", color: "bg-emerald-500/20 text-emerald-400" };
+                {[...dbOrders]
+                  .sort(
+                    (a: any, b: any) =>
+                      new Date(b.createdAt).getTime() -
+                      new Date(a.createdAt).getTime(),
+                  )
+                  .map((order: any) => {
+                    const total = order.cart.reduce(
+                      (s: number, i: any) => s + i.price * i.qty,
+                      0,
+                    );
+                    const statusCfg =
+                      order.status === "pending"
+                        ? {
+                            label: "Pret",
+                            color: "bg-amber-500/20 text-amber-500",
+                          }
+                        : order.status === "claimed"
+                          ? {
+                              label: "Marrë",
+                              color: "bg-blue-500/20 text-blue-400",
+                            }
+                          : {
+                              label: "Kryer",
+                              color: "bg-emerald-500/20 text-emerald-400",
+                            };
 
-                  return (
-                    <div key={order.id} className={`rounded-2xl border p-4 space-y-3 ${isLight ? "border-gray-200 bg-gray-50" : "border-stone-700 bg-stone-800/60"}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className={`font-bold text-sm ${t.text}`}>Tavolina {order.tableNumber}</p>
-                          <p className={`text-xs ${t.textMuted}`}>{new Date(order.createdAt).toLocaleTimeString("sq", { hour: "2-digit", minute: "2-digit" })}</p>
-                          {order.waiterName && (
-                            <p className={`text-xs mt-0.5 ${t.textMuted}`}>👤 {order.waiterName}</p>
-                          )}
-                        </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusCfg.color}`}>{statusCfg.label}</span>
-                      </div>
-
-                      <div className="space-y-1">
-                        {order.cart.map((item: any, idx: number) => (
-                          <div key={idx} className="flex justify-between text-xs">
-                            <span className={t.textMuted}>{item.qty}× {item.name}</span>
-                            <span className={`font-semibold ${t.text}`}>{item.price * item.qty} DEN</span>
+                    return (
+                      <div
+                        key={order.id}
+                        className={`rounded-2xl border p-4 space-y-3 ${isLight ? "border-gray-200 bg-gray-50" : "border-stone-700 bg-stone-800/60"}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className={`font-bold text-sm ${t.text}`}>
+                              Tavolina {order.tableNumber}
+                            </p>
+                            <p className={`text-xs ${t.textMuted}`}>
+                              {new Date(order.createdAt).toLocaleTimeString(
+                                "sq",
+                                { hour: "2-digit", minute: "2-digit" },
+                              )}
+                            </p>
+                            {order.waiterName && (
+                              <p className={`text-xs mt-0.5 ${t.textMuted}`}>
+                                👤 {order.waiterName}
+                              </p>
+                            )}
                           </div>
-                        ))}
-                        <div className={`flex justify-between text-xs font-bold pt-1 border-t ${isLight ? "border-gray-200" : "border-stone-700"}`}>
-                          <span className={t.text}>Total</span>
-                          <span className="text-amber-500">{total} DEN</span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusCfg.color}`}
+                          >
+                            {statusCfg.label}
+                          </span>
                         </div>
-                      </div>
 
-                      {/* Actions */}
-                      {order.status === "pending" && (
-                        claimTarget === order.id ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <KeyRound className={`h-4 w-4 flex-shrink-0 ${t.textMuted}`} />
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                maxLength={3}
-                                placeholder="PIN 3-shifror"
-                                value={pinDigits}
-                                onChange={(e) => { setPinDigits(e.target.value.slice(0, 3)); setClaimError(""); }}
-                                className={`flex-1 h-9 rounded-xl border px-3 text-sm outline-none focus:border-amber-500/60 ${isLight ? "border-gray-300 bg-white text-gray-900" : "border-stone-600 bg-stone-900 text-white"}`}
-                                autoFocus
-                                data-testid="input-pin"
-                              />
+                        <div className="space-y-1">
+                          {order.cart.map((item: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between text-xs"
+                            >
+                              <span className={t.textMuted}>
+                                {item.qty}× {item.name}
+                              </span>
+                              <span className={`font-semibold ${t.text}`}>
+                                {item.price * item.qty} DEN
+                              </span>
                             </div>
-                            {claimError && <p className="text-xs text-red-400">{claimError}</p>}
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => { setClaimTarget(null); setPinDigits(""); setClaimError(""); }}
-                                className={`flex-1 h-9 rounded-xl text-xs font-semibold ${t.surfaceSoft} ${t.textMuted}`}
-                              >Anulo</button>
-                              <button
-                                disabled={pinDigits.length !== 3 || claimLoading}
-                                onClick={async () => {
-                                  setClaimLoading(true);
-                                  setClaimError("");
-                                  try {
-                                    const res = await fetch(`/api/orders/${order.id}/claim`, {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ pinCode: pinDigits, restaurantId }),
-                                    });
-                                    if (res.ok) {
-                                      setClaimTarget(null);
-                                      setPinDigits("");
-                                      refetchOrders();
-                                    } else {
-                                      const d = await res.json();
-                                      setClaimError(d.message || "Gabim");
-                                    }
-                                  } catch {
-                                    setClaimError("Gabim rrjeti");
-                                  } finally {
-                                    setClaimLoading(false);
+                          ))}
+                          <div
+                            className={`flex justify-between text-xs font-bold pt-1 border-t ${isLight ? "border-gray-200" : "border-stone-700"}`}
+                          >
+                            <span className={t.text}>Total</span>
+                            <span className="text-amber-500">{total} DEN</span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        {order.status === "pending" &&
+                          (claimTarget === order.id ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <KeyRound
+                                  className={`h-4 w-4 flex-shrink-0 ${t.textMuted}`}
+                                />
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  maxLength={3}
+                                  placeholder="PIN 3-shifror"
+                                  value={pinDigits}
+                                  onChange={(e) => {
+                                    setPinDigits(e.target.value.slice(0, 3));
+                                    setClaimError("");
+                                  }}
+                                  className={`flex-1 h-9 rounded-xl border px-3 text-sm outline-none focus:border-amber-500/60 ${isLight ? "border-gray-300 bg-white text-gray-900" : "border-stone-600 bg-stone-900 text-white"}`}
+                                  autoFocus
+                                  data-testid="input-pin"
+                                />
+                              </div>
+                              {claimError && (
+                                <p className="text-xs text-red-400">
+                                  {claimError}
+                                </p>
+                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setClaimTarget(null);
+                                    setPinDigits("");
+                                    setClaimError("");
+                                  }}
+                                  className={`flex-1 h-9 rounded-xl text-xs font-semibold ${t.surfaceSoft} ${t.textMuted}`}
+                                >
+                                  Anulo
+                                </button>
+                                <button
+                                  disabled={
+                                    pinDigits.length !== 3 || claimLoading
                                   }
-                                }}
-                                className="flex-1 h-9 rounded-xl bg-amber-500 text-black text-xs font-bold disabled:opacity-40"
-                                data-testid="button-confirm-claim"
-                              >{claimLoading ? "…" : "Konfirmo"}</button>
+                                  onClick={async () => {
+                                    setClaimLoading(true);
+                                    setClaimError("");
+                                    try {
+                                      const res = await fetch(
+                                        `/api/orders/${order.id}/claim`,
+                                        {
+                                          method: "POST",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                          },
+                                          body: JSON.stringify({
+                                            pinCode: pinDigits,
+                                            restaurantId,
+                                          }),
+                                        },
+                                      );
+                                      if (res.ok) {
+                                        setClaimTarget(null);
+                                        setPinDigits("");
+                                        refetchOrders();
+                                      } else {
+                                        const d = await res.json();
+                                        setClaimError(d.message || "Gabim");
+                                      }
+                                    } catch {
+                                      setClaimError("Gabim rrjeti");
+                                    } finally {
+                                      setClaimLoading(false);
+                                    }
+                                  }}
+                                  className="flex-1 h-9 rounded-xl bg-amber-500 text-black text-xs font-bold disabled:opacity-40"
+                                  data-testid="button-confirm-claim"
+                                >
+                                  {claimLoading ? "…" : "Konfirmo"}
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => { setClaimTarget(order.id); setPinDigits(""); setClaimError(""); }}
-                            className="w-full h-9 rounded-xl bg-amber-500 text-black text-xs font-bold"
-                            data-testid={`button-take-order-${order.id}`}
-                          >Merr Porosinë</button>
-                        )
-                      )}
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setClaimTarget(order.id);
+                                setPinDigits("");
+                                setClaimError("");
+                              }}
+                              className="w-full h-9 rounded-xl bg-amber-500 text-black text-xs font-bold"
+                              data-testid={`button-take-order-${order.id}`}
+                            >
+                              Merr Porosinë
+                            </button>
+                          ))}
 
-                      {order.status === "claimed" && (
-                        <button
-                          onClick={async () => {
-                            await fetch(`/api/orders/${order.id}/complete`, { method: "POST" });
-                            refetchOrders();
-                          }}
-                          className="w-full h-9 rounded-xl bg-emerald-600 text-white text-xs font-bold"
-                          data-testid={`button-complete-order-${order.id}`}
-                        >✓ Shëno si të kryer</button>
-                      )}
-                    </div>
-                  );
-                })}
+                        {order.status === "claimed" && (
+                          <button
+                            onClick={async () => {
+                              await fetch(`/api/orders/${order.id}/complete`, {
+                                method: "POST",
+                              });
+                              refetchOrders();
+                            }}
+                            className="w-full h-9 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                            data-testid={`button-complete-order-${order.id}`}
+                          >
+                            ✓ Shëno si të kryer
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </motion.div>
           </>
