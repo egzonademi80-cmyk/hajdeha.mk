@@ -504,10 +504,76 @@ export default function POS({ slug }: POSProps) {
       return res.json();
     },
     enabled: !!restaurantId,
-    refetchInterval: 8000,
+    refetchInterval: 3000,
   });
 
   const pendingCount = dbOrders.filter((o: any) => o.status === "pending").length;
+
+  // Track which DB order IDs have already been processed so polling never duplicates
+  const seenOrderIds = useRef<Set<number>>(new Set());
+  const initialOrderLoadDone = useRef(false);
+
+  useEffect(() => {
+    if (!initialOrderLoadDone.current) {
+      if (dbOrders.length === 0) return;
+      // First load: seed all existing orders as already seen — don't re-trigger them
+      dbOrders.forEach((o: any) => seenOrderIds.current.add(o.id));
+      initialOrderLoadDone.current = true;
+      return;
+    }
+
+    // Subsequent polls: find brand-new pending orders we haven't processed yet
+    const newPending = dbOrders.filter(
+      (o: any) => o.status === "pending" && !seenOrderIds.current.has(o.id)
+    );
+
+    newPending.forEach((order: any) => {
+      seenOrderIds.current.add(order.id);
+      const cart: OrderItem[] = Array.isArray(order.cart) ? order.cart : JSON.parse(order.cart);
+      const tableNum = Number(order.tableNumber);
+      const tableIdx = tableNum - 1;
+
+      // 1. Add items directly into the table
+      if (tableIdx >= 0 && tableIdx < tablesRef.current.length) {
+        setTables((prev) => {
+          const next = [...prev];
+          const existing = next[tableIdx];
+          const merged = [...existing.items];
+          cart.forEach((item) => {
+            const i = merged.findIndex((m) => m.id === item.id);
+            if (i >= 0) merged[i] = { ...merged[i], qty: merged[i].qty + item.qty };
+            else merged.push({ ...item });
+          });
+          const prevRounds = existing.rounds ?? [];
+          next[tableIdx] = {
+            ...existing,
+            items: merged,
+            rounds: [...prevRounds, { items: cart, sentAt: Date.now() }],
+            startedAt: existing.startedAt ?? new Date(),
+          };
+          return next;
+        });
+        setTableFlash(tableIdx);
+        setTimeout(() => setTableFlash(null), 4000);
+      }
+
+      // 2. Show the incoming banner + claim popup
+      const roundNumber = (tablesRef.current[tableIdx]?.rounds?.length ?? 0) + 1;
+      setIncomingBanner({
+        id: `${Date.now()}-${Math.random()}`,
+        tableNumber: tableNum,
+        cart,
+        timestamp: Date.now(),
+        roundNumber,
+      });
+      playChime();
+      if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
+      setTimeout(
+        () => setIncomingBanner((b) => (b?.tableNumber === tableNum ? null : b)),
+        12000,
+      );
+    });
+  }, [dbOrders]);
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -1166,58 +1232,10 @@ export default function POS({ slug }: POSProps) {
       } catch {}
     };
 
-    const handleIncoming = (data: any) => {
-      const cart: OrderItem[] = data.cart || [];
-      const tableNumber = data.tableNumber;
-
-      // Order is already persisted to DB server-side; just refresh the panel
+    const handleIncoming = () => {
+      // Trigger an immediate refetch — the polling useEffect handles
+      // adding items to the table and showing the claim banner.
       refetchOrders();
-      const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
-      const tableIdx = tableDigits - 1;
-
-      const existingRounds = (tableIdx >= 0 && tableIdx < TABLE_COUNT)
-        ? (tablesRef.current[tableIdx]?.rounds ?? [])
-        : [];
-      const roundNumber = existingRounds.length + 1;
-
-      if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
-        setTables((prev) => {
-          const next = [...prev];
-          const merged = [...next[tableIdx].items];
-          cart.forEach((it) => {
-            const ex = merged.find((m) => m.id === it.id);
-            if (ex) ex.qty += it.qty;
-            else merged.push({ ...it });
-          });
-          const prevRounds = next[tableIdx].rounds ?? [];
-          next[tableIdx] = {
-            items: merged,
-            rounds: [...prevRounds, { items: cart, sentAt: Date.now() }],
-            startedAt: next[tableIdx].startedAt ?? new Date(),
-            section: next[tableIdx].section,
-          };
-          return next;
-        });
-        setTableFlash(tableIdx);
-        setTimeout(() => setTableFlash(null), 4000);
-      }
-
-      setIncomingBanner({
-        id: `${Date.now()}-${Math.random()}`,
-        tableNumber,
-        cart,
-        timestamp: data.timestamp || Date.now(),
-        roundNumber,
-      });
-      playChime();
-      if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
-      setTimeout(
-        () =>
-          setIncomingBanner((b) =>
-            b && b.tableNumber === tableNumber ? null : b,
-          ),
-        12000,
-      );
     };
 
     (async () => {
