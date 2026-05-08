@@ -5,11 +5,16 @@ import cookieSession from "cookie-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage.js";
 import { db } from "./db.js";
 import { User as SelectUser } from "../shared/schema.js";
 
 const scryptAsync = promisify(scrypt);
+
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  "e9b8168c9ece2b863894938c631e7e3b698175ff96a07b3a13a9e112a2a2a2f3";
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -39,13 +44,28 @@ export async function generateToken(userId: number): Promise<string> {
 export async function getUserFromToken(
   token: string,
 ): Promise<SelectUser | null> {
-  const result = await db.execute(
-    `SELECT user_id FROM user_tokens WHERE token = '${token}' LIMIT 1`,
-  );
-  const rows = (result as any).rows ?? result;
-  if (!rows || rows.length === 0) return null;
-  const userId = rows[0].user_id;
-  return (await storage.getUser(userId)) ?? null;
+  // Try JWT first (used by Vercel serverless api/ functions)
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: number };
+    if (decoded?.id) {
+      return (await storage.getUser(decoded.id)) ?? null;
+    }
+  } catch {
+    // not a JWT, fall through to DB lookup
+  }
+
+  // Fall back to DB hex token lookup
+  try {
+    const result = await db.execute(
+      `SELECT user_id FROM user_tokens WHERE token = '${token}' LIMIT 1`,
+    );
+    const rows = (result as any).rows ?? result;
+    if (!rows || rows.length === 0) return null;
+    const userId = rows[0].user_id;
+    return (await storage.getUser(userId)) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Middleware: attach user from Bearer token if session auth didn't work ─────
@@ -82,7 +102,6 @@ export function setupAuth(app: Express) {
       sameSite: "lax",
     }),
   );
-
   app.use((req, res, next) => {
     if (req.session && !req.session.regenerate) {
       req.session.regenerate = (cb: any) => cb();
@@ -92,17 +111,12 @@ export function setupAuth(app: Express) {
     }
     next();
   });
-
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
   }
-
   app.use(passport.initialize());
   app.use(passport.session());
-
-  // Attach user from Bearer token for every request (fallback when cookies fail)
   app.use(attachTokenUser);
-
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -116,11 +130,9 @@ export function setupAuth(app: Express) {
       }
     }),
   );
-
   passport.serializeUser((user, done) => {
     done(null, (user as SelectUser).id);
   });
-
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
@@ -129,6 +141,5 @@ export function setupAuth(app: Express) {
       done(err);
     }
   });
-
   return { hashPassword };
 }
