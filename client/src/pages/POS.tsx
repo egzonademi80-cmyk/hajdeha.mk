@@ -464,6 +464,23 @@ export default function POS({ slug }: POSProps) {
   const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
 
+  const playChime = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.frequency.setValueAtTime(880, ctx.currentTime);
+      o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+      o.start();
+      o.stop(ctx.currentTime + 0.55);
+    } catch {}
+  };
+
   // ─── Orders Panel ─────────────────────────────────────────────────────────────
   const [showOrdersPanel, setShowOrdersPanel] = useState(false);
   const [claimTarget, setClaimTarget] = useState<number | null>(null);
@@ -1213,24 +1230,6 @@ export default function POS({ slug }: POSProps) {
   useEffect(() => {
     let pusher: Pusher | null = null;
     let cancelled = false;
-
-    const playChime = () => {
-      try {
-        const ctx = new (window.AudioContext ||
-          (window as any).webkitAudioContext)();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.frequency.setValueAtTime(880, ctx.currentTime);
-        o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
-        g.gain.setValueAtTime(0.0001, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
-        o.start();
-        o.stop(ctx.currentTime + 0.55);
-      } catch {}
-    };
 
     const handleIncoming = () => {
       // Trigger an immediate refetch — the polling useEffect handles
