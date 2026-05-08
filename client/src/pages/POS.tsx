@@ -736,7 +736,7 @@ export default function POS({ slug }: POSProps) {
       return res.json();
     },
     enabled: !!restaurantId,
-  });
+    });
   {
    
    ;
