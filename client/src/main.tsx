@@ -51,7 +51,7 @@ async function subscribeToPush(reg: ServiceWorkerRegistration) {
 // ── Inline Service Worker (works on Vercel static hosting) ──
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   const SW_CODE = `
-const CACHE_NAME = "hajdeha-v2";
+const CACHE_NAME = "hajdeha-v3";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -85,23 +85,8 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET" || url.protocol === "chrome-extension:") return;
 
+  // Never intercept API calls — let the browser handle them natively
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
-        try {
-          const response = await fetch(request);
-          if (response.ok) cache.put(request, response.clone());
-          return response;
-        } catch {
-          const cached = await cache.match(request);
-          if (cached) return cached;
-          return new Response(JSON.stringify({ offline: true, message: "No internet connection" }), {
-            status: 503,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-      })
-    );
     return;
   }
 
@@ -167,13 +152,13 @@ self.addEventListener("message", (event) => {
       if (hasDesserts && items && items.length > 0) {
         if (lang === "mk") {
           title = restaurantName + " — Десерт? 🍰";
-          body = "Може ли да ви предложиме нешто слатко?\nПрепорачуваме: " + items.join(" и ") + ".";
+          body = "Може ли да ви предложиме нешто слатко?\\nПрепорачуваме: " + items.join(" и ") + ".";
         } else if (lang === "en") {
           title = restaurantName + " — Dessert? 🍰";
-          body = "May we tempt you with something sweet?\nWe recommend: " + items.join(" and ") + ".";
+          body = "May we tempt you with something sweet?\\nWe recommend: " + items.join(" and ") + ".";
         } else {
           title = restaurantName + " — Ëmbëlsirë? 🍰";
-          body = "A mund t'ju ofrojmë diçka të ëmbël?\nRekomandojmë: " + items.join(" dhe ") + ".";
+          body = "A mund t'ju ofrojmë diçka të ëmbël?\\nRekomandojmë: " + items.join(" dhe ") + ".";
         }
         tag = "dessert-upsell";
       } else {

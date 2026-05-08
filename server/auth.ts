@@ -31,14 +31,16 @@ async function comparePasswords(supplied: string, stored: string) {
 export async function generateToken(userId: number): Promise<string> {
   const token = randomBytes(32).toString("hex");
   await db.execute(
-    `INSERT INTO user_tokens (token, user_id) VALUES ('${token}', ${userId}) ON CONFLICT (token) DO NOTHING`
+    `INSERT INTO user_tokens (token, user_id) VALUES ('${token}', ${userId}) ON CONFLICT (token) DO NOTHING`,
   );
   return token;
 }
 
-export async function getUserFromToken(token: string): Promise<SelectUser | null> {
+export async function getUserFromToken(
+  token: string,
+): Promise<SelectUser | null> {
   const result = await db.execute(
-    `SELECT user_id FROM user_tokens WHERE token = '${token}' LIMIT 1`
+    `SELECT user_id FROM user_tokens WHERE token = '${token}' LIMIT 1`,
   );
   const rows = (result as any).rows ?? result;
   if (!rows || rows.length === 0) return null;
@@ -47,7 +49,11 @@ export async function getUserFromToken(token: string): Promise<SelectUser | null
 }
 
 // ── Middleware: attach user from Bearer token if session auth didn't work ─────
-export async function attachTokenUser(req: Request, _res: Response, next: NextFunction) {
+export async function attachTokenUser(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) {
   if (req.isAuthenticated()) return next();
   const auth = req.headers.authorization;
   if (auth?.startsWith("Bearer ")) {
@@ -71,7 +77,8 @@ export function setupAuth(app: Express) {
       name: "session",
       keys: [process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y"],
       maxAge: 24 * 60 * 60 * 1000,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
+      httpOnly: false,
       sameSite: "lax",
     }),
   );
