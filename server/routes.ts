@@ -747,7 +747,6 @@ export async function registerRoutes(
   });
 
   app.post("/api/orders/:id/complete", async (req, res) => {
-    if (!requireAuth(req, res)) return;
     try {
       const id = parseInt(req.params.id);
       const order = await storage.getOrder(id);
