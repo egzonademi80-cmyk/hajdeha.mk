@@ -468,7 +468,7 @@ function printReceiptWindow({
     color: #555;
   }
   .total-amount {
-    font-size: 26px;
+    font-size: 18px;
     font-weight: 700;
     letter-spacing: -1px;
     color: #111;
@@ -539,11 +539,6 @@ function printReceiptWindow({
       <span class="total-currency">DEN</span>
     </span>
   </div>
-
-  <div>
-    <span class="pay-method">${methodIcon} ${methodLabel}</span>
-  </div>
-
   <hr class="div-dashed"/>
 
   <div class="footer">
