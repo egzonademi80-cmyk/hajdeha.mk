@@ -725,14 +725,23 @@ export default function POS({ slug }: POSProps) {
     queryKey: ["/api/admin/waiters", restaurantId],
     queryFn: async () => {
       if (!restaurantId) return [];
+      const token = localStorage.getItem("auth_token");
+      const headers: HeadersInit = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(
         `/api/admin/waiters?action=list&restaurantId=${restaurantId}`,
+        { headers, credentials: "include" },
       );
       if (!res.ok) return [];
       return res.json();
     },
     enabled: !!restaurantId,
   });
+  {
+   
+   ;
+ 
+   >                                
 
   const { data: dbOrders = [], refetch: refetchOrders } = useQuery({
     queryKey: ["/api/orders", restaurantId],
