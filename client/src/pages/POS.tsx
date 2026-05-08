@@ -1069,7 +1069,9 @@ export default function POS({ slug }: POSProps) {
       const waiter: { id: number; name: string } = await res.json();
       const tableIdx = tablePinSlot.idx;
       const existingWaiterId = tables[tableIdx].waiterId;
-      if (existingWaiterId && existingWaiterId !== waiter.id) {
+      const tableHasItems = tables[tableIdx].items.length > 0;
+      // Only block entry if the table has active items belonging to a different waiter
+      if (existingWaiterId && existingWaiterId !== waiter.id && tableHasItems) {
         setTablePinError(`Kjo tryezë i takon ${tables[tableIdx].waiterName}`);
         return;
       }
@@ -2944,13 +2946,29 @@ export default function POS({ slug }: POSProps) {
               });
               if (res.ok) {
                 const claimed = await res.json();
-                // Assign waiter to local table state
                 const tableIdx = tableNum - 1;
                 if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
+                  // Add the claimed order items into the table AND assign the waiter
+                  const incomingItems: OrderItem[] = (claimed.cart ?? []).map((ci: any) => ({
+                    id: ci.id,
+                    name: ci.name,
+                    price: ci.price,
+                    qty: ci.qty,
+                  }));
                   setTables(prev => {
                     const next = [...prev];
+                    const existing = next[tableIdx];
+                    // Merge incoming items into existing table items
+                    const merged = [...existing.items];
+                    incomingItems.forEach(incoming => {
+                      const idx = merged.findIndex(i => i.id === incoming.id);
+                      if (idx >= 0) merged[idx] = { ...merged[idx], qty: merged[idx].qty + incoming.qty };
+                      else merged.push({ ...incoming });
+                    });
                     next[tableIdx] = {
-                      ...next[tableIdx],
+                      ...existing,
+                      items: merged,
+                      startedAt: existing.startedAt ?? new Date(),
                       waiterId: claimed.waiterId,
                       waiterName: claimed.waiterName,
                     };
@@ -2962,18 +2980,11 @@ export default function POS({ slug }: POSProps) {
                 setClaimTarget(null);
                 setPinDigits("");
                 refetchOrders();
-                // Navigate to the table
+                // Navigate directly to the table — waiter already proved identity via claim PIN
                 if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
-                  if (waiters.length > 0) {
-                    setTablePinSlot({ kind: "table", idx: tableIdx });
-                    setTablePinDigits("");
-                    setTablePinError("");
-                    setShowTablePinModal(true);
-                  } else {
-                    setActive({ kind: "table", idx: tableIdx });
-                    setScreen("menu");
-                    setActiveCategory("All");
-                  }
+                  setActive({ kind: "table", idx: tableIdx });
+                  setScreen("menu");
+                  setActiveCategory("All");
                 }
               } else {
                 const d = await res.json();
