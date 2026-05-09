@@ -1248,11 +1248,7 @@ export default function POS({ slug }: POSProps) {
 
   // FIX [2]: openSlot — PIN gate only when table has NO waiter yet
   const openSlot = (slot: ActiveSlot) => {
-    if (
-      slot?.kind === "table" &&
-      waiters.length > 0 &&
-      !tables[slot.idx].waiterId // skip PIN if waiter already owns table
-    ) {
+    {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
