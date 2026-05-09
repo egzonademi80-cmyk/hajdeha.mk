@@ -284,16 +284,24 @@ function printReceiptWindow({
   tableLabel,
   items,
   payMethod,
+  waiterName,
+  sectionName,
+  roundNumber,
+  startedAt,
 }: {
   restaurantName: string;
   tableLabel: string;
   items: OrderItem[];
   payMethod?: "cash" | "card";
+  waiterName?: string;
+  sectionName?: string;
+  roundNumber?: number;
+  startedAt?: Date | null;
 }) {
   const win = window.open(
     "",
     "_blank",
-    "width=340,height=700,toolbar=0,scrollbars=0,status=0,menubar=0",
+    "width=340,height=800,toolbar=0,scrollbars=0,status=0,menubar=0",
   );
   if (!win) return;
 
@@ -310,14 +318,33 @@ function printReceiptWindow({
   });
   const methodLabel =
     payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
+  const methodIcon =
+    payMethod === "cash" ? "💵" : payMethod === "card" ? "💳" : "✓";
+
+  let durationStr = "";
+  if (startedAt) {
+    const mins = Math.floor(
+      (now.getTime() - new Date(startedAt).getTime()) / 60000,
+    );
+    if (mins < 60) durationStr = `${mins} min`;
+    else durationStr = `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  }
+
+  const openedStr = startedAt
+    ? new Date(startedAt).toLocaleTimeString("sq-MK", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   const rows = items
     .map(
       (item) =>
         `<tr>
-      <td style="padding:3px 0">${item.qty}x ${item.name}</td>
-      <td style="text-align:right;padding:3px 0;white-space:nowrap">${(item.price * item.qty).toFixed(0)} DEN</td>
-    </tr>`,
+          <td class="item-qty">${item.qty}×</td>
+          <td class="item-name">${item.name}</td>
+          <td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td>
+        </tr>`,
     )
     .join("");
 
@@ -326,35 +353,271 @@ function printReceiptWindow({
 <head>
 <meta charset="utf-8"/>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: 'Courier New', Courier, monospace; font-size: 13px; width: 80mm; padding: 10px 8px 20px; color: #000; background: #fff; }
-  .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .name { font-size: 17px; font-weight: bold; letter-spacing: 1px; }
-  .dash { border: none; border-top: 1px dashed #000; margin: 7px 0; }
-  table { width: 100%; border-collapse: collapse; }
-  td { vertical-align: top; }
-  .meta { display: flex; justify-content: space-between; font-size: 11px; color: #333; }
-  .total-row td { font-weight: bold; font-size: 15px; padding-top: 5px; border-top: 1px solid #000; }
-  .method { font-size: 11px; color: #444; padding-top: 2px; }
-  .footer { margin-top: 12px; font-size: 11px; text-align: center; color: #555; }
+  body {
+    font-family: 'Inter', 'Helvetica Neue', sans-serif;
+    font-size: 12px;
+    width: 80mm;
+    background: #fff;
+    color: #111;
+    padding: 0;
+  }
+
+  .header {
+    background: #111;
+    color: #fff;
+    padding: 18px 16px 14px;
+    text-align: center;
+  }
+  .header .brand {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .header .tagline {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+
+  .meta-strip {
+    background: #f5f5f5;
+    border-bottom: 1px solid #e8e8e8;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .meta-strip .table-info {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111;
+  }
+  .meta-strip .datetime {
+    font-size: 10px;
+    color: #888;
+    text-align: right;
+  }
+
+  .info-block {
+    padding: 10px 16px;
+    border-bottom: 1px dashed #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #666;
+  }
+  .info-row span:last-child {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .items-section {
+    padding: 12px 16px;
+  }
+  .items-label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .item-qty {
+    width: 20px;
+    color: #aaa;
+    font-weight: 500;
+    vertical-align: top;
+    padding: 3px 0;
+    font-size: 11px;
+  }
+  .item-name {
+    padding: 3px 8px 3px 4px;
+    color: #222;
+    font-weight: 500;
+    vertical-align: top;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .item-price {
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 600;
+    color: #111;
+    vertical-align: top;
+    padding: 3px 0;
+    font-size: 11px;
+  }
+
+  .total-block {
+    margin: 0 16px;
+    background: #111;
+    color: #fff;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .total-block .total-label {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.6;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .total-block .total-amount {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .total-block .total-currency {
+    font-size: 11px;
+    opacity: 0.5;
+    margin-left: 3px;
+  }
+
+  .payment-row {
+    margin: 8px 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #eee;
+  }
+  .payment-row .pay-icon { font-size: 14px; }
+  .payment-row .pay-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #333;
+    flex: 1;
+  }
+  .payment-row .pay-method {
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    background: #111;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  .duration-row {
+    margin: 6px 16px 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #aaa;
+    padding: 0 2px;
+  }
+
+  .footer {
+    margin-top: 16px;
+    padding: 14px 16px 20px;
+    text-align: center;
+    border-top: 1px dashed #e0e0e0;
+  }
+  .footer .thanks {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+  }
+  .footer .sub {
+    font-size: 9px;
+    color: #bbb;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .divider {
+    height: 1px;
+    background: #f0f0f0;
+    margin: 10px 16px;
+  }
+
   @page { margin: 0; size: 80mm auto; }
   @media print { body { width: 80mm; } }
 </style>
 </head>
 <body>
-  <div class="center name">${restaurantName}</div>
-  <div class="dash"></div>
-  <div class="meta"><span>${dateStr} &nbsp; ${timeStr}</span><span>${tableLabel}</span></div>
-  <div class="dash"></div>
-  <table>${rows}</table>
-  <div class="dash"></div>
-  <table>
-    <tr class="total-row"><td>TOTAL</td><td style="text-align:right">${total.toFixed(0)} DEN</td></tr>
-    <tr><td class="method" colspan="2">${methodLabel}</td></tr>
-  </table>
-  <div class="dash"></div>
-  <div class="footer">Faleminderit! &nbsp;•&nbsp; Hvala! &nbsp;•&nbsp; Thank you!</div>
+
+  <div class="header">
+    <div class="brand">${restaurantName}</div>
+    <div class="tagline">Faturë &nbsp;·&nbsp; Receipt</div>
+  </div>
+
+  <div class="meta-strip">
+    <div class="table-info">
+      ${sectionName ? `<span style="opacity:0.5;font-weight:500;font-size:11px">${sectionName} · </span>` : ""}${tableLabel}
+    </div>
+    <div class="datetime">
+      <div>${dateStr}</div>
+      <div style="font-weight:600;color:#333">${timeStr}</div>
+    </div>
+  </div>
+
+  <div class="info-block">
+    ${waiterName ? `<div class="info-row"><span>Kamarieri</span><span>${waiterName}</span></div>` : ""}
+    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>Raundi i porosisë</span><span>Porosi #${roundNumber}</span></div>` : ""}
+    ${openedStr ? `<div class="info-row"><span>Hapur në</span><span>${openedStr}</span></div>` : ""}
+    ${durationStr ? `<div class="info-row"><span>Kohëzgjatja</span><span>${durationStr}</span></div>` : ""}
+  </div>
+
+  <div class="items-section">
+    <div class="items-label">Artikujt</div>
+    <table>${rows}</table>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="total-block">
+    <div>
+      <div class="total-label">Total</div>
+      <div style="font-size:10px;opacity:0.4;margin-top:1px">${items.reduce((s, i) => s + i.qty, 0)} artikuj</div>
+    </div>
+    <div>
+      <span class="total-amount">${total.toLocaleString()}</span>
+      <span class="total-currency">DEN</span>
+    </div>
+  </div>
+
+  <div class="payment-row">
+    <span class="pay-icon">${methodIcon}</span>
+    <span class="pay-label">Mënyra e pagesës</span>
+    <span class="pay-method">${methodLabel.toUpperCase()}</span>
+  </div>
+
+  ${
+    durationStr
+      ? `
+  <div class="duration-row">
+    <span>Hapur: ${openedStr}</span>
+    <span>Mbyllur: ${timeStr}</span>
+    <span>⏱ ${durationStr}</span>
+  </div>`
+      : ""
+  }
+
+  <div class="footer">
+    <div class="thanks">Faleminderit për vizitën!</div>
+    <div class="sub">Hvala &nbsp;·&nbsp; Thank you</div>
+  </div>
+
 </body>
 </html>`);
 
@@ -364,7 +627,7 @@ function printReceiptWindow({
     win.print();
     win.onafterprint = () => win.close();
     setTimeout(() => win.close(), 4000);
-  }, 350);
+  }, 400);
 }
 
 function playWaiterChime(type: WaiterSignal["type"]) {
@@ -770,6 +1033,9 @@ export default function POS({ slug }: POSProps) {
           tableLabel: `Tavolina ${splitTableIdx + 1} — ${person.name}`,
           items: personItems,
           payMethod: method,
+          waiterName: tables[splitTableIdx].waiterName,
+          sectionName: getTableSection(splitTableIdx),
+          startedAt: tables[splitTableIdx].startedAt,
         });
       }
     }
@@ -858,6 +1124,10 @@ export default function POS({ slug }: POSProps) {
     tableLabel: string;
     items: OrderItem[];
     payMethod?: "cash" | "card";
+    waiterName?: string;
+    sectionName?: string;
+    roundNumber?: number;
+    startedAt?: Date | null;
   }) => {
     if (data.items.length === 0) return;
     if (usbDevice) {
@@ -1216,6 +1486,18 @@ export default function POS({ slug }: POSProps) {
         restaurantName: restaurant?.name ?? "Restaurant",
         tableLabel,
         items: receiptItems,
+        waiterName:
+          slot.kind === "table" ? tables[slot.idx].waiterName : undefined,
+        sectionName:
+          slot.kind === "table" ? getTableSection(slot.idx) : undefined,
+        roundNumber:
+          slot.kind === "table"
+            ? (tables[slot.idx].rounds?.length ?? 1)
+            : undefined,
+        startedAt:
+          slot.kind === "table"
+            ? tables[slot.idx].startedAt
+            : personTabs[slot.idx]?.startedAt,
       });
     }
     if (slot.kind === "table") {
