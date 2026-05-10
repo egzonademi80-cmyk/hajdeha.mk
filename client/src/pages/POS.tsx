@@ -1,3 +1,4 @@
+/// <reference types="w3c-web-usb" />
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -276,7 +277,7 @@ async function sendToUsbPrinter(
   try {
     await device.claimInterface(interfaceNum);
   } catch {}
-  await device.transferOut(endpointNum, data);
+  await device.transferOut(endpointNum, data.buffer as ArrayBuffer);
 }
 
 function printReceiptWindow({
@@ -318,18 +319,15 @@ function printReceiptWindow({
   });
   const methodLabel =
     payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
-  const methodIcon =
-    payMethod === "cash" ? "💵" : payMethod === "card" ? "💳" : "✓";
 
   let durationStr = "";
   if (startedAt) {
     const mins = Math.floor(
       (now.getTime() - new Date(startedAt).getTime()) / 60000,
     );
-    if (mins < 60) durationStr = `${mins} min`;
-    else durationStr = `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    durationStr =
+      mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
   }
-
   const openedStr = startedAt
     ? new Date(startedAt).toLocaleTimeString("sq-MK", {
         hour: "2-digit",
@@ -341,10 +339,10 @@ function printReceiptWindow({
     .map(
       (item) =>
         `<tr>
-          <td class="item-qty">${item.qty}×</td>
-          <td class="item-name">${item.name}</td>
-          <td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td>
-        </tr>`,
+      <td class="item-qty">${item.qty}×</td>
+      <td class="item-name">${item.name}</td>
+      <td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td>
+    </tr>`,
     )
     .join("");
 
@@ -353,205 +351,190 @@ function printReceiptWindow({
 <head>
 <meta charset="utf-8"/>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
     font-family: 'Inter', 'Helvetica Neue', sans-serif;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 700;
     width: 80mm;
     background: #fff;
-    color: #111;
-    padding: 0;
+    color: #000;
+    -webkit-print-color-adjust: exact;
   }
-
   .header {
-    background: #111;
-    color: #fff;
-    padding: 18px 16px 14px;
+    padding: 20px 16px 14px;
     text-align: center;
+    border-bottom: 3px solid #000;
   }
-  .header .brand {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    margin-bottom: 4px;
-  }
-  .header .tagline {
-    font-size: 9px;
-    letter-spacing: 2px;
+  .brand {
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 4px;
     text-transform: uppercase;
-    opacity: 0.5;
+    margin-bottom: 3px;
+    color: #000;
   }
-
+  .tagline {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #000;
+  }
   .meta-strip {
-    background: #f5f5f5;
-    border-bottom: 1px solid #e8e8e8;
     padding: 10px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-bottom: 1.5px dashed #000;
   }
-  .meta-strip .table-info {
-    font-size: 13px;
+  .table-section {
+    font-size: 9px;
     font-weight: 700;
-    color: #111;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    color: #000;
   }
-  .meta-strip .datetime {
-    font-size: 10px;
-    color: #888;
+  .table-info {
+    font-size: 16px;
+    font-weight: 900;
+    color: #000;
+  }
+  .datetime {
     text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.7;
+    color: #000;
   }
-
   .info-block {
     padding: 10px 16px;
-    border-bottom: 1px dashed #e0e0e0;
+    border-bottom: 1.5px dashed #000;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
   }
   .info-row {
     display: flex;
     justify-content: space-between;
-    font-size: 10px;
-    color: #666;
+    font-size: 11px;
+    font-weight: 700;
+    color: #000;
   }
-  .info-row span:last-child {
-    font-weight: 600;
-    color: #333;
-  }
-
   .items-section {
-    padding: 12px 16px;
+    padding: 12px 16px 8px;
   }
   .items-label {
     font-size: 9px;
-    letter-spacing: 1.5px;
+    font-weight: 800;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    color: #aaa;
-    margin-bottom: 8px;
-    font-weight: 600;
+    color: #000;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #000;
   }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
+  table { width: 100%; border-collapse: collapse; }
   .item-qty {
-    width: 20px;
-    color: #aaa;
-    font-weight: 500;
+    width: 22px;
+    font-weight: 700;
     vertical-align: top;
-    padding: 3px 0;
-    font-size: 11px;
+    padding: 4px 0;
+    font-size: 12px;
+    color: #000;
   }
   .item-name {
-    padding: 3px 8px 3px 4px;
-    color: #222;
-    font-weight: 500;
+    padding: 4px 8px 4px 2px;
+    font-weight: 700;
     vertical-align: top;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.4;
+    color: #000;
   }
   .item-price {
     text-align: right;
     white-space: nowrap;
-    font-weight: 600;
-    color: #111;
+    font-weight: 800;
     vertical-align: top;
-    padding: 3px 0;
-    font-size: 11px;
+    padding: 4px 0;
+    font-size: 12px;
+    color: #000;
   }
-
   .total-block {
-    margin: 0 16px;
-    background: #111;
-    color: #fff;
-    border-radius: 10px;
-    padding: 12px 14px;
+    margin: 10px 16px;
+    padding: 12px 0;
+    border-top: 3px solid #000;
+    border-bottom: 3px solid #000;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
-  .total-block .total-label {
-    font-size: 11px;
-    font-weight: 600;
-    opacity: 0.6;
-    letter-spacing: 1px;
+  .total-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
     text-transform: uppercase;
+    color: #000;
   }
-  .total-block .total-amount {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-  }
-  .total-block .total-currency {
-    font-size: 11px;
-    opacity: 0.5;
-    margin-left: 3px;
-  }
-
-  .payment-row {
-    margin: 8px 16px 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    background: #f9f9f9;
-    border-radius: 8px;
-    border: 1px solid #eee;
-  }
-  .payment-row .pay-icon { font-size: 14px; }
-  .payment-row .pay-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #333;
-    flex: 1;
-  }
-  .payment-row .pay-method {
+  .total-count {
     font-size: 10px;
     font-weight: 700;
-    color: #fff;
-    background: #111;
-    padding: 2px 8px;
-    border-radius: 20px;
+    margin-top: 3px;
+    color: #000;
+  }
+  .total-amount {
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: #000;
+  }
+  .total-currency {
+    font-size: 13px;
+    font-weight: 700;
+    margin-left: 3px;
+    color: #000;
+  }
+  .duration-row {
+    margin: 0 16px 10px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    font-weight: 700;
+    color: #000;
     letter-spacing: 0.5px;
   }
-
-  .duration-row {
-    margin: 6px 16px 0;
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    color: #aaa;
-    padding: 0 2px;
-  }
-
   .footer {
-    margin-top: 16px;
     padding: 14px 16px 20px;
     text-align: center;
-    border-top: 1px dashed #e0e0e0;
+    border-top: 1.5px dashed #000;
   }
-  .footer .thanks {
-    font-size: 12px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 4px;
+  .thanks {
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+    color: #000;
   }
-  .footer .sub {
+  .sub-footer {
     font-size: 9px;
-    color: #bbb;
-    letter-spacing: 1px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
     text-transform: uppercase;
+    color: #000;
   }
-
-  .divider {
-    height: 1px;
-    background: #f0f0f0;
-    margin: 10px 16px;
+  @media print {
+    body {
+      width: auto;
+      max-width: 80mm;
+      margin: 0 auto;
+    }
+    @page {
+      size: auto;
+      margin: 8mm;
+    }
   }
-
-  @page { margin: 0; size: 80mm auto; }
-  @media print { body { width: 80mm; } }
 </style>
 </head>
 <body>
@@ -562,33 +545,32 @@ function printReceiptWindow({
   </div>
 
   <div class="meta-strip">
-    <div class="table-info">
-      ${sectionName ? `<span style="opacity:0.5;font-weight:500;font-size:11px">${sectionName} · </span>` : ""}${tableLabel}
+    <div>
+      ${sectionName ? `<div class="table-section">${sectionName}</div>` : ""}
+      <div class="table-info">${tableLabel}</div>
     </div>
     <div class="datetime">
       <div>${dateStr}</div>
-      <div style="font-weight:600;color:#333">${timeStr}</div>
+      <div>${timeStr}</div>
     </div>
   </div>
 
   <div class="info-block">
     ${waiterName ? `<div class="info-row"><span>Kamarieri</span><span>${waiterName}</span></div>` : ""}
-    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>Raundi i porosisë</span><span>Porosi #${roundNumber}</span></div>` : ""}
+    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>Raundi</span><span>Porosi #${roundNumber}</span></div>` : ""}
     ${openedStr ? `<div class="info-row"><span>Hapur në</span><span>${openedStr}</span></div>` : ""}
     ${durationStr ? `<div class="info-row"><span>Kohëzgjatja</span><span>${durationStr}</span></div>` : ""}
   </div>
 
   <div class="items-section">
-    <div class="items-label">Artikujt</div>
+    <div class="items-label">Artikujt · ${items.reduce((s, i) => s + i.qty, 0)} copë</div>
     <table>${rows}</table>
   </div>
-
-  <div class="divider"></div>
 
   <div class="total-block">
     <div>
       <div class="total-label">Total</div>
-      <div style="font-size:10px;opacity:0.4;margin-top:1px">${items.reduce((s, i) => s + i.qty, 0)} artikuj</div>
+      <div class="total-count">${items.reduce((s, i) => s + i.qty, 0)} artikuj</div>
     </div>
     <div>
       <span class="total-amount">${total.toLocaleString()}</span>
@@ -596,26 +578,20 @@ function printReceiptWindow({
     </div>
   </div>
 
-  <div class="payment-row">
-    <span class="pay-icon">${methodIcon}</span>
-    <span class="pay-label">Mënyra e pagesës</span>
-    <span class="pay-method">${methodLabel.toUpperCase()}</span>
-  </div>
-
   ${
-    durationStr
+    openedStr && durationStr
       ? `
   <div class="duration-row">
     <span>Hapur: ${openedStr}</span>
-    <span>Mbyllur: ${timeStr}</span>
     <span>⏱ ${durationStr}</span>
+    <span>Mbyllur: ${timeStr}</span>
   </div>`
       : ""
   }
 
   <div class="footer">
     <div class="thanks">Faleminderit për vizitën!</div>
-    <div class="sub">Hvala &nbsp;·&nbsp; Thank you</div>
+    <div class="sub-footer">Hvala &nbsp;·&nbsp; Thank you</div>
   </div>
 
 </body>
@@ -2756,7 +2732,7 @@ export default function POS({ slug }: POSProps) {
           )}
       </AnimatePresence>
 
-      {/* ═══════════════════════════ MODALS ════════════════════ p�══════ */}
+      {/* ═══════════════════════════ MODALS ═══════════════s��════ p�══════ */}
 
       {/* Split Bill Modal */}
       <AnimatePresence>
