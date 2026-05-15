@@ -236,13 +236,13 @@ function buildEscPosBytes({
   push(0x1b, 0x45, 0x00);
 
   const methodLabel =
-    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Karte" : "Paguar";
+    payMethod === "cash" ? "Cash" : payMethod === "card" ? "Card" : "Paid";
   text(methodLabel);
   lf();
   dashes();
 
   push(0x1b, 0x61, 0x01);
-  text("Faleminderit! Hvala! Thank you!");
+  text("Thank you!");
   lf();
   lf();
   lf();
@@ -318,7 +318,7 @@ function printReceiptWindow({
     minute: "2-digit",
   });
   const methodLabel =
-    payMethod === "cash" ? "Kesh" : payMethod === "card" ? "Kartë" : "Paguar";
+    payMethod === "cash" ? "Cash" : payMethod === "card" ? "Card" : "Paid";
 
   let durationStr = "";
   if (startedAt) {
@@ -556,21 +556,21 @@ function printReceiptWindow({
   </div>
 
   <div class="info-block">
-    ${waiterName ? `<div class="info-row"><span>Kamarieri</span><span>${waiterName}</span></div>` : ""}
-    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>Raundi</span><span>Porosi #${roundNumber}</span></div>` : ""}
-    ${openedStr ? `<div class="info-row"><span>Hapur në</span><span>${openedStr}</span></div>` : ""}
-    ${durationStr ? `<div class="info-row"><span>Kohëzgjatja</span><span>${durationStr}</span></div>` : ""}
+    ${waiterName ? `<div class="info-row"><span>Waiter</span><span>${waiterName}</span></div>` : ""}
+    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>Round</span><span>Order #${roundNumber}</span></div>` : ""}
+    ${openedStr ? `<div class="info-row"><span>Opened at</span><span>${openedStr}</span></div>` : ""}
+    ${durationStr ? `<div class="info-row"><span>Duration</span><span>${durationStr}</span></div>` : ""}
   </div>
 
   <div class="items-section">
-    <div class="items-label">Artikujt · ${items.reduce((s, i) => s + i.qty, 0)} copë</div>
+    <div class="items-label">Items · ${items.reduce((s, i) => s + i.qty, 0)} pcs</div>
     <table>${rows}</table>
   </div>
 
   <div class="total-block">
     <div>
       <div class="total-label">Total</div>
-      <div class="total-count">${items.reduce((s, i) => s + i.qty, 0)} artikuj</div>
+      <div class="total-count">${items.reduce((s, i) => s + i.qty, 0)} items</div>
     </div>
     <div>
       <span class="total-amount">${total.toLocaleString()}</span>
@@ -582,16 +582,16 @@ function printReceiptWindow({
     openedStr && durationStr
       ? `
   <div class="duration-row">
-    <span>Hapur: ${openedStr}</span>
+    <span>Opened: ${openedStr}</span>
     <span>⏱ ${durationStr}</span>
-    <span>Mbyllur: ${timeStr}</span>
+    <span>Closed: ${timeStr}</span>
   </div>`
       : ""
   }
 
   <div class="footer">
-    <div class="thanks">Faleminderit për vizitën!</div>
-    <div class="sub-footer">Hvala &nbsp;·&nbsp; Thank you</div>
+    <div class="thanks">Thank you for your visit!</div>
+    <div class="sub-footer">Thank you</div>
   </div>
 
 </body>
@@ -1006,7 +1006,7 @@ export default function POS({ slug }: POSProps) {
       if (personItems.length > 0) {
         handlePrint({
           restaurantName: restaurant?.name ?? "Restaurant",
-          tableLabel: `Tavolina ${splitTableIdx + 1} — ${person.name}`,
+          tableLabel: `Table ${splitTableIdx + 1} — ${person.name}`,
           items: personItems,
           payMethod: method,
           waiterName: tables[splitTableIdx].waiterName,
@@ -1468,7 +1468,7 @@ export default function POS({ slug }: POSProps) {
         : personTabs[slot.idx].items;
     const tableLabel =
       slot.kind === "table"
-        ? `Tavolina ${slot.idx + 1}`
+        ? `Table ${slot.idx + 1}`
         : (personTabs[slot.idx]?.name ?? "Tab");
     if (receiptItems.length > 0) {
       handlePrint({
@@ -1564,7 +1564,7 @@ export default function POS({ slug }: POSProps) {
       });
       if (!res.ok) {
         const d = await res.json();
-        setTablePinError(d.message || "PIN i gabuar");
+        setTablePinError(d.message || "Wrong PIN");
         return;
       }
       const waiter: { id: number; name: string } = await res.json();
@@ -1573,7 +1573,7 @@ export default function POS({ slug }: POSProps) {
 
       // Block only if a DIFFERENT waiter already owns this table
       if (existingWaiterId && existingWaiterId !== waiter.id) {
-        setTablePinError(`Kjo tryezë i takon ${tables[tableIdx].waiterName}`);
+        setTablePinError(`This table belongs to ${tables[tableIdx].waiterName}`);
         return;
       }
 
@@ -1595,7 +1595,7 @@ export default function POS({ slug }: POSProps) {
       setScreen("menu");
       setActiveCategory("All");
     } catch {
-      setTablePinError("Gabim rrjeti");
+      setTablePinError("Network error");
     } finally {
       setTablePinLoading(false);
     }
@@ -1938,18 +1938,18 @@ export default function POS({ slug }: POSProps) {
                   ? {
                       grad: "from-emerald-600 to-emerald-500",
                       icon: "💵",
-                      label: `Fatura Kesh — Tavolina ${signal.tableNumber}`,
+                      label: `Cash Bill — Table ${signal.tableNumber}`,
                     }
                   : signal.type === "bill-card"
                     ? {
                         grad: "from-blue-600 to-blue-500",
                         icon: "💳",
-                        label: `Fatura Kartë — Tavolina ${signal.tableNumber}`,
+                        label: `Card Bill — Table ${signal.tableNumber}`,
                       }
                     : {
                         grad: "from-amber-500 to-amber-400",
                         icon: "🔔",
-                        label: `Keni nevojë — Tavolina ${signal.tableNumber}`,
+                        label: `Need help — Table ${signal.tableNumber}`,
                       };
               return (
                 <motion.button
@@ -2035,14 +2035,14 @@ export default function POS({ slug }: POSProps) {
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-bold leading-tight">
                 {incomingBanner.roundNumber > 1
-                  ? `⚡ Porosi ${incomingBanner.roundNumber} — Tavolina ${incomingBanner.tableNumber}`
-                  : `Porosi e re — Tavolina ${incomingBanner.tableNumber}`}
+                  ? `⚡ Order ${incomingBanner.roundNumber} — Table ${incomingBanner.tableNumber}`
+                  : `New Order — Table ${incomingBanner.tableNumber}`}
               </p>
               <p
                 className="text-[11px] font-semibold opacity-80 truncate"
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
-                {incomingBanner.cart.reduce((s, i) => s + i.qty, 0)} artikuj ·{" "}
+                {incomingBanner.cart.reduce((s, i) => s + i.qty, 0)} items ·{" "}
                 {incomingBanner.cart.reduce((s, i) => s + i.price * i.qty, 0)}{" "}
                 DEN
               </p>
@@ -2232,14 +2232,14 @@ export default function POS({ slug }: POSProps) {
                   className={`text-[10px] ${t.textFaint}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  PERSONAT
+                  PERSONS
                 </p>
                 <button
                   onClick={() => setShowNewPerson(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold active:bg-amber-500/25"
                 >
                   <UserPlus className="h-3 w-3" />
-                  Krijo
+                  New
                 </button>
               </div>
 
@@ -2248,7 +2248,7 @@ export default function POS({ slug }: POSProps) {
                   className={`rounded-2xl border border-dashed ${t.borderDashed} flex items-center justify-center py-6 lg:py-10`}
                 >
                   <p className={`${t.textFaint} text-xs lg:text-sm`}>
-                    Nuk ka persona aktiv
+                    No active persons
                   </p>
                 </div>
               ) : (
@@ -2270,7 +2270,7 @@ export default function POS({ slug }: POSProps) {
                           <>
                             <CheckCircle className="h-5 w-5 text-emerald-400 flex-shrink-0" />
                             <span className="text-sm text-emerald-400 font-semibold">
-                              Paguar ✓
+                              Paid ✓
                             </span>
                           </>
                         ) : (
@@ -2379,7 +2379,7 @@ export default function POS({ slug }: POSProps) {
                   className={`text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  AKTIV
+                  ACTIVE
                 </p>
                 <p
                   className={`text-xl font-bold ${t.text}`}
@@ -2528,7 +2528,7 @@ export default function POS({ slug }: POSProps) {
                 >
                   <ShoppingBag className="h-4 w-4 text-amber-400" />
                   <p className="text-sm font-bold">
-                    Porosia ·{" "}
+                    Order ·{" "}
                     <span className="text-amber-400">{activeLabel}</span>
                   </p>
                   <span
@@ -2721,13 +2721,13 @@ export default function POS({ slug }: POSProps) {
                           onClick={() => setPayConfirm(false)}
                           className={`flex-1 h-12 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold hover:bg-white/12`}
                         >
-                          Anulo
+                          Cancel
                         </button>
                         <button
                           onClick={payOrder}
                           className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-400"
                         >
-                          ✓ Paguar
+                          ✓ Paid
                         </button>
                       </div>
                     ) : (
@@ -2746,7 +2746,7 @@ export default function POS({ slug }: POSProps) {
                           className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
                         >
                           <Receipt className="h-4 w-4" />
-                          Paguaj {orderTotal(currentOrder)} DEN
+                          Pay {orderTotal(currentOrder)} DEN
                         </button>
                       </div>
                     )}
@@ -3330,10 +3330,10 @@ export default function POS({ slug }: POSProps) {
               className={`fixed left-4 right-4 bottom-1/3 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.borderDashed} shadow-2xl`}
             >
               <p className={`text-base font-bold ${t.text} mb-1`}>
-                Krijo Person
+                New Person
               </p>
               <p className={`text-xs ${t.textDim} mb-4`}>
-                Shkruaj emrin e personit
+                Enter the person's name
               </p>
               <input
                 ref={nameInputRef}
@@ -3342,7 +3342,7 @@ export default function POS({ slug }: POSProps) {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleCreatePerson();
                 }}
-                placeholder="p.sh. Besart, Mirem, Person1…"
+                placeholder="e.g. John, Mary, Person1…"
                 className={`w-full h-12 rounded-xl border ${t.inputBorder} px-4 text-sm outline-none focus:border-amber-500/50 mb-4`}
                 style={{ background: t.inputBgStyle, color: t.inputTextStyle }}
               />
@@ -3354,14 +3354,14 @@ export default function POS({ slug }: POSProps) {
                   }}
                   className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
                 >
-                  Anulo
+                  Cancel
                 </button>
                 <button
                   onClick={handleCreatePerson}
                   disabled={!newPersonName.trim()}
                   className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
                 >
-                  Krijo
+                  Create
                 </button>
               </div>
             </motion.div>
@@ -3395,20 +3395,20 @@ export default function POS({ slug }: POSProps) {
                 <KeyRound className="h-4 w-4 text-amber-400" />
                 <p className={`text-base font-bold ${t.text}`}>
                   {tables[tablePinSlot.idx].waiterId
-                    ? `Tavolina ${tablePinSlot.idx + 1} · ${tables[tablePinSlot.idx].waiterName}`
-                    : `Tavolina ${tablePinSlot.idx + 1}`}
+                    ? `Table ${tablePinSlot.idx + 1} · ${tables[tablePinSlot.idx].waiterName}`
+                    : `Table ${tablePinSlot.idx + 1}`}
                 </p>
               </div>
               <p className={`text-xs ${t.textDim} mb-4`}>
                 {tables[tablePinSlot.idx].waiterId
-                  ? "Futni PIN-in tuaj për të vazhduar"
-                  : "Futni PIN-in tuaj për të marrë tavolinën"}
+                  ? "Enter your PIN to continue"
+                  : "Enter your PIN to claim the table"}
               </p>
               <input
                 type="number"
                 inputMode="numeric"
                 maxLength={3}
-                placeholder="PIN 3-shifror"
+                placeholder="3-digit PIN"
                 value={tablePinDigits}
                 autoFocus
                 onChange={(e) => {
@@ -3436,7 +3436,7 @@ export default function POS({ slug }: POSProps) {
                   }}
                   className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
                 >
-                  Anulo
+                  Cancel
                 </button>
                 <button
                   onClick={confirmTablePin}
@@ -3444,7 +3444,7 @@ export default function POS({ slug }: POSProps) {
                   className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
                   data-testid="button-confirm-table-pin"
                 >
-                  {tablePinLoading ? "…" : "Hyr"}
+                  {tablePinLoading ? "…" : "Enter"}
                 </button>
               </div>
             </motion.div>
@@ -3530,10 +3530,10 @@ export default function POS({ slug }: POSProps) {
                   }
                 } else {
                   const d = await res.json();
-                  setClaimError(d.message || "PIN i gabuar");
+                  setClaimError(d.message || "Wrong PIN");
                 }
               } catch {
-                setClaimError("Gabim rrjeti");
+                setClaimError("Network error");
               } finally {
                 setClaimLoading(false);
               }
@@ -3573,13 +3573,13 @@ export default function POS({ slug }: POSProps) {
                       </div>
                       <div>
                         <p className={`text-sm font-bold ${t.text}`}>
-                          Merr Porosinë
+                          Claim Order
                         </p>
                         <p
                           className={`text-[11px] ${t.textMuted}`}
                           style={{ fontFamily: "'DM Mono', monospace" }}
                         >
-                          TAVOLINA {tableNum} · {cartTotal} DEN
+                          TABLE {tableNum} · {cartTotal} DEN
                         </p>
                       </div>
                     </div>
@@ -3617,7 +3617,7 @@ export default function POS({ slug }: POSProps) {
                       className={`text-[10px] font-bold ${t.textDim} mb-2 text-center`}
                       style={{ fontFamily: "'DM Mono', monospace" }}
                     >
-                      FUTNI PIN-IN TUAJ
+                      ENTER YOUR PIN
                     </p>
                     <div className="flex items-center justify-center gap-4 mb-2">
                       {[0, 1, 2].map((i) => (
@@ -3662,7 +3662,7 @@ export default function POS({ slug }: POSProps) {
                       className="w-full h-14 rounded-2xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                       data-testid="button-confirm-incoming-claim"
                     >
-                      {claimLoading ? (
+                      {claimLoading ? ( 
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{
@@ -3676,7 +3676,7 @@ export default function POS({ slug }: POSProps) {
                       ) : (
                         <>
                           <KeyRound className="h-4 w-4" />
-                          Konfirmo dhe Merr Porosinë
+                          Confirm & Claim Order
                         </>
                       )}
                     </button>
@@ -3716,13 +3716,13 @@ export default function POS({ slug }: POSProps) {
                 style={{ borderColor: isLight ? "#e5e7eb" : "#292524" }}
               >
                 <div>
-                  <h2 className={`text-base font-bold ${t.text}`}>Porositë</h2>
+                  <h2 className={`text-base font-bold ${t.text}`}>Orders</h2>
                   <p className={`text-xs ${t.textMuted}`}>
                     {
                       dbOrders.filter((o: any) => o.status !== "completed")
                         .length
                     }{" "}
-                    aktive
+                    active
                   </p>
                 </div>
                 <button
@@ -3740,7 +3740,7 @@ export default function POS({ slug }: POSProps) {
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {dbOrders.length === 0 && (
                   <div className={`text-center py-12 ${t.textMuted} text-sm`}>
-                    Nuk ka porosi ende
+                    No orders yet
                   </div>
                 )}
                 {[...dbOrders]
@@ -3758,16 +3758,16 @@ export default function POS({ slug }: POSProps) {
                     const statusCfg =
                       order.status === "pending"
                         ? {
-                            label: "Pret",
+                            label: "Pending",
                             color: "bg-amber-500/20 text-amber-500",
                           }
                         : order.status === "claimed"
                           ? {
-                              label: "Marrë",
+                              label: "Claimed",
                               color: "bg-blue-500/20 text-blue-400",
                             }
                           : {
-                              label: "Kryer",
+                              label: "Done",
                               color: "bg-emerald-500/20 text-emerald-400",
                             };
                     return (
@@ -3778,7 +3778,7 @@ export default function POS({ slug }: POSProps) {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className={`font-bold text-sm ${t.text}`}>
-                              Tavolina {order.tableNumber}
+                              Table {order.tableNumber}
                             </p>
                             <p className={`text-xs ${t.textMuted}`}>
                               {new Date(order.createdAt).toLocaleTimeString(
@@ -3832,7 +3832,7 @@ export default function POS({ slug }: POSProps) {
                                   type="number"
                                   inputMode="numeric"
                                   maxLength={3}
-                                  placeholder="PIN 3-shifror"
+                                  placeholder="3-digit PIN"
                                   value={pinDigits}
                                   onChange={(e) => {
                                     setPinDigits(e.target.value.slice(0, 3));
@@ -3857,7 +3857,7 @@ export default function POS({ slug }: POSProps) {
                                   }}
                                   className={`flex-1 h-9 rounded-xl text-xs font-semibold ${t.surfaceSoft} ${t.textMuted}`}
                                 >
-                                  Anulo
+                                  Cancel
                                 </button>
                                 <button
                                   disabled={
@@ -3920,10 +3920,10 @@ export default function POS({ slug }: POSProps) {
                                         }
                                       } else {
                                         const d = await res.json();
-                                        setClaimError(d.message || "Gabim");
+                                        setClaimError(d.message || "Error");
                                       }
                                     } catch {
-                                      setClaimError("Gabim rrjeti");
+                                      setClaimError("Network error");
                                     } finally {
                                       setClaimLoading(false);
                                     }
@@ -3931,7 +3931,7 @@ export default function POS({ slug }: POSProps) {
                                   className="flex-1 h-9 rounded-xl bg-amber-500 text-black text-xs font-bold disabled:opacity-40"
                                   data-testid="button-confirm-claim"
                                 >
-                                  {claimLoading ? "…" : "Konfirmo"}
+                                  {claimLoading ? "…" : "Confirm"}
                                 </button>
                               </div>
                             </div>
@@ -3945,7 +3945,7 @@ export default function POS({ slug }: POSProps) {
                               className="w-full h-9 rounded-xl bg-amber-500 text-black text-xs font-bold"
                               data-testid={`button-take-order-${order.id}`}
                             >
-                              Merr Porosinë
+                              Claim Order
                             </button>
                           ))}
 
