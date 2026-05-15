@@ -1504,9 +1504,8 @@ export default function POS({ slug }: POSProps) {
     setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // FIX [2]: openSlot — PIN gate only when table has NO waiter yet
   const openSlot = (slot: ActiveSlot) => {
-    {
+    if (slot?.kind === "table" && waiters.length > 0) {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
