@@ -165,16 +165,143 @@ const defaultSections: TableSection[] = [
   { name: "Bar", tables: [] },
 ];
 
+const posTranslations = {
+  en: {
+    addItems: "ADD ITEMS", orderScreen: "ORDER",
+    printerConnected: "Printer connected — click to disconnect",
+    connectPrinter: "Connect thermal printer",
+    transferTable: "Transfer Table", mergeTables: "Merge Tables",
+    sections: "Sections", allSections: "All Sections", totalOpen: "TOTAL OPEN",
+    orderDot: "Order", persons: "PERSONS", newBtn: "New",
+    noActivePersons: "No active persons", activeLabel: "ACTIVE",
+    pay: "Pay", paidBtn: "✓ Paid", paidCheck: "Paid ✓",
+    cancel: "Cancel", splitBill: "Split Bill", addPerson: "Add Person",
+    assignItems: "ASSIGN EACH ITEM TO A PERSON", checkout: "CHECKOUT",
+    unassigned: "Unassigned:", nothingAssigned: "Nothing assigned",
+    allPaid: "All Paid!", tableCleared: "Table cleared",
+    transferTitle: "Transfer Table",
+    transferFromHint: "Select source table (table to move FROM)",
+    mergeTitle: "Merge Tables", mergeFirstHint: "Select first table to merge",
+    tableSections: "Table Sections",
+    assignTablesHint: "Select a section, then tap tables to assign them",
+    unassignedLabel: "UNASSIGNED", saveSections: "Save sections",
+    newPersonTitle: "New Person", enterNameHint: "Enter the person's name",
+    namePlaceholder: "e.g. John, Mary, Person1…", create: "Create",
+    enterPinContinue: "Enter your PIN to continue",
+    enterPinClaim: "Enter your PIN to claim the table",
+    pinPlaceholder: "3-digit PIN", enterBtn: "Enter",
+    newOrder: "New Order", orderLabel: "Order", tableTag: "TABLE",
+    claimOrder: "Claim Order", confirmClaim: "Confirm & Claim Order",
+    confirm: "Confirm", enterYourPin: "ENTER YOUR PIN",
+    cashBill: "Cash Bill", cardBill: "Card Bill", needHelp: "Need help",
+    ordersTitle: "Orders", activeCount: "active", noOrdersYet: "No orders yet",
+    statusPending: "Pending", statusClaimed: "Claimed", statusDone: "Done",
+    claimOrderBtn: "Claim Order", markDone: "✓ Mark as done",
+    wrongPin: "Wrong PIN", networkError: "Network error", error: "Error",
+    thisTableBelongsTo: (name: string) => `This table belongs to ${name}`,
+    transferToHint: (n: number) => `Select destination table (move T${n} TO...)`,
+    mergeSecondHint: (n: number) => `Select second table to merge T${n} with...`,
+    receiptTagline: "Receipt", waiter: "Waiter", round: "Round",
+    orderNum: "Order", openedAt: "Opened at", duration: "Duration",
+    itemsLabel: "Items", pcs: "pcs", opened: "Opened:", closed: "Closed:",
+    thanks: "Thank you for your visit!", cash: "Cash", card: "Card", paid: "Paid",
+  },
+  al: {
+    addItems: "SHTO", orderScreen: "POROSI",
+    printerConnected: "Printer i lidhur — kliko për të shkëputur",
+    connectPrinter: "Lidhu me printer termik",
+    transferTable: "Transfero Tavolinën", mergeTables: "Bashko Tavolinat",
+    sections: "Seksione", allSections: "Të gjitha", totalOpen: "TOTAL I HAPUR",
+    orderDot: "Porosi", persons: "PERSONAT", newBtn: "Krijo",
+    noActivePersons: "Nuk ka persona aktiv", activeLabel: "AKTIV",
+    pay: "Paguaj", paidBtn: "✓ Paguar", paidCheck: "Paguar ✓",
+    cancel: "Anulo", splitBill: "Ndaj Faturën", addPerson: "Shto Person",
+    assignItems: "CAKTO ÇDO ARTIKULL", checkout: "ARKË",
+    unassigned: "Pa caktuar:", nothingAssigned: "Asgjë e caktuar",
+    allPaid: "Të gjithë paguan!", tableCleared: "Tavolina u pastrua",
+    transferTitle: "Transfero Tavolinën",
+    transferFromHint: "Zgjidhni tabelën burimore (lëvize NGA)",
+    mergeTitle: "Bashko Tavolinat",
+    mergeFirstHint: "Zgjidhni tabelën e parë për t'u bashkuar",
+    tableSections: "Seksionet e Tavolinave",
+    assignTablesHint: "Zgjidhni seksionin, pastaj shtypni tavolinat",
+    unassignedLabel: "PA SEKSION", saveSections: "Ruaj seksionet",
+    newPersonTitle: "Person i Ri", enterNameHint: "Shkruaj emrin e personit",
+    namePlaceholder: "p.sh. Besart, Mirem, Person1…", create: "Krijo",
+    enterPinContinue: "Futni PIN-in tuaj për të vazhduar",
+    enterPinClaim: "Futni PIN-in tuaj për të marrë tavolinën",
+    pinPlaceholder: "PIN 3-shifror", enterBtn: "Hyr",
+    newOrder: "Porosi e Re", orderLabel: "Porosi", tableTag: "TAVOLINA",
+    claimOrder: "Merr Porosinë", confirmClaim: "Konfirmo dhe Merr Porosinë",
+    confirm: "Konfirmo", enterYourPin: "FUTNI PIN-IN TUAJ",
+    cashBill: "Faturë Kesh", cardBill: "Faturë Kartë", needHelp: "Keni nevojë",
+    ordersTitle: "Porositë", activeCount: "aktive", noOrdersYet: "Nuk ka porosi ende",
+    statusPending: "Pret", statusClaimed: "Marrë", statusDone: "Kryer",
+    claimOrderBtn: "Merr Porosinë", markDone: "✓ Shëno si të kryer",
+    wrongPin: "PIN i gabuar", networkError: "Gabim rrjeti", error: "Gabim",
+    thisTableBelongsTo: (name: string) => `Kjo tryezë i takon ${name}`,
+    transferToHint: (n: number) => `Zgjidhni destinacionin (Lëviz T${n} TE...)`,
+    mergeSecondHint: (n: number) => `Zgjidhni tabelën e dytë (Bashko T${n} me...)`,
+    receiptTagline: "Faturë", waiter: "Kamarier", round: "Rund",
+    orderNum: "Porosi", openedAt: "Hapur në", duration: "Kohëzgjatja",
+    itemsLabel: "Artikujt", pcs: "copë", opened: "Hapur:", closed: "Mbyllur:",
+    thanks: "Faleminderit për vizitën!", cash: "Kesh", card: "Kartë", paid: "Paguar",
+  },
+  mk: {
+    addItems: "ДОДАЈ", orderScreen: "НАРАЧКА",
+    printerConnected: "Принтер поврзан — клик за исклучување",
+    connectPrinter: "Поврзи термален принтер",
+    transferTable: "Префрли маса", mergeTables: "Спои маси",
+    sections: "Секции", allSections: "Сите", totalOpen: "ВКУПНО ОТВОРЕНО",
+    orderDot: "Нарачка", persons: "ЛИЦА", newBtn: "Ново",
+    noActivePersons: "Нема активни лица", activeLabel: "АКТИВНИ",
+    pay: "Плати", paidBtn: "✓ Платено", paidCheck: "Платено ✓",
+    cancel: "Откажи", splitBill: "Сплит", addPerson: "Додај лице",
+    assignItems: "ДОДЕЛИ СЕКОЈА СТАВКА НА ЛИЦЕ", checkout: "КАСА",
+    unassigned: "Недоделено:", nothingAssigned: "Ништо доделено",
+    allPaid: "Сите платиле!", tableCleared: "Масата е исчистена",
+    transferTitle: "Префрли маса",
+    transferFromHint: "Изберете изворна маса (маса за преместување ОД)",
+    mergeTitle: "Спои маси", mergeFirstHint: "Изберете прва маса за спојување",
+    tableSections: "Секции на маси",
+    assignTablesHint: "Изберете секција, потоа допрете маси за доделување",
+    unassignedLabel: "НЕДОДЕЛЕНО", saveSections: "Зачувај секции",
+    newPersonTitle: "Ново лице", enterNameHint: "Внеси го името",
+    namePlaceholder: "пр. Бесарт, Мирем, Лице1…", create: "Креирај",
+    enterPinContinue: "Внесете PIN за да продолжите",
+    enterPinClaim: "Внесете PIN за да ја земете масата",
+    pinPlaceholder: "PIN 3 цифри", enterBtn: "Влези",
+    newOrder: "Нова нарачка", orderLabel: "Нарачка", tableTag: "МАСА",
+    claimOrder: "Земи нарачка", confirmClaim: "Потврди и земи нарачка",
+    confirm: "Потврди", enterYourPin: "ВНЕСЕТЕ ВАШ PIN",
+    cashBill: "Сметка готовина", cardBill: "Сметка картичка", needHelp: "Потребна помош",
+    ordersTitle: "Нарачки", activeCount: "активни", noOrdersYet: "Сè уште нема нарачки",
+    statusPending: "Чека", statusClaimed: "Земена", statusDone: "Готова",
+    claimOrderBtn: "Земи нарачка", markDone: "✓ Означи завршена",
+    wrongPin: "Погрешен PIN", networkError: "Мрежна грешка", error: "Грешка",
+    thisTableBelongsTo: (name: string) => `Оваа маса му припаѓа на ${name}`,
+    transferToHint: (n: number) => `Изберете одредиште (помести T${n} КОН...)`,
+    mergeSecondHint: (n: number) => `Изберете втора маса за спојување со T${n}...`,
+    receiptTagline: "Сметка", waiter: "Официант", round: "Рунда",
+    orderNum: "Нарачка", openedAt: "Отворено во", duration: "Траење",
+    itemsLabel: "Ставки", pcs: "ком", opened: "Отворено:", closed: "Затворено:",
+    thanks: "Ви благодариме за посетата!", cash: "Готовина", card: "Картичка", paid: "Платено",
+  },
+};
+type PosLang = keyof typeof posTranslations;
+
 function buildEscPosBytes({
   restaurantName,
   tableLabel,
   items,
   payMethod,
+  lang,
 }: {
   restaurantName: string;
   tableLabel: string;
   items: OrderItem[];
   payMethod?: "cash" | "card";
+  lang?: PosLang;
 }): Uint8Array {
   const COL = 42;
   const enc = new TextEncoder();
@@ -235,14 +362,15 @@ function buildEscPosBytes({
   cols("TOTAL", `${total.toFixed(0)} DEN`);
   push(0x1b, 0x45, 0x00);
 
+  const rl = posTranslations[(lang as PosLang) || "en"];
   const methodLabel =
-    payMethod === "cash" ? "Cash" : payMethod === "card" ? "Card" : "Paid";
+    payMethod === "cash" ? rl.cash : payMethod === "card" ? rl.card : rl.paid;
   text(methodLabel);
   lf();
   dashes();
 
   push(0x1b, 0x61, 0x01);
-  text("Thank you!");
+  text(rl.thanks);
   lf();
   lf();
   lf();
@@ -289,6 +417,7 @@ function printReceiptWindow({
   sectionName,
   roundNumber,
   startedAt,
+  lang,
 }: {
   restaurantName: string;
   tableLabel: string;
@@ -298,6 +427,7 @@ function printReceiptWindow({
   sectionName?: string;
   roundNumber?: number;
   startedAt?: Date | null;
+  lang?: PosLang;
 }) {
   const win = window.open(
     "",
@@ -317,8 +447,9 @@ function printReceiptWindow({
     hour: "2-digit",
     minute: "2-digit",
   });
+  const rl2 = posTranslations[(lang as PosLang) || "en"];
   const methodLabel =
-    payMethod === "cash" ? "Cash" : payMethod === "card" ? "Card" : "Paid";
+    payMethod === "cash" ? rl2.cash : payMethod === "card" ? rl2.card : rl2.paid;
 
   let durationStr = "";
   if (startedAt) {
@@ -541,7 +672,7 @@ function printReceiptWindow({
 
   <div class="header">
     <div class="brand">${restaurantName}</div>
-    <div class="tagline">Faturë &nbsp;·&nbsp; Receipt</div>
+    <div class="tagline">${rl2.receiptTagline}</div>
   </div>
 
   <div class="meta-strip">
@@ -556,21 +687,21 @@ function printReceiptWindow({
   </div>
 
   <div class="info-block">
-    ${waiterName ? `<div class="info-row"><span>Waiter</span><span>${waiterName}</span></div>` : ""}
-    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>Round</span><span>Order #${roundNumber}</span></div>` : ""}
-    ${openedStr ? `<div class="info-row"><span>Opened at</span><span>${openedStr}</span></div>` : ""}
-    ${durationStr ? `<div class="info-row"><span>Duration</span><span>${durationStr}</span></div>` : ""}
+    ${waiterName ? `<div class="info-row"><span>${rl2.waiter}</span><span>${waiterName}</span></div>` : ""}
+    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>${rl2.round}</span><span>${rl2.orderNum} #${roundNumber}</span></div>` : ""}
+    ${openedStr ? `<div class="info-row"><span>${rl2.openedAt}</span><span>${openedStr}</span></div>` : ""}
+    ${durationStr ? `<div class="info-row"><span>${rl2.duration}</span><span>${durationStr}</span></div>` : ""}
   </div>
 
   <div class="items-section">
-    <div class="items-label">Items · ${items.reduce((s, i) => s + i.qty, 0)} pcs</div>
+    <div class="items-label">${rl2.itemsLabel} · ${items.reduce((s, i) => s + i.qty, 0)} ${rl2.pcs}</div>
     <table>${rows}</table>
   </div>
 
   <div class="total-block">
     <div>
       <div class="total-label">Total</div>
-      <div class="total-count">${items.reduce((s, i) => s + i.qty, 0)} items</div>
+      <div class="total-count">${items.reduce((s, i) => s + i.qty, 0)} ${rl2.itemsLabel}</div>
     </div>
     <div>
       <span class="total-amount">${total.toLocaleString()}</span>
@@ -582,16 +713,16 @@ function printReceiptWindow({
     openedStr && durationStr
       ? `
   <div class="duration-row">
-    <span>Opened: ${openedStr}</span>
+    <span>${rl2.opened} ${openedStr}</span>
     <span>⏱ ${durationStr}</span>
-    <span>Closed: ${timeStr}</span>
+    <span>${rl2.closed} ${timeStr}</span>
   </div>`
       : ""
   }
 
   <div class="footer">
-    <div class="thanks">Thank you for your visit!</div>
-    <div class="sub-footer">Thank you</div>
+    <div class="thanks">${rl2.thanks}</div>
+    <div class="sub-footer">${rl2.receiptTagline}</div>
   </div>
 
 </body>
@@ -1073,6 +1204,16 @@ export default function POS({ slug }: POSProps) {
   }, [theme]);
   const isLight = theme === "light";
 
+  const [lang, setLang] = useState<PosLang>(() => {
+    const saved = localStorage.getItem("hajdeha-lang");
+    return (saved as PosLang) || "en";
+  });
+  const handleLangChange = (newLang: PosLang) => {
+    setLang(newLang);
+    localStorage.setItem("hajdeha-lang", newLang);
+  };
+  const tr = posTranslations[lang];
+
   const [usbDevice, setUsbDevice] = useState<USBDevice | null>(null);
   const [printerStatus, setPrinterStatus] = useState<
     "idle" | "printing" | "error"
@@ -1118,12 +1259,13 @@ export default function POS({ slug }: POSProps) {
     sectionName?: string;
     roundNumber?: number;
     startedAt?: Date | null;
+    lang?: PosLang;
   }) => {
     if (data.items.length === 0) return;
     if (usbDevice) {
       try {
         setPrinterStatus("printing");
-        const bytes = buildEscPosBytes(data);
+        const bytes = buildEscPosBytes({ ...data, lang });
         await sendToUsbPrinter(usbDevice, bytes);
         setPrinterStatus("idle");
         return;
@@ -1134,7 +1276,7 @@ export default function POS({ slug }: POSProps) {
         setTimeout(() => setPrinterStatus("idle"), 3000);
       }
     }
-    printReceiptWindow(data);
+    printReceiptWindow({ ...data, lang });
   };
 
   const t = isLight
@@ -1564,7 +1706,7 @@ export default function POS({ slug }: POSProps) {
       });
       if (!res.ok) {
         const d = await res.json();
-        setTablePinError(d.message || "Wrong PIN");
+        setTablePinError(d.message || tr.wrongPin);
         return;
       }
       const waiter: { id: number; name: string } = await res.json();
@@ -1573,7 +1715,7 @@ export default function POS({ slug }: POSProps) {
 
       // Block only if a DIFFERENT waiter already owns this table
       if (existingWaiterId && existingWaiterId !== waiter.id) {
-        setTablePinError(`This table belongs to ${tables[tableIdx].waiterName}`);
+        setTablePinError(tr.thisTableBelongsTo(tables[tableIdx].waiterName || ""));
         return;
       }
 
@@ -1595,7 +1737,7 @@ export default function POS({ slug }: POSProps) {
       setScreen("menu");
       setActiveCategory("All");
     } catch {
-      setTablePinError("Network error");
+      setTablePinError(tr.networkError);
     } finally {
       setTablePinLoading(false);
     }
@@ -1859,18 +2001,18 @@ export default function POS({ slug }: POSProps) {
             style={{ fontFamily: "'DM Mono', monospace" }}
           >
             {screen === "tables"
-              ? `${allActive} ACTIVE`
+              ? `${allActive} ${tr.activeLabel}`
               : screen === "menu"
-                ? "ADD ITEMS"
-                : "ORDER"}
+                ? tr.addItems
+                : tr.orderScreen}
           </p>
         </div>
         <button
           onClick={usbDevice ? () => setUsbDevice(null) : connectPrinter}
           title={
             usbDevice
-              ? "Printer connected — click to disconnect"
-              : "Connect thermal printer"
+              ? tr.printerConnected
+              : tr.connectPrinter
           }
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors relative ${t.backBtn}`}
         >
@@ -1884,6 +2026,18 @@ export default function POS({ slug }: POSProps) {
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
           )}
         </button>
+        {/* Language Switcher */}
+        <div className={`flex rounded-xl border ${t.border} p-0.5 gap-0.5`}>
+          {(["en", "al", "mk"] as PosLang[]).map((l) => (
+            <button
+              key={l}
+              onClick={() => handleLangChange(l)}
+              className={`px-2 py-1 text-[10px] font-bold rounded-lg transition-all ${lang === l ? "bg-amber-500 text-black" : `${t.textDim} hover:${t.textMuted}`}`}
+            >
+              {l.toUpperCase()}
+            </button>
+          ))}
+        </div>
         <button
           onClick={() => setTheme(isLight ? "dark" : "light")}
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
@@ -1938,18 +2092,18 @@ export default function POS({ slug }: POSProps) {
                   ? {
                       grad: "from-emerald-600 to-emerald-500",
                       icon: "💵",
-                      label: `Cash Bill — Table ${signal.tableNumber}`,
+                      label: `${tr.cashBill} — Table ${signal.tableNumber}`,
                     }
                   : signal.type === "bill-card"
                     ? {
                         grad: "from-blue-600 to-blue-500",
                         icon: "💳",
-                        label: `Card Bill — Table ${signal.tableNumber}`,
+                        label: `${tr.cardBill} — Table ${signal.tableNumber}`,
                       }
                     : {
                         grad: "from-amber-500 to-amber-400",
                         icon: "🔔",
-                        label: `Need help — Table ${signal.tableNumber}`,
+                        label: `${tr.needHelp} — Table ${signal.tableNumber}`,
                       };
               return (
                 <motion.button
@@ -2036,7 +2190,7 @@ export default function POS({ slug }: POSProps) {
               <p className="text-sm font-bold leading-tight">
                 {incomingBanner.roundNumber > 1
                   ? `⚡ Order ${incomingBanner.roundNumber} — Table ${incomingBanner.tableNumber}`
-                  : `New Order — Table ${incomingBanner.tableNumber}`}
+                  : `${tr.newOrder} — Table ${incomingBanner.tableNumber}`}
               </p>
               <p
                 className="text-[11px] font-semibold opacity-80 truncate"
@@ -2075,14 +2229,14 @@ export default function POS({ slug }: POSProps) {
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
               >
                 <ArrowRightLeft className="h-3.5 w-3.5" />
-                Transfer Table
+                {tr.transferTable}
               </button>
               <button
                 onClick={() => setShowMergeModal(true)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
               >
                 <Merge className="h-3.5 w-3.5" />
-                Merge Tables
+                {tr.mergeTables}
               </button>
               <button
                 onClick={() => {
@@ -2093,7 +2247,7 @@ export default function POS({ slug }: POSProps) {
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${t.actionBtnAlt} transition-colors`}
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
-                Sections
+                {tr.sections}
               </button>
             </div>
 
@@ -2103,7 +2257,7 @@ export default function POS({ slug }: POSProps) {
                 onClick={() => setSelectedSection("all")}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${selectedSection === "all" ? "bg-amber-500 text-black" : t.chipInactive}`}
               >
-                All Sections
+                {tr.allSections}
               </button>
               {sections.map((section) => (
                 <button
@@ -2232,14 +2386,14 @@ export default function POS({ slug }: POSProps) {
                   className={`text-[10px] ${t.textFaint}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  PERSONS
+                  {tr.persons}
                 </p>
                 <button
                   onClick={() => setShowNewPerson(true)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold active:bg-amber-500/25"
                 >
                   <UserPlus className="h-3 w-3" />
-                  New
+                  {tr.newBtn}
                 </button>
               </div>
 
@@ -2248,7 +2402,7 @@ export default function POS({ slug }: POSProps) {
                   className={`rounded-2xl border border-dashed ${t.borderDashed} flex items-center justify-center py-6 lg:py-10`}
                 >
                   <p className={`${t.textFaint} text-xs lg:text-sm`}>
-                    No active persons
+                    {tr.noActivePersons}
                   </p>
                 </div>
               ) : (
@@ -2270,7 +2424,7 @@ export default function POS({ slug }: POSProps) {
                           <>
                             <CheckCircle className="h-5 w-5 text-emerald-400 flex-shrink-0" />
                             <span className="text-sm text-emerald-400 font-semibold">
-                              Paid ✓
+                              {tr.paidCheck}
                             </span>
                           </>
                         ) : (
@@ -2365,7 +2519,7 @@ export default function POS({ slug }: POSProps) {
                   className={`text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  TOTAL OPEN
+                  {tr.totalOpen}
                 </p>
                 <p
                   className="text-xl font-bold text-amber-400"
@@ -2379,7 +2533,7 @@ export default function POS({ slug }: POSProps) {
                   className={`text-[10px] ${t.textDim}`}
                   style={{ fontFamily: "'DM Mono', monospace" }}
                 >
-                  ACTIVE
+                  {tr.activeLabel}
                 </p>
                 <p
                   className={`text-xl font-bold ${t.text}`}
@@ -2528,7 +2682,7 @@ export default function POS({ slug }: POSProps) {
                 >
                   <ShoppingBag className="h-4 w-4 text-amber-400" />
                   <p className="text-sm font-bold">
-                    Order ·{" "}
+                    {tr.orderDot} ·{" "}
                     <span className="text-amber-400">{activeLabel}</span>
                   </p>
                   <span
@@ -2721,13 +2875,13 @@ export default function POS({ slug }: POSProps) {
                           onClick={() => setPayConfirm(false)}
                           className={`flex-1 h-12 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold hover:bg-white/12`}
                         >
-                          Cancel
+                          {tr.cancel}
                         </button>
                         <button
                           onClick={payOrder}
                           className="flex-1 h-12 rounded-2xl bg-emerald-500 text-sm font-bold text-white hover:bg-emerald-400"
                         >
-                          ✓ Paid
+                          {tr.paidBtn}
                         </button>
                       </div>
                     ) : (
@@ -2738,7 +2892,7 @@ export default function POS({ slug }: POSProps) {
                             className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-amber-500/40 transition-colors`}
                           >
                             <Divide className="h-4 w-4" />
-                            Split Bill
+                            {tr.splitBill}
                           </button>
                         )}
                         <button
@@ -2746,7 +2900,7 @@ export default function POS({ slug }: POSProps) {
                           className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
                         >
                           <Receipt className="h-4 w-4" />
-                          Pay {orderTotal(currentOrder)} DEN
+                          {tr.pay} {orderTotal(currentOrder)} DEN
                         </button>
                       </div>
                     )}
@@ -2807,7 +2961,7 @@ export default function POS({ slug }: POSProps) {
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${t.actionBtn} transition-colors`}
                       >
                         <UserPlus className="h-3.5 w-3.5" />
-                        Add Person
+                        {tr.addPerson}
                       </button>
                       <button
                         onClick={() => setShowSplitModal(false)}
@@ -2825,7 +2979,7 @@ export default function POS({ slug }: POSProps) {
                         className={`text-[10px] ${t.textFaint} mb-3`}
                         style={{ fontFamily: "'DM Mono', monospace" }}
                       >
-                        ASSIGN EACH ITEM TO A PERSON
+                        {tr.assignItems}
                       </p>
                       {order.items.map((item, itemIdx) => {
                         const assignedPerson = itemAssignments[itemIdx];
@@ -2914,7 +3068,7 @@ export default function POS({ slug }: POSProps) {
                         className={`text-[10px] ${t.textFaint} mb-3`}
                         style={{ fontFamily: "'DM Mono', monospace" }}
                       >
-                        CHECKOUT
+                        {tr.checkout}
                       </p>
                       {splitPersons.map((person, pIdx) => {
                         const pc =
@@ -2953,8 +3107,8 @@ export default function POS({ slug }: POSProps) {
                                 <CheckCircle className="h-3.5 w-3.5" />
                                 <span className="text-xs font-semibold">
                                   {person.payMethod === "cash"
-                                    ? "Cash ✓"
-                                    : "Card ✓"}
+                                    ? `${tr.cash} ✓`
+                                    : `${tr.card} ✓`}
                                 </span>
                               </div>
                             ) : total > 0 ? (
@@ -2984,10 +3138,10 @@ export default function POS({ slug }: POSProps) {
                         <div className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 p-3 text-center">
                           <CheckCircle className="h-5 w-5 text-emerald-400 mx-auto mb-1" />
                           <p className="text-xs font-bold text-emerald-400">
-                            All Paid!
+                            {tr.allPaid}
                           </p>
                           <p className={`text-[10px] ${t.textFaint} mt-0.5`}>
-                            Table cleared
+                            {tr.tableCleared}
                           </p>
                         </div>
                       )}
@@ -3022,12 +3176,12 @@ export default function POS({ slug }: POSProps) {
             >
               <div className="flex items-center gap-2 mb-4">
                 <ArrowRightLeft className="h-5 w-5 text-blue-400" />
-                <p className="text-base font-bold">Transfer Table</p>
+                <p className="text-base font-bold">{tr.transferTitle}</p>
               </div>
               <p className={`text-xs ${t.textDim} mb-4`}>
                 {transferSource === null
-                  ? "Select source table (table to move FROM)"
-                  : `Select destination table (move T${transferSource + 1} TO...)`}
+                  ? tr.transferFromHint
+                  : tr.transferToHint(transferSource + 1)}
               </p>
               <div className="grid grid-cols-4 gap-2 mb-4">
                 {tables.map((table, idx) => {
@@ -3065,7 +3219,7 @@ export default function POS({ slug }: POSProps) {
                 }}
                 className={`w-full h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
               >
-                Cancel
+                {tr.cancel}
               </button>
             </motion.div>
           </>
@@ -3095,12 +3249,12 @@ export default function POS({ slug }: POSProps) {
             >
               <div className="flex items-center gap-2 mb-4">
                 <Merge className="h-5 w-5 text-blue-400" />
-                <p className="text-base font-bold">Merge Tables</p>
+                <p className="text-base font-bold">{tr.mergeTitle}</p>
               </div>
               <p className={`text-xs ${t.textDim} mb-4`}>
                 {mergeSource === null
-                  ? "Select first table to merge"
-                  : `Select second table to merge T${mergeSource + 1} with...`}
+                  ? tr.mergeFirstHint
+                  : tr.mergeSecondHint(mergeSource + 1)}
               </p>
               <div className="grid grid-cols-4 gap-2 mb-4">
                 {tables.map((table, idx) => {
@@ -3138,7 +3292,7 @@ export default function POS({ slug }: POSProps) {
                 }}
                 className={`w-full h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
               >
-                Cancel
+                {tr.cancel}
               </button>
             </motion.div>
           </>
@@ -3165,10 +3319,10 @@ export default function POS({ slug }: POSProps) {
             >
               <div className="flex items-center gap-2 mb-1">
                 <LayoutGrid className="h-5 w-5 text-purple-400" />
-                <p className="text-base font-bold">Table Sections</p>
+                <p className="text-base font-bold">{tr.tableSections}</p>
               </div>
               <p className={`text-xs ${t.textDim} mb-4`}>
-                Select a section, then tap tables to assign them
+                {tr.assignTablesHint}
               </p>
               <div className="flex gap-2 mb-4">
                 {draftSections.map((section) => (
@@ -3277,7 +3431,7 @@ export default function POS({ slug }: POSProps) {
                     className={`text-[10px] ${t.textDim}`}
                     style={{ fontFamily: "'DM Mono', monospace" }}
                   >
-                    UNASSIGNED ·{" "}
+                    {tr.unassignedLabel} ·{" "}
                     {TABLE_COUNT -
                       draftSections.reduce(
                         (sum, s) => sum + s.tables.length,
@@ -3291,7 +3445,7 @@ export default function POS({ slug }: POSProps) {
                   onClick={() => setShowSectionsModal(false)}
                   className={`flex-1 h-11 rounded-2xl ${t.cancelBtn} text-sm font-semibold`}
                 >
-                  Cancel
+                  {tr.cancel}
                 </button>
                 <button
                   onClick={() => {
@@ -3300,7 +3454,7 @@ export default function POS({ slug }: POSProps) {
                   }}
                   className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black"
                 >
-                  Save sections
+                  {tr.saveSections}
                 </button>
               </div>
             </motion.div>
@@ -3330,10 +3484,10 @@ export default function POS({ slug }: POSProps) {
               className={`fixed left-4 right-4 bottom-1/3 z-50 ${t.modalBg} rounded-3xl p-6 border ${t.borderDashed} shadow-2xl`}
             >
               <p className={`text-base font-bold ${t.text} mb-1`}>
-                New Person
+                {tr.newPersonTitle}
               </p>
               <p className={`text-xs ${t.textDim} mb-4`}>
-                Enter the person's name
+                {tr.enterNameHint}
               </p>
               <input
                 ref={nameInputRef}
@@ -3342,7 +3496,7 @@ export default function POS({ slug }: POSProps) {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleCreatePerson();
                 }}
-                placeholder="e.g. John, Mary, Person1…"
+                placeholder={tr.namePlaceholder}
                 className={`w-full h-12 rounded-xl border ${t.inputBorder} px-4 text-sm outline-none focus:border-amber-500/50 mb-4`}
                 style={{ background: t.inputBgStyle, color: t.inputTextStyle }}
               />
@@ -3354,14 +3508,14 @@ export default function POS({ slug }: POSProps) {
                   }}
                   className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
                 >
-                  Cancel
+                  {tr.cancel}
                 </button>
                 <button
                   onClick={handleCreatePerson}
                   disabled={!newPersonName.trim()}
                   className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
                 >
-                  Create
+                  {tr.create}
                 </button>
               </div>
             </motion.div>
@@ -3401,14 +3555,14 @@ export default function POS({ slug }: POSProps) {
               </div>
               <p className={`text-xs ${t.textDim} mb-4`}>
                 {tables[tablePinSlot.idx].waiterId
-                  ? "Enter your PIN to continue"
-                  : "Enter your PIN to claim the table"}
+                  ? tr.enterPinContinue
+                  : tr.enterPinClaim}
               </p>
               <input
                 type="number"
                 inputMode="numeric"
                 maxLength={3}
-                placeholder="3-digit PIN"
+                placeholder={tr.pinPlaceholder}
                 value={tablePinDigits}
                 autoFocus
                 onChange={(e) => {
@@ -3436,7 +3590,7 @@ export default function POS({ slug }: POSProps) {
                   }}
                   className={`flex-1 h-11 rounded-2xl ${t.surfaceSoft} text-sm ${t.textMuted} font-semibold`}
                 >
-                  Cancel
+                  {tr.cancel}
                 </button>
                 <button
                   onClick={confirmTablePin}
@@ -3444,7 +3598,7 @@ export default function POS({ slug }: POSProps) {
                   className="flex-1 h-11 rounded-2xl bg-amber-500 text-sm font-bold text-black disabled:opacity-40"
                   data-testid="button-confirm-table-pin"
                 >
-                  {tablePinLoading ? "…" : "Enter"}
+                  {tablePinLoading ? "…" : tr.enterBtn}
                 </button>
               </div>
             </motion.div>
@@ -3530,10 +3684,10 @@ export default function POS({ slug }: POSProps) {
                   }
                 } else {
                   const d = await res.json();
-                  setClaimError(d.message || "Wrong PIN");
+                  setClaimError(d.message || tr.wrongPin);
                 }
               } catch {
-                setClaimError("Network error");
+                setClaimError(tr.networkError);
               } finally {
                 setClaimLoading(false);
               }
@@ -3573,13 +3727,13 @@ export default function POS({ slug }: POSProps) {
                       </div>
                       <div>
                         <p className={`text-sm font-bold ${t.text}`}>
-                          Claim Order
+                          {tr.claimOrder}
                         </p>
                         <p
                           className={`text-[11px] ${t.textMuted}`}
                           style={{ fontFamily: "'DM Mono', monospace" }}
                         >
-                          TABLE {tableNum} · {cartTotal} DEN
+                          {tr.tableTag} {tableNum} · {cartTotal} DEN
                         </p>
                       </div>
                     </div>
@@ -3617,7 +3771,7 @@ export default function POS({ slug }: POSProps) {
                       className={`text-[10px] font-bold ${t.textDim} mb-2 text-center`}
                       style={{ fontFamily: "'DM Mono', monospace" }}
                     >
-                      ENTER YOUR PIN
+                      {tr.enterYourPin}
                     </p>
                     <div className="flex items-center justify-center gap-4 mb-2">
                       {[0, 1, 2].map((i) => (
@@ -3676,7 +3830,7 @@ export default function POS({ slug }: POSProps) {
                       ) : (
                         <>
                           <KeyRound className="h-4 w-4" />
-                          Confirm & Claim Order
+                          {tr.confirmClaim}
                         </>
                       )}
                     </button>
@@ -3716,13 +3870,13 @@ export default function POS({ slug }: POSProps) {
                 style={{ borderColor: isLight ? "#e5e7eb" : "#292524" }}
               >
                 <div>
-                  <h2 className={`text-base font-bold ${t.text}`}>Orders</h2>
+                  <h2 className={`text-base font-bold ${t.text}`}>{tr.ordersTitle}</h2>
                   <p className={`text-xs ${t.textMuted}`}>
                     {
                       dbOrders.filter((o: any) => o.status !== "completed")
                         .length
                     }{" "}
-                    active
+                    {tr.activeCount}
                   </p>
                 </div>
                 <button
@@ -3740,7 +3894,7 @@ export default function POS({ slug }: POSProps) {
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {dbOrders.length === 0 && (
                   <div className={`text-center py-12 ${t.textMuted} text-sm`}>
-                    No orders yet
+                    {tr.noOrdersYet}
                   </div>
                 )}
                 {[...dbOrders]
@@ -3758,16 +3912,16 @@ export default function POS({ slug }: POSProps) {
                     const statusCfg =
                       order.status === "pending"
                         ? {
-                            label: "Pending",
+                            label: tr.statusPending,
                             color: "bg-amber-500/20 text-amber-500",
                           }
                         : order.status === "claimed"
                           ? {
-                              label: "Claimed",
+                              label: tr.statusClaimed,
                               color: "bg-blue-500/20 text-blue-400",
                             }
                           : {
-                              label: "Done",
+                              label: tr.statusDone,
                               color: "bg-emerald-500/20 text-emerald-400",
                             };
                     return (
@@ -3832,7 +3986,7 @@ export default function POS({ slug }: POSProps) {
                                   type="number"
                                   inputMode="numeric"
                                   maxLength={3}
-                                  placeholder="3-digit PIN"
+                                  placeholder={tr.pinPlaceholder}
                                   value={pinDigits}
                                   onChange={(e) => {
                                     setPinDigits(e.target.value.slice(0, 3));
@@ -3857,7 +4011,7 @@ export default function POS({ slug }: POSProps) {
                                   }}
                                   className={`flex-1 h-9 rounded-xl text-xs font-semibold ${t.surfaceSoft} ${t.textMuted}`}
                                 >
-                                  Cancel
+                                  {tr.cancel}
                                 </button>
                                 <button
                                   disabled={
@@ -3920,10 +4074,10 @@ export default function POS({ slug }: POSProps) {
                                         }
                                       } else {
                                         const d = await res.json();
-                                        setClaimError(d.message || "Error");
+                                        setClaimError(d.message || tr.error);
                                       }
                                     } catch {
-                                      setClaimError("Network error");
+                                      setClaimError(tr.networkError);
                                     } finally {
                                       setClaimLoading(false);
                                     }
@@ -3931,7 +4085,7 @@ export default function POS({ slug }: POSProps) {
                                   className="flex-1 h-9 rounded-xl bg-amber-500 text-black text-xs font-bold disabled:opacity-40"
                                   data-testid="button-confirm-claim"
                                 >
-                                  {claimLoading ? "…" : "Confirm"}
+                                  {claimLoading ? "…" : tr.confirm}
                                 </button>
                               </div>
                             </div>
@@ -3945,7 +4099,7 @@ export default function POS({ slug }: POSProps) {
                               className="w-full h-9 rounded-xl bg-amber-500 text-black text-xs font-bold"
                               data-testid={`button-take-order-${order.id}`}
                             >
-                              Claim Order
+                              {tr.claimOrderBtn}
                             </button>
                           ))}
 
@@ -3960,7 +4114,7 @@ export default function POS({ slug }: POSProps) {
                             className="w-full h-9 rounded-xl bg-emerald-600 text-white text-xs font-bold"
                             data-testid={`button-complete-order-${order.id}`}
                           >
-                            ✓ Shëno si të kryer
+                            {tr.markDone}
                           </button>
                         )}
                       </div>
