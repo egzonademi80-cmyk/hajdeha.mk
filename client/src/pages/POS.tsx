@@ -1021,7 +1021,21 @@ export default function POS({ slug }: POSProps) {
       );
       const allPaid = next.every((p) => p.paid);
       if (allPaid && splitTableIdx !== null) {
-        // emptyTable() now resets waiterId/waiterName too
+        const allItems = tables[splitTableIdx].items;
+        const tableWaiterId = tables[splitTableIdx].waiterId ?? null;
+        // Save full table order to DB for profit tracking
+        if (allItems.length > 0 && restaurantId) {
+          fetch("/api/pos/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              restaurantId,
+              tableNumber: splitTableIdx + 1,
+              items: allItems,
+              waiterId: tableWaiterId,
+            }),
+          }).catch(() => {});
+        }
         setTables((t) => {
           const updated = [...t];
           updated[splitTableIdx] = emptyTable();
@@ -1445,7 +1459,6 @@ export default function POS({ slug }: POSProps) {
     }
   };
 
-  // FIX [4]: payOrder calls emptyTable() — waiter fields cleared automatically
   const payOrder = () => {
     if (!active) return;
     const slot = active;
@@ -1475,11 +1488,24 @@ export default function POS({ slug }: POSProps) {
             ? tables[slot.idx].startedAt
             : personTabs[slot.idx]?.startedAt,
       });
+      // Save to DB for profit tracking (all POS checkouts, not just QR orders)
+      if (slot.kind === "table" && restaurantId) {
+        fetch("/api/pos/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            restaurantId,
+            tableNumber: slot.idx + 1,
+            items: receiptItems,
+            waiterId: tables[slot.idx].waiterId ?? null,
+          }),
+        }).catch(() => {});
+      }
     }
     if (slot.kind === "table") {
       setTables((prev) => {
         const next = [...prev];
-        next[slot.idx] = emptyTable(); // clears items + waiter
+        next[slot.idx] = emptyTable();
         return next;
       });
       fetch("/api/table/cart-cleared", {

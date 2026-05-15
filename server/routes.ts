@@ -668,6 +668,26 @@ export async function registerRoutes(
     }
   });
 
+  // === POS MANUAL CHECKOUT — saves a completed order for profit tracking ===
+  app.post("/api/pos/checkout", async (req, res) => {
+    try {
+      const { restaurantId, tableNumber, items, waiterId } = req.body;
+      if (!restaurantId || !tableNumber || !Array.isArray(items) || items.length === 0)
+        return res.status(400).json({ message: "Missing fields" });
+      const order = await storage.createOrder({
+        restaurantId: Number(restaurantId),
+        tableNumber: Number(tableNumber),
+        cart: JSON.stringify(items),
+        status: "completed",
+        waiterId: waiterId ?? null,
+      });
+      return res.status(201).json(order);
+    } catch (err: any) {
+      console.error("POS checkout error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // === ORDERS ===
   app.post("/api/orders", async (req, res) => {
     try {
@@ -788,28 +808,24 @@ export async function registerRoutes(
       const todayOrders = allOrders.filter(
         (o) =>
           (o.status === "claimed" || o.status === "completed") &&
-          new Date(o.createdAt) >= today &&
-          o.waiterId !== null,
+          new Date(o.createdAt) >= today,
       );
       const waiterList = await storage.getWaiters(restaurantId);
       const waiterMap = new Map(waiterList.map((w) => [w.id, w.name]));
-      const earningsMap = new Map<number, number>();
+      const earningsMap = new Map<number | null, number>();
       for (const order of todayOrders) {
-        if (!order.waiterId) continue;
+        const key = order.waiterId ?? null;
         const cart = JSON.parse(order.cart);
         const total = cart.reduce(
           (s: number, i: any) => s + i.price * i.qty,
           0,
         );
-        earningsMap.set(
-          order.waiterId,
-          (earningsMap.get(order.waiterId) ?? 0) + total,
-        );
+        earningsMap.set(key, (earningsMap.get(key) ?? 0) + total);
       }
       const earnings = Array.from(earningsMap.entries()).map(
         ([waiterId, total]) => ({
           waiterId,
-          waiterName: waiterMap.get(waiterId) ?? "Unknown",
+          waiterName: waiterId ? (waiterMap.get(waiterId) ?? "Unknown") : "Pa kamarier",
           total,
         }),
       );
