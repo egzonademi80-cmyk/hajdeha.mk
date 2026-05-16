@@ -945,6 +945,14 @@ function RadialMenu({ x, y, onSelect, onClose, isLight }: RadialMenuProps) {
     </>
   );
 }
+function safeParseCart(cart: any): any[] {
+  if (Array.isArray(cart)) return cart;
+  if (typeof cart === "string") {
+    try { return JSON.parse(cart); } catch { return []; }
+  }
+  return [];
+}
+
 export default function POS({ slug }: POSProps) {
   const RESTAURANT_SLUG = slug;
   const TABLES_KEY = `pos-${slug}-tables-v3`;
@@ -3612,7 +3620,7 @@ export default function POS({ slug }: POSProps) {
           claimModalOrder &&
           (() => {
             const order = claimModalOrder;
-            const cartTotal = order.cart.reduce(
+            const cartTotal = safeParseCart(order.cart).reduce(
               (s: number, i: any) => s + i.price * i.qty,
               0,
             );
@@ -3752,7 +3760,7 @@ export default function POS({ slug }: POSProps) {
                   <div
                     className={`mx-4 mt-3 rounded-2xl ${t.surface} border ${t.border} px-4 py-3 max-h-28 overflow-y-auto`}
                   >
-                    {order.cart.map((item: any, idx: number) => (
+                    {safeParseCart(order.cart).map((item: any, idx: number) => (
                       <div
                         key={idx}
                         className="flex justify-between text-xs py-0.5"
@@ -3905,7 +3913,7 @@ export default function POS({ slug }: POSProps) {
                       new Date(a.createdAt).getTime(),
                   )
                   .map((order: any) => {
-                    const total = order.cart.reduce(
+                    const total = safeParseCart(order.cart).reduce(
                       (s: number, i: any) => s + i.price * i.qty,
                       0,
                     );
@@ -3953,7 +3961,7 @@ export default function POS({ slug }: POSProps) {
                           </span>
                         </div>
                         <div className="space-y-1">
-                          {order.cart.map((item: any, idx: number) => (
+                          {safeParseCart(order.cart).map((item: any, idx: number) => (
                             <div
                               key={idx}
                               className="flex justify-between text-xs"

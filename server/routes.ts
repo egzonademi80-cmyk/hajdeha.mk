@@ -256,11 +256,16 @@ export async function registerRoutes(
 
       // ── POS live broadcast + DB save (always, regardless of orderMode) ──
       // channel format: `table-{slug}-{tableNumber}` → extract slug, look up restaurant
+      // tableNumber is always a digit suffix, slug may contain hyphens
       try {
-        const m = String(channel).match(/^table-(.+)-([^-]+)$/);
+        console.log("[place-order] channel received:", channel);
+        const m = String(channel).match(/^table-(.+)-(\d+)$/);
+        console.log("[place-order] regex match:", m ? `slug="${m[1]}" table="${m[2]}"` : "no match");
         if (m) {
           const slug = m[1];
+          console.log("[place-order] looking up restaurant slug:", slug);
           const restaurant = await storage.getRestaurantBySlug(slug);
+          console.log("[place-order] restaurant found:", restaurant ? restaurant.name : "NOT FOUND");
           if (restaurant) {
             // Always fire to POS so orders panel always works
             await safeTrigger(`pos-${slug}`, "incoming-order", {
@@ -717,11 +722,19 @@ export async function registerRoutes(
       const list = await storage.getOrders(restaurantId, status);
       const waiters = await storage.getWaiters(restaurantId);
       const waiterMap = new Map(waiters.map((w) => [w.id, w.name]));
-      const enriched = list.map((o) => ({
-        ...o,
-        cart: JSON.parse(o.cart),
-        waiterName: o.waiterId ? (waiterMap.get(o.waiterId) ?? null) : null,
-      }));
+      const enriched = list.map((o) => {
+        let parsedCart: any[] = [];
+        try {
+          parsedCart = typeof o.cart === "string" ? JSON.parse(o.cart) : (Array.isArray(o.cart) ? o.cart : []);
+        } catch {
+          parsedCart = [];
+        }
+        return {
+          ...o,
+          cart: parsedCart,
+          waiterName: o.waiterId ? (waiterMap.get(o.waiterId) ?? null) : null,
+        };
+      });
       return res.json(enriched);
     } catch (err: any) {
       console.error("Get orders error:", err);
