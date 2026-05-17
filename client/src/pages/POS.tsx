@@ -998,6 +998,10 @@ export default function POS({ slug }: POSProps) {
     tablesRef.current = tables;
   }, [tables]);
 
+  // Track which DB order IDs have already been merged into the table grid
+  // so we never double-count an order regardless of how many times dbOrders refetches
+  const processedOrderIdsRef = useRef<Set<number>>(new Set());
+
   useEffect(() => {
     setTables((prev) => {
       if (prev.length === TABLE_COUNT) return prev;
@@ -1072,6 +1076,52 @@ export default function POS({ slug }: POSProps) {
   const pendingCount = dbOrders.filter(
     (o: any) => o.status === "pending",
   ).length;
+
+  // Sync DB orders into the table grid so it stays up-to-date even when
+  // Pusher is not configured (poll-based fallback for handleIncoming)
+  useEffect(() => {
+    if (!dbOrders || dbOrders.length === 0) return;
+    const newOrders = (dbOrders as any[]).filter(
+      (o) =>
+        (o.status === "pending" || o.status === "claimed") &&
+        !processedOrderIdsRef.current.has(o.id),
+    );
+    if (newOrders.length === 0) return;
+
+    setTables((prev) => {
+      const next = [...prev];
+      newOrders.forEach((order: any) => {
+        const tableDigits = parseInt(
+          String(order.tableNumber).replace(/\D/g, ""),
+          10,
+        );
+        const tableIdx = tableDigits - 1;
+        if (tableIdx < 0 || tableIdx >= next.length) return;
+        const cart: any[] = safeParseCart(order.cart);
+        if (cart.length === 0) return;
+        const merged = [...next[tableIdx].items];
+        cart.forEach((it: any) => {
+          const ex = merged.find((m) => m.id === it.id);
+          if (ex) ex.qty += it.qty;
+          else merged.push({ ...it });
+        });
+        const prevRounds = next[tableIdx].rounds ?? [];
+        next[tableIdx] = {
+          ...next[tableIdx],
+          items: merged,
+          rounds: [
+            ...prevRounds,
+            { items: cart, sentAt: new Date(order.createdAt).getTime() },
+          ],
+          startedAt: next[tableIdx].startedAt ?? new Date(order.createdAt),
+          waiterId: order.waiterId ?? next[tableIdx].waiterId,
+          waiterName: order.waiterName ?? next[tableIdx].waiterName,
+        };
+        processedOrderIdsRef.current.add(order.id);
+      });
+      return next;
+    });
+  }, [dbOrders]);
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
