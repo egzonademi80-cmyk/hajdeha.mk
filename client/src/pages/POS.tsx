@@ -2386,12 +2386,6 @@ export default function POS({ slug }: POSProps) {
                           )}
                           {table.items.length > 0 && (
                             <>
-                              {/* FIX [6]: Show "?" badge if unclaimed (no waiter yet) */}
-                              {status === "unclaimed" && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500/30 text-sky-400">
-                                  MERR
-                                </span>
-                              )}
                               <span
                                 className={`text-[10px] font-bold font-['DM_Mono'] ${c.time}`}
                               >
@@ -2427,6 +2421,33 @@ export default function POS({ slug }: POSProps) {
                                 transition={{ duration: 1.2, repeat: Infinity }}
                                 className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${c.dot}`}
                               />
+                              {/* Claim button — visible on unclaimed tables */}
+                              {status === "unclaimed" && (
+                                <button
+                                  data-testid={`button-claim-table-${idx}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const pendingOrder = (dbOrders as any[]).find(
+                                      (o) =>
+                                        o.tableNumber === idx + 1 &&
+                                        (o.status === "pending" || o.status === "claimed"),
+                                    );
+                                    if (waiters.length === 0) {
+                                      setActive({ kind: "table", idx });
+                                      setScreen("menu");
+                                      setActiveCategory("All");
+                                    } else if (pendingOrder) {
+                                      openIncomingClaim(pendingOrder);
+                                    } else {
+                                      openSlot({ kind: "table", idx });
+                                    }
+                                  }}
+                                  className="absolute bottom-1.5 left-1.5 right-1.5 h-5 rounded-lg bg-sky-500 text-white text-[8px] font-bold flex items-center justify-center gap-0.5 active:bg-sky-600"
+                                >
+                                  <KeyRound className="h-2.5 w-2.5" />
+                                  {tr.claimOrder}
+                                </button>
+                              )}
                             </>
                           )}
                         </>
