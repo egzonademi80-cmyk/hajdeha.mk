@@ -2300,10 +2300,10 @@ export default function POS({ slug }: POSProps) {
                         repeat: tableFlash === idx ? 2 : 0,
                       }}
                       className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${wasJustPaid
-                          ? "bg-emerald-500/20 border-emerald-500/40"
-                          : tableFlash === idx
-                            ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
-                            : `${c.bg} ${c.border}`
+                        ? "bg-emerald-500/20 border-emerald-500/40"
+                        : tableFlash === idx
+                          ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
+                          : `${c.bg} ${c.border}`
                         }`}
                     >
                       {wasJustPaid ? (
@@ -3326,12 +3326,12 @@ export default function POS({ slug }: POSProps) {
                     key={section.name}
                     onClick={() => setActiveDraftSection(section.name)}
                     className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${activeDraftSection === section.name
-                        ? section.name === "Indoor"
-                          ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
-                          : section.name === "Outdoor"
-                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-                            : "bg-purple-500/20 border-purple-500/50 text-purple-400"
-                        : `${t.surface} ${t.border} ${t.textMuted}`
+                      ? section.name === "Indoor"
+                        ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                        : section.name === "Outdoor"
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                          : "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                      : `${t.surface} ${t.border} ${t.textMuted}`
                       }`}
                   >
                     {section.name}
@@ -3820,7 +3820,7 @@ export default function POS({ slug }: POSProps) {
           })()}
       </AnimatePresence>
 
-      {/* Orders Panel */}
+      {/* Orders Panel 
       <AnimatePresence>
         {showOrdersPanel && (
           <>
