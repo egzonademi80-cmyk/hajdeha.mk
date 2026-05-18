@@ -2045,7 +2045,7 @@ export default function POS({ slug }: POSProps) {
           )}
         </button>
         {/* Orders panel button */}
-        <button
+        {/*<button
           onClick={() => setShowOrdersPanel(true)}
           className={`relative h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
           data-testid="button-orders-panel"
@@ -2056,7 +2056,7 @@ export default function POS({ slug }: POSProps) {
               {pendingCount}
             </span>
           )}
-        </button>
+        </button>*/}
         {screen === "menu" &&
           active !== null &&
           currentOrder &&
