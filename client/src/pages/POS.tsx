@@ -508,7 +508,7 @@ async function sendToUsbPrinter(
 ): Promise<void> {
   try {
     await device.open();
-  } catch {}
+  } catch { }
   if (device.configuration === null) await device.selectConfiguration(1);
   let interfaceNum = -1;
   let endpointNum = -1;
@@ -525,7 +525,7 @@ async function sendToUsbPrinter(
   if (interfaceNum === -1) throw new Error("No bulk OUT endpoint found");
   try {
     await device.claimInterface(interfaceNum);
-  } catch {}
+  } catch { }
   await device.transferOut(endpointNum, data.buffer as ArrayBuffer);
 }
 
@@ -584,9 +584,9 @@ function printReceiptWindow({
   }
   const openedStr = startedAt
     ? new Date(startedAt).toLocaleTimeString("sq-MK", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+      hour: "2-digit",
+      minute: "2-digit",
+    })
     : null;
   const rows = items
     .map(
@@ -668,21 +668,21 @@ function playWaiterChime(type: WaiterSignal["type"]) {
     const notes: [number, number, number][] =
       type === "help"
         ? [
-            [880, 0, 0.18],
-            [660, 0.2, 0.28],
-            [660, 0.42, 0.28],
-          ]
+          [880, 0, 0.18],
+          [660, 0.2, 0.28],
+          [660, 0.42, 0.28],
+        ]
         : type === "bill-cash"
           ? [
-              [660, 0, 0.16],
-              [880, 0.18, 0.16],
-              [1108, 0.36, 0.28],
-            ]
+            [660, 0, 0.16],
+            [880, 0.18, 0.16],
+            [1108, 0.36, 0.28],
+          ]
           : [
-              [660, 0, 0.16],
-              [990, 0.18, 0.16],
-              [1320, 0.36, 0.28],
-            ];
+            [660, 0, 0.16],
+            [990, 0.18, 0.16],
+            [1320, 0.36, 0.28],
+          ];
     notes.forEach(([freq, start, dur]) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -700,7 +700,7 @@ function playWaiterChime(type: WaiterSignal["type"]) {
       osc.stop(ctx.currentTime + start + dur + 0.05);
     });
     setTimeout(() => ctx.close(), 1500);
-  } catch {}
+  } catch { }
 }
 
 // ─── Incoming order chime ─────────────────────────────────────────────────────
@@ -719,7 +719,7 @@ function playIncomingChime() {
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
     o.start();
     o.stop(ctx.currentTime + 0.55);
-  } catch {}
+  } catch { }
 }
 // ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
 // ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
@@ -916,7 +916,7 @@ export default function POS({ slug }: POSProps) {
     try {
       const saved = localStorage.getItem(SECTIONS_KEY);
       if (saved) return JSON.parse(saved) as TableSection[];
-    } catch {}
+    } catch { }
     return defaultSections;
   });
 
@@ -931,7 +931,7 @@ export default function POS({ slug }: POSProps) {
         const parsed = JSON.parse(saved) as TableOrder[];
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch {}
+    } catch { }
     return Array.from({ length: TABLE_COUNT }, emptyTable);
   });
   const tablesRef = useRef(tables);
@@ -958,7 +958,7 @@ export default function POS({ slug }: POSProps) {
     try {
       const saved = localStorage.getItem(PERSONS_KEY);
       if (saved) return JSON.parse(saved) as PersonTab[];
-    } catch {}
+    } catch { }
     return [];
   });
 
@@ -1057,7 +1057,7 @@ export default function POS({ slug }: POSProps) {
           body: JSON.stringify({ pinCode: existingWaiterPin, restaurantId }),
         })
           .then(() => refetchOrders())
-          .catch(() => {});
+          .catch(() => { });
       });
   }, [dbOrders]);
 
@@ -1078,13 +1078,13 @@ export default function POS({ slug }: POSProps) {
     try {
       const saved = localStorage.getItem(THEME_KEY);
       if (saved === "light" || saved === "dark") return saved;
-    } catch {}
+    } catch { }
     return "dark";
   });
   useEffect(() => {
     try {
       localStorage.setItem(THEME_KEY, theme);
-    } catch {}
+    } catch { }
   }, [theme]);
   const isLight = theme === "light";
 
@@ -1099,7 +1099,7 @@ export default function POS({ slug }: POSProps) {
     setLang(newLang);
     try {
       localStorage.setItem("hajdeha-lang", newLang);
-    } catch {}
+    } catch { }
   };
   const tr = posTranslations[lang];
 
@@ -1121,7 +1121,7 @@ export default function POS({ slug }: POSProps) {
       .then((devices: USBDevice[]) => {
         if (devices.length > 0) setUsbDevice(devices[0]);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const connectPrinter = async () => {
@@ -1171,72 +1171,72 @@ export default function POS({ slug }: POSProps) {
   // ─── Theme tokens ───────────────────────────────────────────────────────────
   const t = isLight
     ? {
-        appBg: "bg-[#FAFAF9]",
-        panelBg: "bg-white",
-        text: "text-[#1A1A1A]",
-        textSoft: "text-[#3A3A3A]",
-        textMuted: "text-[#7A7A7A]",
-        textFaint: "text-[#A8A8A8]",
-        textDim: "text-[#BFBDB9]",
-        border: "border-[#E8E6E3]",
-        borderSoft: "border-[#EFEDEA]",
-        borderDashed: "border-[#D8D4CF]",
-        surface: "bg-[#F4F2EF]",
-        surfaceSoft: "bg-[#EDEAE5]",
-        surfaceHover: "hover:bg-[#ECE9E5]",
-        chipInactive:
-          "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
-        cartItemActive: "bg-amber-100 border-amber-400",
-        cartItemInactive:
-          "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
-        backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
-        modalBg: "bg-white",
-        modalOverlay: "bg-black/50",
-        inputBgStyle: "#F4F2EF",
-        inputTextStyle: "#1A1A1A",
-        inputBorder: "border-[#E0DDD8]",
-        cancelBtn: "bg-[#EDEAE5] text-[#7A7A7A] hover:bg-[#E2DED9]",
-        deletePersonBtn: "bg-[#EDEAE5] hover:bg-red-100 text-[#7A7A7A]",
-        personIconEmpty: "bg-[#EDEAE5] text-[#A8A8A8]",
-        qtyControlBg: "bg-[#EDEAE5]",
-        qtyBtnText: "text-[#5A5A5A] hover:bg-[#D8D4CF]",
-        actionBtn: "bg-blue-50 text-blue-600 hover:bg-blue-100",
-        actionBtnAlt: "bg-purple-50 text-purple-600 hover:bg-purple-100",
-      }
+      appBg: "bg-[#FAFAF9]",
+      panelBg: "bg-white",
+      text: "text-[#1A1A1A]",
+      textSoft: "text-[#3A3A3A]",
+      textMuted: "text-[#7A7A7A]",
+      textFaint: "text-[#A8A8A8]",
+      textDim: "text-[#BFBDB9]",
+      border: "border-[#E8E6E3]",
+      borderSoft: "border-[#EFEDEA]",
+      borderDashed: "border-[#D8D4CF]",
+      surface: "bg-[#F4F2EF]",
+      surfaceSoft: "bg-[#EDEAE5]",
+      surfaceHover: "hover:bg-[#ECE9E5]",
+      chipInactive:
+        "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
+      cartItemActive: "bg-amber-100 border-amber-400",
+      cartItemInactive:
+        "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
+      backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
+      modalBg: "bg-white",
+      modalOverlay: "bg-black/50",
+      inputBgStyle: "#F4F2EF",
+      inputTextStyle: "#1A1A1A",
+      inputBorder: "border-[#E0DDD8]",
+      cancelBtn: "bg-[#EDEAE5] text-[#7A7A7A] hover:bg-[#E2DED9]",
+      deletePersonBtn: "bg-[#EDEAE5] hover:bg-red-100 text-[#7A7A7A]",
+      personIconEmpty: "bg-[#EDEAE5] text-[#A8A8A8]",
+      qtyControlBg: "bg-[#EDEAE5]",
+      qtyBtnText: "text-[#5A5A5A] hover:bg-[#D8D4CF]",
+      actionBtn: "bg-blue-50 text-blue-600 hover:bg-blue-100",
+      actionBtnAlt: "bg-purple-50 text-purple-600 hover:bg-purple-100",
+    }
     : {
-        appBg: "bg-[#0F0F0F]",
-        panelBg: "bg-[#0B0B0B]",
-        text: "text-white",
-        textSoft: "text-white/85",
-        textMuted: "text-white/40",
-        textFaint: "text-white/25",
-        textDim: "text-white/30",
-        border: "border-white/10",
-        borderSoft: "border-white/5",
-        borderDashed: "border-white/10",
-        surface: "bg-white/[0.04]",
-        surfaceSoft: "bg-white/[0.08]",
-        surfaceHover: "hover:bg-white/[0.06]",
-        chipInactive:
-          "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
-        cartItemActive: "bg-amber-500/15 border-amber-500/50",
-        cartItemInactive:
-          "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
-        backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
-        modalBg: "bg-[#1A1A1A]",
-        modalOverlay: "bg-black/70",
-        inputBgStyle: "#2A2A2A",
-        inputTextStyle: "#FFFFFF",
-        inputBorder: "border-white/12",
-        cancelBtn: "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]",
-        deletePersonBtn: "bg-white/[0.06] hover:bg-red-500/20 text-white/30",
-        personIconEmpty: "bg-white/[0.06] text-white/30",
-        qtyControlBg: "bg-white/[0.06]",
-        qtyBtnText:
-          "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
-        actionBtn: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30",
-        actionBtnAlt: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30",
-      };
+      appBg: "bg-[#0F0F0F]",
+      panelBg: "bg-[#0B0B0B]",
+      text: "text-white",
+      textSoft: "text-white/85",
+      textMuted: "text-white/40",
+      textFaint: "text-white/25",
+      textDim: "text-white/30",
+      border: "border-white/10",
+      borderSoft: "border-white/5",
+      borderDashed: "border-white/10",
+      surface: "bg-white/[0.04]",
+      surfaceSoft: "bg-white/[0.08]",
+      surfaceHover: "hover:bg-white/[0.06]",
+      chipInactive:
+        "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
+      cartItemActive: "bg-amber-500/15 border-amber-500/50",
+      cartItemInactive:
+        "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
+      backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
+      modalBg: "bg-[#1A1A1A]",
+      modalOverlay: "bg-black/70",
+      inputBgStyle: "#2A2A2A",
+      inputTextStyle: "#FFFFFF",
+      inputBorder: "border-white/12",
+      cancelBtn: "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]",
+      deletePersonBtn: "bg-white/[0.06] hover:bg-red-500/20 text-white/30",
+      personIconEmpty: "bg-white/[0.06] text-white/30",
+      qtyControlBg: "bg-white/[0.06]",
+      qtyBtnText:
+        "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
+      actionBtn: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30",
+      actionBtnAlt: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30",
+    };
 
   const statusColorsLight = {
     empty: {
@@ -1314,17 +1314,17 @@ export default function POS({ slug }: POSProps) {
   };
   const dotColors = isLight
     ? {
-        fresh: "bg-emerald-500",
-        mid: "bg-amber-500",
-        late: "bg-red-500",
-        unclaimed: "bg-sky-500",
-      }
+      fresh: "bg-emerald-500",
+      mid: "bg-amber-500",
+      late: "bg-red-500",
+      unclaimed: "bg-sky-500",
+    }
     : {
-        fresh: "bg-emerald-400",
-        mid: "bg-amber-400",
-        late: "bg-red-400",
-        unclaimed: "bg-sky-400",
-      };
+      fresh: "bg-emerald-400",
+      mid: "bg-amber-400",
+      late: "bg-red-400",
+      unclaimed: "bg-sky-400",
+    };
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -1568,7 +1568,7 @@ export default function POS({ slug }: POSProps) {
               items: allItems,
               waiterId: tableWaiterId,
             }),
-          }).catch(() => {});
+          }).catch(() => { });
         }
         setTables((t) => {
           const updated = [...t];
@@ -1581,7 +1581,7 @@ export default function POS({ slug }: POSProps) {
           body: JSON.stringify({
             channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
           }),
-        }).catch(() => {});
+        }).catch(() => { });
         setJustPaid({ kind: "table", idx: splitTableIdx });
         setTimeout(() => setJustPaid(null), 2500);
         setShowSplitModal(false);
@@ -1631,7 +1631,7 @@ export default function POS({ slug }: POSProps) {
             items: receiptItems,
             waiterId: tables[slot.idx].waiterId ?? null,
           }),
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
     if (slot.kind === "table") {
@@ -1646,7 +1646,7 @@ export default function POS({ slug }: POSProps) {
         body: JSON.stringify({
           channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
         }),
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
     }
@@ -1719,7 +1719,7 @@ export default function POS({ slug }: POSProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
-        }).catch(() => {});
+        }).catch(() => { });
         refetchOrders();
       }
 
@@ -1780,17 +1780,17 @@ export default function POS({ slug }: POSProps) {
   useEffect(() => {
     try {
       localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
-    } catch {}
+    } catch { }
   }, [tables, TABLES_KEY]);
   useEffect(() => {
     try {
       localStorage.setItem(PERSONS_KEY, JSON.stringify(personTabs));
-    } catch {}
+    } catch { }
   }, [personTabs, PERSONS_KEY]);
   useEffect(() => {
     try {
       localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
-    } catch {}
+    } catch { }
   }, [sections, SECTIONS_KEY]);
   useEffect(() => {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
@@ -1917,7 +1917,7 @@ export default function POS({ slug }: POSProps) {
       try {
         pusher?.unsubscribe(`pos-${RESTAURANT_SLUG}`);
         pusher?.disconnect();
-      } catch {}
+      } catch { }
     };
   }, [RESTAURANT_SLUG, TABLE_COUNT]);
 
@@ -2087,21 +2087,21 @@ export default function POS({ slug }: POSProps) {
               const cfg =
                 signal.type === "bill-cash"
                   ? {
-                      grad: "from-emerald-600 to-emerald-500",
-                      icon: "💵",
-                      label: `${tr.cashBill} — Table ${signal.tableNumber}`,
-                    }
+                    grad: "from-emerald-600 to-emerald-500",
+                    icon: "💵",
+                    label: `${tr.cashBill} — Table ${signal.tableNumber}`,
+                  }
                   : signal.type === "bill-card"
                     ? {
-                        grad: "from-blue-600 to-blue-500",
-                        icon: "💳",
-                        label: `${tr.cardBill} — Table ${signal.tableNumber}`,
-                      }
+                      grad: "from-blue-600 to-blue-500",
+                      icon: "💳",
+                      label: `${tr.cardBill} — Table ${signal.tableNumber}`,
+                    }
                     : {
-                        grad: "from-amber-500 to-amber-400",
-                        icon: "🔔",
-                        label: `${tr.needHelp} — Table ${signal.tableNumber}`,
-                      };
+                      grad: "from-amber-500 to-amber-400",
+                      icon: "🔔",
+                      label: `${tr.needHelp} — Table ${signal.tableNumber}`,
+                    };
               return (
                 <motion.button
                   key={signal.id}
@@ -2299,13 +2299,12 @@ export default function POS({ slug }: POSProps) {
                         duration: 1.6,
                         repeat: tableFlash === idx ? 2 : 0,
                       }}
-                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
-                        wasJustPaid
+                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${wasJustPaid
                           ? "bg-emerald-500/20 border-emerald-500/40"
                           : tableFlash === idx
                             ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
                             : `${c.bg} ${c.border}`
-                      }`}
+                        }`}
                     >
                       {wasJustPaid ? (
                         <CheckCircle className="h-6 w-6 text-emerald-400" />
@@ -2681,7 +2680,7 @@ export default function POS({ slug }: POSProps) {
                 </div>
               </div>
 
-              {/* Order panel */}
+              {/*{/* Order panel 
               <div
                 className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
               >
@@ -2908,9 +2907,11 @@ export default function POS({ slug }: POSProps) {
                   </div>
                 )}
               </div>
+              */}
             </motion.div>
           )}
       </AnimatePresence>
+
 
       {/* ══════════════════════════ MODALS ══════════════════════════════════ */}
 
@@ -2987,9 +2988,9 @@ export default function POS({ slug }: POSProps) {
                         const pc =
                           assignedPerson !== null
                             ? SPLIT_COLORS[
-                                splitPersons[assignedPerson]?.colorIdx %
-                                  SPLIT_COLORS.length
-                              ]
+                            splitPersons[assignedPerson]?.colorIdx %
+                            SPLIT_COLORS.length
+                            ]
                             : null;
                         return (
                           <div
@@ -3032,7 +3033,7 @@ export default function POS({ slug }: POSProps) {
                               {splitPersons.map((person, pIdx) => {
                                 const pColor =
                                   SPLIT_COLORS[
-                                    person.colorIdx % SPLIT_COLORS.length
+                                  person.colorIdx % SPLIT_COLORS.length
                                   ];
                                 const isSelected = assignedPerson === pIdx;
                                 return (
@@ -3324,15 +3325,14 @@ export default function POS({ slug }: POSProps) {
                   <button
                     key={section.name}
                     onClick={() => setActiveDraftSection(section.name)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${
-                      activeDraftSection === section.name
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${activeDraftSection === section.name
                         ? section.name === "Indoor"
                           ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
                           : section.name === "Outdoor"
                             ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
                             : "bg-purple-500/20 border-purple-500/50 text-purple-400"
                         : `${t.surface} ${t.border} ${t.textMuted}`
-                    }`}
+                      }`}
                   >
                     {section.name}
                     <span className="ml-1 opacity-60">
@@ -3371,15 +3371,15 @@ export default function POS({ slug }: POSProps) {
                             if (s.name === activeDraftSection)
                               return isAssignedHere
                                 ? {
-                                    ...s,
-                                    tables: s.tables.filter((t) => t !== idx),
-                                  }
+                                  ...s,
+                                  tables: s.tables.filter((t) => t !== idx),
+                                }
                                 : {
-                                    ...s,
-                                    tables: [...s.tables, idx].sort(
-                                      (a, b) => a - b,
-                                    ),
-                                  };
+                                  ...s,
+                                  tables: [...s.tables, idx].sort(
+                                    (a, b) => a - b,
+                                  ),
+                                };
                             return {
                               ...s,
                               tables: s.tables.filter((t) => t !== idx),
@@ -3893,18 +3893,18 @@ export default function POS({ slug }: POSProps) {
                     const statusCfg =
                       order.status === "pending"
                         ? {
-                            label: tr.statusPending,
-                            color: "bg-amber-500/20 text-amber-500",
-                          }
+                          label: tr.statusPending,
+                          color: "bg-amber-500/20 text-amber-500",
+                        }
                         : order.status === "claimed"
                           ? {
-                              label: tr.statusClaimed,
-                              color: "bg-blue-500/20 text-blue-400",
-                            }
+                            label: tr.statusClaimed,
+                            color: "bg-blue-500/20 text-blue-400",
+                          }
                           : {
-                              label: tr.statusDone,
-                              color: "bg-emerald-500/20 text-emerald-400",
-                            };
+                            label: tr.statusDone,
+                            color: "bg-emerald-500/20 text-emerald-400",
+                          };
                     return (
                       <div
                         key={order.id}
