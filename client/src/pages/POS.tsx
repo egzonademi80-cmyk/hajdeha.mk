@@ -985,20 +985,20 @@ export default function POS({ slug }: POSProps) {
 
   const restaurantId = restaurant?.id;
 
-  const { data: waiters = [] } = useQuery<
-    { id: number; name: string; pinCode: string }[]
-  >({
-    queryKey: ["/api/admin/waiters", restaurantId],
+  // Check if restaurant has waiters (public endpoint, no auth required)
+  const { data: hasWaitersData } = useQuery<{ hasWaiters: boolean }>({
+    queryKey: ["/api/pos/has-waiters", restaurantId],
     queryFn: async () => {
-      if (!restaurantId) return [];
+      if (!restaurantId) return { hasWaiters: false };
       const res = await fetch(
-        `/api/admin/waiters?action=list&restaurantId=${restaurantId}`,
+        `/api/pos/has-waiters?restaurantId=${restaurantId}`,
       );
-      if (!res.ok) return [];
+      if (!res.ok) return { hasWaiters: false };
       return res.json();
     },
     enabled: !!restaurantId,
   });
+  const hasWaiters = hasWaitersData?.hasWaiters ?? false;
 
   const { data: dbOrders = [], refetch: refetchOrders } = useQuery({
     queryKey: ["/api/orders", restaurantId],
@@ -1039,6 +1039,9 @@ export default function POS({ slug }: POSProps) {
         // Mark immediately so nothing else processes it
         processedOrderIdsRef.current.add(order.id);
 
+        // Skip auto-claim if no waiters configured
+        if (!hasWaiters) return;
+
         // Auto-claim if table already has a waiter
         const tableDigits = parseInt(
           String(order.tableNumber).replace(/\D/g, ""),
@@ -1046,10 +1049,11 @@ export default function POS({ slug }: POSProps) {
         );
         const tableIdx = tableDigits - 1;
         const existingWaiterId = tablesRef.current[tableIdx]?.waiterId;
-        const existingWaiterPin = waiters.find(
-          (w) => w.id === existingWaiterId,
-        )?.pinCode;
-        if (!existingWaiterId || !existingWaiterPin) return;
+        if (!existingWaiterId) return;
+
+        // Fetch the waiter's PIN from the table state and claim the order
+        const existingWaiterPin = tablesRef.current[tableIdx]?.waiterPin;
+        if (!existingWaiterPin) return;
 
         fetch(`/api/orders/${order.id}/claim`, {
           method: "POST",
@@ -1664,17 +1668,14 @@ export default function POS({ slug }: POSProps) {
 
   // ─── openSlot: shows PIN modal only if waiters exist ─────────────────────
   const openSlot = (slot: ActiveSlot) => {
-    console.log("[v0] openSlot called, waiters:", waiters, "length:", waiters.length);
     if (slot?.kind === "table") {
       // If no waiters configured, skip PIN and go directly to menu
-      if (waiters.length === 0) {
-        console.log("[v0] No waiters, skipping PIN");
+      if (!hasWaiters) {
         setActive(slot);
         setScreen("menu");
         setActiveCategory("All");
         return;
       }
-      console.log("[v0] Waiters exist, showing PIN modal");
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
@@ -2168,7 +2169,7 @@ export default function POS({ slug }: POSProps) {
                 (o: any) =>
                   o.status === "pending" && Number(o.tableNumber) === tableNum,
               );
-              if (pendingOrder && waiters.length > 0)
+              if (pendingOrder && hasWaiters)
                 openIncomingClaim(pendingOrder);
               else {
                 const idx = tableNum - 1;
@@ -2210,7 +2211,7 @@ export default function POS({ slug }: POSProps) {
               className="text-[10px] font-bold opacity-70"
               style={{ fontFamily: "'DM Mono', monospace" }}
             >
-              {waiters.length > 0 ? `${tr.claimOrder} →` : "→"}
+              {hasWaiters ? `${tr.claimOrder} →` : "→"}
             </span>
           </motion.button>
         )}
@@ -2376,7 +2377,7 @@ export default function POS({ slug }: POSProps) {
                                 className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${c.dot}`}
                               />
                               {/* Claim button on unclaimed tables — opens PIN only if waiters exist */}
-                              {status === "unclaimed" && waiters.length > 0 && (
+                              {status === "unclaimed" && hasWaiters && (
                                 <button
                                   data-testid={`button-claim-table-${idx}`}
                                   onClick={(e) => {
