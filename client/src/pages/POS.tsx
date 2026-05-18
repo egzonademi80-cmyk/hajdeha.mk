@@ -1664,14 +1664,17 @@ export default function POS({ slug }: POSProps) {
 
   // ─── openSlot: shows PIN modal only if waiters exist ─────────────────────
   const openSlot = (slot: ActiveSlot) => {
+    console.log("[v0] openSlot called, waiters:", waiters, "length:", waiters.length);
     if (slot?.kind === "table") {
       // If no waiters configured, skip PIN and go directly to menu
       if (waiters.length === 0) {
+        console.log("[v0] No waiters, skipping PIN");
         setActive(slot);
         setScreen("menu");
         setActiveCategory("All");
         return;
       }
+      console.log("[v0] Waiters exist, showing PIN modal");
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
