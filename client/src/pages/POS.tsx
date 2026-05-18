@@ -2045,35 +2045,6 @@ export default function POS({ slug }: POSProps) {
           )}
         </button>
         {/* Orders panel button */}
-        {/*<button
-          onClick={() => setShowOrdersPanel(true)}
-          className={`relative h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
-          data-testid="button-orders-panel"
-        >
-          <ClipboardList className="h-4 w-4 lg:h-5 lg:w-5" />
-          {pendingCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-amber-500 text-black text-[9px] font-bold flex items-center justify-center">
-              {pendingCount}
-            </span>
-          )}
-        </button>*/}
-        {screen === "menu" &&
-          active !== null &&
-          currentOrder &&
-          currentOrder.items.length > 0 && (
-            <button
-              onClick={() => setScreen("order")}
-              className="lg:hidden flex items-center gap-2 bg-amber-500 rounded-full pl-3 pr-3 py-1.5"
-            >
-              <ShoppingBag className="h-3.5 w-3.5 text-black" />
-              <span
-                className="text-xs font-bold text-black"
-                style={{ fontFamily: "'DM Mono', monospace" }}
-              >
-                {orderCount(currentOrder)} · {orderTotal(currentOrder)} DEN
-              </span>
-            </button>
-          )}
       </div>
 
       {/* ── Waiter signal banners ── */}
@@ -2680,7 +2651,7 @@ export default function POS({ slug }: POSProps) {
                 </div>
               </div>
 
-              {/*{/* Order panel 
+
               <div
                 className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
               >
@@ -2907,11 +2878,9 @@ export default function POS({ slug }: POSProps) {
                   </div>
                 )}
               </div>
-              */}
             </motion.div>
           )}
       </AnimatePresence>
-
 
       {/* ══════════════════════════ MODALS ══════════════════════════════════ */}
 
@@ -3820,7 +3789,7 @@ export default function POS({ slug }: POSProps) {
           })()}
       </AnimatePresence>
 
-      {/* Orders Panel 
+      {/* Orders Panel *
       <AnimatePresence>
         {showOrdersPanel && (
           <>
@@ -3893,18 +3862,18 @@ export default function POS({ slug }: POSProps) {
                     const statusCfg =
                       order.status === "pending"
                         ? {
-                          label: tr.statusPending,
-                          color: "bg-amber-500/20 text-amber-500",
-                        }
+                            label: tr.statusPending,
+                            color: "bg-amber-500/20 text-amber-500",
+                          }
                         : order.status === "claimed"
                           ? {
-                            label: tr.statusClaimed,
-                            color: "bg-blue-500/20 text-blue-400",
-                          }
+                              label: tr.statusClaimed,
+                              color: "bg-blue-500/20 text-blue-400",
+                            }
                           : {
-                            label: tr.statusDone,
-                            color: "bg-emerald-500/20 text-emerald-400",
-                          };
+                              label: tr.statusDone,
+                              color: "bg-emerald-500/20 text-emerald-400",
+                            };
                     return (
                       <div
                         key={order.id}
