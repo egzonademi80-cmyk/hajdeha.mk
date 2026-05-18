@@ -792,6 +792,19 @@ export async function registerRoutes(
     }
   });
 
+  // === CHECK IF RESTAURANT HAS WAITERS (public, no auth) ===
+  app.get("/api/pos/has-waiters", async (req, res) => {
+    try {
+      const restaurantId = parseInt(req.query.restaurantId as string);
+      if (isNaN(restaurantId))
+        return res.status(400).json({ message: "restaurantId required" });
+      const waiters = await storage.getWaiters(restaurantId);
+      return res.json({ hasWaiters: waiters.length > 0 });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // === VERIFY WAITER PIN (for POS table claim) ===
   app.post("/api/pos/verify-pin", async (req, res) => {
     try {
