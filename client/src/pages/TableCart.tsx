@@ -1081,13 +1081,19 @@ function WaiterSheet({
   const [sent, setSent] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) { setBillPicker(false); setSent(null); }
+    if (!open) {
+      setBillPicker(false);
+      setSent(null);
+    }
   }, [open]);
 
   const sendSignal = (type: "help" | "bill-cash" | "bill-card") => {
     onSignal(type);
     setSent(type);
-    setTimeout(() => { onClose(); setSent(null); }, 1800);
+    setTimeout(() => {
+      onClose();
+      setSent(null);
+    }, 1800);
   };
 
   const WaIcon = () => (
@@ -1224,59 +1230,75 @@ function WaiterSheet({
                         <CheckCircle className="h-8 w-8 text-emerald-500" />
                       </div>
                       <p className="text-base font-bold text-foreground">
-                        {lang === "al" ? "Kamarieri vjen!" : lang === "mk" ? "Келнерот доаѓа!" : "Waiter is coming!"}
+                        {lang === "al"
+                          ? "Kamarieri vjen!"
+                          : lang === "mk"
+                            ? "Келнерот доаѓа!"
+                            : "Waiter is coming!"}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {lang === "al" ? "Kërkesa juaj u dërgua." : lang === "mk" ? "Барањето е испратено." : "Your request was sent."}
+                        {lang === "al"
+                          ? "Kërkesa juaj u dërgua."
+                          : lang === "mk"
+                            ? "Барањето е испратено."
+                            : "Your request was sent."}
                       </p>
                     </div>
                   ) : (
                     <>
-                  {/* Cash button */}
-                  <motion.button
-                    whileTap={{ scale: 0.985 }}
-                    onClick={() => sendSignal("bill-cash")}
-                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
-                  >
-                    <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-200 dark:shadow-emerald-900/40">
-                      <Banknote
-                        className="h-6 w-6 text-white"
-                        strokeWidth={1.75}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-semibold text-foreground leading-tight">
-                        {tr.cash}
-                      </p>
-                      <p className="text-[12px] text-muted-foreground mt-0.5">
-                        {lang === "al" ? "Njofton kamarieren direkt" : lang === "mk" ? "Го известува келнерот директно" : "Notifies the waiter directly"}
-                      </p>
-                    </div>
-                    <CheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0 opacity-0 group-active:opacity-100 transition-opacity" />
-                  </motion.button>
+                      {/* Cash button */}
+                      <motion.button
+                        whileTap={{ scale: 0.985 }}
+                        onClick={() => sendSignal("bill-cash")}
+                        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-all text-left group"
+                      >
+                        <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-200 dark:shadow-emerald-900/40">
+                          <Banknote
+                            className="h-6 w-6 text-white"
+                            strokeWidth={1.75}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[15px] font-semibold text-foreground leading-tight">
+                            {tr.cash}
+                          </p>
+                          <p className="text-[12px] text-muted-foreground mt-0.5">
+                            {lang === "al"
+                              ? "Njofton kamarieren direkt"
+                              : lang === "mk"
+                                ? "Го известува келнерот директно"
+                                : "Notifies the waiter directly"}
+                          </p>
+                        </div>
+                        <CheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0 opacity-0 group-active:opacity-100 transition-opacity" />
+                      </motion.button>
 
-                  {/* Card button */}
-                  <motion.button
-                    whileTap={{ scale: 0.985 }}
-                    onClick={() => sendSignal("bill-card")}
-                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
-                  >
-                    <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200 dark:shadow-blue-900/40">
-                      <CreditCard
-                        className="h-6 w-6 text-white"
-                        strokeWidth={1.75}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-semibold text-foreground leading-tight">
-                        {tr.card}
-                      </p>
-                      <p className="text-[12px] text-muted-foreground mt-0.5">
-                        {lang === "al" ? "Njofton kamarieren direkt" : lang === "mk" ? "Го известува келнерот директно" : "Notifies the waiter directly"}
-                      </p>
-                    </div>
-                    <CheckCircle className="h-5 w-5 text-blue-500 flex-shrink-0 opacity-0 group-active:opacity-100 transition-opacity" />
-                  </motion.button>
+                      {/* Card button */}
+                      <motion.button
+                        whileTap={{ scale: 0.985 }}
+                        onClick={() => sendSignal("bill-card")}
+                        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 shadow-sm active:shadow-none active:bg-blue-50 dark:active:bg-blue-900/20 transition-all text-left group"
+                      >
+                        <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200 dark:shadow-blue-900/40">
+                          <CreditCard
+                            className="h-6 w-6 text-white"
+                            strokeWidth={1.75}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[15px] font-semibold text-foreground leading-tight">
+                            {tr.card}
+                          </p>
+                          <p className="text-[12px] text-muted-foreground mt-0.5">
+                            {lang === "al"
+                              ? "Njofton kamarieren direkt"
+                              : lang === "mk"
+                                ? "Го известува келнерот директно"
+                                : "Notifies the waiter directly"}
+                          </p>
+                        </div>
+                        <CheckCircle className="h-5 w-5 text-blue-500 flex-shrink-0 opacity-0 group-active:opacity-100 transition-opacity" />
+                      </motion.button>
                     </>
                   )}
                 </motion.div>
@@ -1296,50 +1318,58 @@ function WaiterSheet({
                         <CheckCircle className="h-8 w-8 text-amber-500" />
                       </div>
                       <p className="text-base font-bold text-foreground">
-                        {lang === "al" ? "Kamarieri vjen!" : lang === "mk" ? "Келнерот доаѓа!" : "Waiter is coming!"}
+                        {lang === "al"
+                          ? "Kamarieri vjen!"
+                          : lang === "mk"
+                            ? "Келнерот доаѓа!"
+                            : "Waiter is coming!"}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {lang === "al" ? "Kërkesa juaj u dërgua." : lang === "mk" ? "Барањето е испратено." : "Your request was sent."}
+                        {lang === "al"
+                          ? "Kërkesa juaj u dërgua."
+                          : lang === "mk"
+                            ? "Барањето е испратено."
+                            : "Your request was sent."}
                       </p>
                     </div>
-                  ) : tr.waiterMessages(tableNumber).map((msg) => {
-                    const isBill = msg.icon === "🧾";
-                    return (
-                      <motion.button
-                        key={msg.label}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() =>
-                          isBill
-                            ? setBillPicker(true)
-                            : sendSignal("help")
-                        }
-                        className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
-                      >
-                        <span className="text-2xl flex-shrink-0">
-                          {msg.icon}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground leading-snug">
-                            {msg.label}
-                          </p>
+                  ) : (
+                    tr.waiterMessages(tableNumber).map((msg) => {
+                      const isBill = msg.icon === "🧾";
+                      return (
+                        <motion.button
+                          key={msg.label}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() =>
+                            isBill ? setBillPicker(true) : sendSignal("help")
+                          }
+                          className="w-full flex items-center gap-3.5 p-4 rounded-2xl bg-stone-50 dark:bg-stone-800 border border-border active:bg-primary/5 active:border-primary/20 transition-colors text-left"
+                        >
+                          <span className="text-2xl flex-shrink-0">
+                            {msg.icon}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground leading-snug">
+                              {msg.label}
+                            </p>
+                            {isBill ? (
+                              <p className="text-[11px] text-primary font-medium mt-0.5">
+                                {tr.cash} · {tr.card}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                                {msg.text}
+                              </p>
+                            )}
+                          </div>
                           {isBill ? (
-                            <p className="text-[11px] text-primary font-medium mt-0.5">
-                              {tr.cash} · {tr.card}
-                            </p>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           ) : (
-                            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
-                              {msg.text}
-                            </p>
+                            <WaIcon />
                           )}
-                        </div>
-                        {isBill ? (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        ) : (
-                          <WaIcon />
-                        )}
-                      </motion.button>
-                    );
-                  })}
+                        </motion.button>
+                      );
+                    })
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

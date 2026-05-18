@@ -121,7 +121,6 @@ const SPLIT_COLORS = [
   },
 ];
 
-// FIX [1]: emptyTable always wipes waiter fields so payment fully resets the table
 const emptyTable = (): TableOrder => ({
   items: [],
   rounds: [],
@@ -165,131 +164,265 @@ const defaultSections: TableSection[] = [
   { name: "Bar", tables: [] },
 ];
 
+// ─── Translations ─────────────────────────────────────────────────────────────
 const posTranslations = {
   en: {
-    addItems: "ADD ITEMS", orderScreen: "ORDER",
+    addItems: "ADD ITEMS",
+    orderScreen: "ORDER",
     printerConnected: "Printer connected — click to disconnect",
     connectPrinter: "Connect thermal printer",
-    transferTable: "Transfer Table", mergeTables: "Merge Tables",
-    sections: "Sections", allSections: "All Sections", totalOpen: "TOTAL OPEN",
-    orderDot: "Order", persons: "PERSONS", newBtn: "New",
-    noActivePersons: "No active persons", activeLabel: "ACTIVE",
-    pay: "Pay", paidBtn: "✓ Paid", paidCheck: "Paid ✓",
-    cancel: "Cancel", splitBill: "Split Bill", addPerson: "Add Person",
-    assignItems: "ASSIGN EACH ITEM TO A PERSON", checkout: "CHECKOUT",
-    unassigned: "Unassigned:", nothingAssigned: "Nothing assigned",
-    allPaid: "All Paid!", tableCleared: "Table cleared",
+    transferTable: "Transfer Table",
+    mergeTables: "Merge Tables",
+    sections: "Sections",
+    allSections: "All Sections",
+    totalOpen: "TOTAL OPEN",
+    orderDot: "Order",
+    persons: "PERSONS",
+    newBtn: "New",
+    noActivePersons: "No active persons",
+    activeLabel: "ACTIVE",
+    pay: "Pay",
+    paidBtn: "✓ Paid",
+    paidCheck: "Paid ✓",
+    cancel: "Cancel",
+    splitBill: "Split Bill",
+    addPerson: "Add Person",
+    assignItems: "ASSIGN EACH ITEM TO A PERSON",
+    checkout: "CHECKOUT",
+    unassigned: "Unassigned:",
+    nothingAssigned: "Nothing assigned",
+    allPaid: "All Paid!",
+    tableCleared: "Table cleared",
     transferTitle: "Transfer Table",
     transferFromHint: "Select source table (table to move FROM)",
-    mergeTitle: "Merge Tables", mergeFirstHint: "Select first table to merge",
+    mergeTitle: "Merge Tables",
+    mergeFirstHint: "Select first table to merge",
     tableSections: "Table Sections",
     assignTablesHint: "Select a section, then tap tables to assign them",
-    unassignedLabel: "UNASSIGNED", saveSections: "Save sections",
-    newPersonTitle: "New Person", enterNameHint: "Enter the person's name",
-    namePlaceholder: "e.g. John, Mary, Person1…", create: "Create",
+    unassignedLabel: "UNASSIGNED",
+    saveSections: "Save sections",
+    newPersonTitle: "New Person",
+    enterNameHint: "Enter the person's name",
+    namePlaceholder: "e.g. John, Mary, Person1…",
+    create: "Create",
     enterPinContinue: "Enter your PIN to continue",
     enterPinClaim: "Enter your PIN to claim the table",
-    pinPlaceholder: "3-digit PIN", enterBtn: "Enter",
-    newOrder: "New Order", orderLabel: "Order", tableTag: "TABLE",
-    claimOrder: "Claim Order", confirmClaim: "Confirm & Claim Order",
-    confirm: "Confirm", enterYourPin: "ENTER YOUR PIN",
-    cashBill: "Cash Bill", cardBill: "Card Bill", needHelp: "Need help",
-    ordersTitle: "Orders", activeCount: "active", noOrdersYet: "No orders yet",
-    statusPending: "Pending", statusClaimed: "Claimed", statusDone: "Done",
-    claimOrderBtn: "Claim Order", markDone: "✓ Mark as done",
-    wrongPin: "Wrong PIN", networkError: "Network error", error: "Error",
+    pinPlaceholder: "3-digit PIN",
+    enterBtn: "Enter",
+    newOrder: "New Order",
+    orderLabel: "Order",
+    tableTag: "TABLE",
+    claimOrder: "Claim Order",
+    confirmClaim: "Confirm & Claim Order",
+    confirm: "Confirm",
+    enterYourPin: "ENTER YOUR PIN",
+    cashBill: "Cash Bill",
+    cardBill: "Card Bill",
+    needHelp: "Need help",
+    ordersTitle: "Orders",
+    activeCount: "active",
+    noOrdersYet: "No orders yet",
+    statusPending: "Pending",
+    statusClaimed: "Claimed",
+    statusDone: "Done",
+    claimOrderBtn: "Claim Order",
+    markDone: "✓ Mark as done",
+    wrongPin: "Wrong PIN",
+    networkError: "Network error",
+    error: "Error",
     thisTableBelongsTo: (name: string) => `This table belongs to ${name}`,
-    transferToHint: (n: number) => `Select destination table (move T${n} TO...)`,
-    mergeSecondHint: (n: number) => `Select second table to merge T${n} with...`,
-    receiptTagline: "Receipt", waiter: "Waiter", round: "Round",
-    orderNum: "Order", openedAt: "Opened at", duration: "Duration",
-    itemsLabel: "Items", pcs: "pcs", opened: "Opened:", closed: "Closed:",
-    thanks: "Thank you for your visit!", cash: "Cash", card: "Card", paid: "Paid",
+    transferToHint: (n: number) =>
+      `Select destination table (move T${n} TO...)`,
+    mergeSecondHint: (n: number) =>
+      `Select second table to merge T${n} with...`,
+    receiptTagline: "Receipt",
+    waiter: "Waiter",
+    round: "Round",
+    orderNum: "Order",
+    openedAt: "Opened at",
+    duration: "Duration",
+    itemsLabel: "Items",
+    pcs: "pcs",
+    opened: "Opened:",
+    closed: "Closed:",
+    thanks: "Thank you for your visit!",
+    cash: "Cash",
+    card: "Card",
+    paid: "Paid",
+    porosiLabel: "ORDER",
   },
   al: {
-    addItems: "SHTO", orderScreen: "POROSI",
+    addItems: "SHTO",
+    orderScreen: "POROSI",
     printerConnected: "Printer i lidhur — kliko për të shkëputur",
     connectPrinter: "Lidhu me printer termik",
-    transferTable: "Transfero Tavolinën", mergeTables: "Bashko Tavolinat",
-    sections: "Seksione", allSections: "Të gjitha", totalOpen: "TOTAL I HAPUR",
-    orderDot: "Porosi", persons: "PERSONAT", newBtn: "Krijo",
-    noActivePersons: "Nuk ka persona aktiv", activeLabel: "AKTIV",
-    pay: "Paguaj", paidBtn: "✓ Paguar", paidCheck: "Paguar ✓",
-    cancel: "Anulo", splitBill: "Ndaj Faturën", addPerson: "Shto Person",
-    assignItems: "CAKTO ÇDO ARTIKULL", checkout: "ARKË",
-    unassigned: "Pa caktuar:", nothingAssigned: "Asgjë e caktuar",
-    allPaid: "Të gjithë paguan!", tableCleared: "Tavolina u pastrua",
+    transferTable: "Transfero Tavolinën",
+    mergeTables: "Bashko Tavolinat",
+    sections: "Seksione",
+    allSections: "Të gjitha",
+    totalOpen: "TOTAL I HAPUR",
+    orderDot: "Porosi",
+    persons: "PERSONAT",
+    newBtn: "Krijo",
+    noActivePersons: "Nuk ka persona aktiv",
+    activeLabel: "AKTIV",
+    pay: "Paguaj",
+    paidBtn: "✓ Paguar",
+    paidCheck: "Paguar ✓",
+    cancel: "Anulo",
+    splitBill: "Ndaj Faturën",
+    addPerson: "Shto Person",
+    assignItems: "CAKTO ÇDO ARTIKULL",
+    checkout: "ARKË",
+    unassigned: "Pa caktuar:",
+    nothingAssigned: "Asgjë e caktuar",
+    allPaid: "Të gjithë paguan!",
+    tableCleared: "Tavolina u pastrua",
     transferTitle: "Transfero Tavolinën",
     transferFromHint: "Zgjidhni tabelën burimore (lëvize NGA)",
     mergeTitle: "Bashko Tavolinat",
     mergeFirstHint: "Zgjidhni tabelën e parë për t'u bashkuar",
     tableSections: "Seksionet e Tavolinave",
     assignTablesHint: "Zgjidhni seksionin, pastaj shtypni tavolinat",
-    unassignedLabel: "PA SEKSION", saveSections: "Ruaj seksionet",
-    newPersonTitle: "Person i Ri", enterNameHint: "Shkruaj emrin e personit",
-    namePlaceholder: "p.sh. Besart, Mirem, Person1…", create: "Krijo",
+    unassignedLabel: "PA SEKSION",
+    saveSections: "Ruaj seksionet",
+    newPersonTitle: "Person i Ri",
+    enterNameHint: "Shkruaj emrin e personit",
+    namePlaceholder: "p.sh. Besart, Mirem, Person1…",
+    create: "Krijo",
     enterPinContinue: "Futni PIN-in tuaj për të vazhduar",
     enterPinClaim: "Futni PIN-in tuaj për të marrë tavolinën",
-    pinPlaceholder: "PIN 3-shifror", enterBtn: "Hyr",
-    newOrder: "Porosi e Re", orderLabel: "Porosi", tableTag: "TAVOLINA",
-    claimOrder: "Merr Porosinë", confirmClaim: "Konfirmo dhe Merr Porosinë",
-    confirm: "Konfirmo", enterYourPin: "FUTNI PIN-IN TUAJ",
-    cashBill: "Faturë Kesh", cardBill: "Faturë Kartë", needHelp: "Keni nevojë",
-    ordersTitle: "Porositë", activeCount: "aktive", noOrdersYet: "Nuk ka porosi ende",
-    statusPending: "Pret", statusClaimed: "Marrë", statusDone: "Kryer",
-    claimOrderBtn: "Merr Porosinë", markDone: "✓ Shëno si të kryer",
-    wrongPin: "PIN i gabuar", networkError: "Gabim rrjeti", error: "Gabim",
+    pinPlaceholder: "PIN 3-shifror",
+    enterBtn: "Hyr",
+    newOrder: "Porosi e Re",
+    orderLabel: "Porosi",
+    tableTag: "TAVOLINA",
+    claimOrder: "Merr Porosinë",
+    confirmClaim: "Konfirmo dhe Merr Porosinë",
+    confirm: "Konfirmo",
+    enterYourPin: "FUTNI PIN-IN TUAJ",
+    cashBill: "Faturë Kesh",
+    cardBill: "Faturë Kartë",
+    needHelp: "Keni nevojë",
+    ordersTitle: "Porositë",
+    activeCount: "aktive",
+    noOrdersYet: "Nuk ka porosi ende",
+    statusPending: "Pret",
+    statusClaimed: "Marrë",
+    statusDone: "Kryer",
+    claimOrderBtn: "Merr Porosinë",
+    markDone: "✓ Shëno si të kryer",
+    wrongPin: "PIN i gabuar",
+    networkError: "Gabim rrjeti",
+    error: "Gabim",
     thisTableBelongsTo: (name: string) => `Kjo tryezë i takon ${name}`,
     transferToHint: (n: number) => `Zgjidhni destinacionin (Lëviz T${n} TE...)`,
-    mergeSecondHint: (n: number) => `Zgjidhni tabelën e dytë (Bashko T${n} me...)`,
-    receiptTagline: "Faturë", waiter: "Kamarier", round: "Rund",
-    orderNum: "Porosi", openedAt: "Hapur në", duration: "Kohëzgjatja",
-    itemsLabel: "Artikujt", pcs: "copë", opened: "Hapur:", closed: "Mbyllur:",
-    thanks: "Faleminderit për vizitën!", cash: "Kesh", card: "Kartë", paid: "Paguar",
+    mergeSecondHint: (n: number) =>
+      `Zgjidhni tabelën e dytë (Bashko T${n} me...)`,
+    receiptTagline: "Faturë",
+    waiter: "Kamarier",
+    round: "Rund",
+    orderNum: "Porosi",
+    openedAt: "Hapur në",
+    duration: "Kohëzgjatja",
+    itemsLabel: "Artikujt",
+    pcs: "copë",
+    opened: "Hapur:",
+    closed: "Mbyllur:",
+    thanks: "Faleminderit për vizitën!",
+    cash: "Kesh",
+    card: "Kartë",
+    paid: "Paguar",
+    porosiLabel: "POROSI",
   },
   mk: {
-    addItems: "ДОДАЈ", orderScreen: "НАРАЧКА",
+    addItems: "ДОДАЈ",
+    orderScreen: "НАРАЧКА",
     printerConnected: "Принтер поврзан — клик за исклучување",
     connectPrinter: "Поврзи термален принтер",
-    transferTable: "Префрли маса", mergeTables: "Спои маси",
-    sections: "Секции", allSections: "Сите", totalOpen: "ВКУПНО ОТВОРЕНО",
-    orderDot: "Нарачка", persons: "ЛИЦА", newBtn: "Ново",
-    noActivePersons: "Нема активни лица", activeLabel: "АКТИВНИ",
-    pay: "Плати", paidBtn: "✓ Платено", paidCheck: "Платено ✓",
-    cancel: "Откажи", splitBill: "Сплит", addPerson: "Додај лице",
-    assignItems: "ДОДЕЛИ СЕКОЈА СТАВКА НА ЛИЦЕ", checkout: "КАСА",
-    unassigned: "Недоделено:", nothingAssigned: "Ништо доделено",
-    allPaid: "Сите платиле!", tableCleared: "Масата е исчистена",
+    transferTable: "Префрли маса",
+    mergeTables: "Спои маси",
+    sections: "Секции",
+    allSections: "Сите",
+    totalOpen: "ВКУПНО ОТВОРЕНО",
+    orderDot: "Нарачка",
+    persons: "ЛИЦА",
+    newBtn: "Ново",
+    noActivePersons: "Нема активни лица",
+    activeLabel: "АКТИВНИ",
+    pay: "Плати",
+    paidBtn: "✓ Платено",
+    paidCheck: "Платено ✓",
+    cancel: "Откажи",
+    splitBill: "Сплит",
+    addPerson: "Додај лице",
+    assignItems: "ДОДЕЛИ СЕКОЈА СТАВКА НА ЛИЦЕ",
+    checkout: "КАСА",
+    unassigned: "Недоделено:",
+    nothingAssigned: "Ништо доделено",
+    allPaid: "Сите платиле!",
+    tableCleared: "Масата е исчистена",
     transferTitle: "Префрли маса",
     transferFromHint: "Изберете изворна маса (маса за преместување ОД)",
-    mergeTitle: "Спои маси", mergeFirstHint: "Изберете прва маса за спојување",
+    mergeTitle: "Спои маси",
+    mergeFirstHint: "Изберете прва маса за спојување",
     tableSections: "Секции на маси",
     assignTablesHint: "Изберете секција, потоа допрете маси за доделување",
-    unassignedLabel: "НЕДОДЕЛЕНО", saveSections: "Зачувај секции",
-    newPersonTitle: "Ново лице", enterNameHint: "Внеси го името",
-    namePlaceholder: "пр. Бесарт, Мирем, Лице1…", create: "Креирај",
+    unassignedLabel: "НЕДОДЕЛЕНО",
+    saveSections: "Зачувај секции",
+    newPersonTitle: "Ново лице",
+    enterNameHint: "Внеси го името",
+    namePlaceholder: "пр. Бесарт, Мирем, Лице1…",
+    create: "Креирај",
     enterPinContinue: "Внесете PIN за да продолжите",
     enterPinClaim: "Внесете PIN за да ја земете масата",
-    pinPlaceholder: "PIN 3 цифри", enterBtn: "Влези",
-    newOrder: "Нова нарачка", orderLabel: "Нарачка", tableTag: "МАСА",
-    claimOrder: "Земи нарачка", confirmClaim: "Потврди и земи нарачка",
-    confirm: "Потврди", enterYourPin: "ВНЕСЕТЕ ВАШ PIN",
-    cashBill: "Сметка готовина", cardBill: "Сметка картичка", needHelp: "Потребна помош",
-    ordersTitle: "Нарачки", activeCount: "активни", noOrdersYet: "Сè уште нема нарачки",
-    statusPending: "Чека", statusClaimed: "Земена", statusDone: "Готова",
-    claimOrderBtn: "Земи нарачка", markDone: "✓ Означи завршена",
-    wrongPin: "Погрешен PIN", networkError: "Мрежна грешка", error: "Грешка",
+    pinPlaceholder: "PIN 3 цифри",
+    enterBtn: "Влези",
+    newOrder: "Нова нарачка",
+    orderLabel: "Нарачка",
+    tableTag: "МАСА",
+    claimOrder: "Земи нарачка",
+    confirmClaim: "Потврди и земи нарачка",
+    confirm: "Потврди",
+    enterYourPin: "ВНЕСЕТЕ ВАШ PIN",
+    cashBill: "Сметка готовина",
+    cardBill: "Сметка картичка",
+    needHelp: "Потребна помош",
+    ordersTitle: "Нарачки",
+    activeCount: "активни",
+    noOrdersYet: "Сè уште нема нарачки",
+    statusPending: "Чека",
+    statusClaimed: "Земена",
+    statusDone: "Готова",
+    claimOrderBtn: "Земи нарачка",
+    markDone: "✓ Означи завршена",
+    wrongPin: "Погрешен PIN",
+    networkError: "Мрежна грешка",
+    error: "Грешка",
     thisTableBelongsTo: (name: string) => `Оваа маса му припаѓа на ${name}`,
     transferToHint: (n: number) => `Изберете одредиште (помести T${n} КОН...)`,
-    mergeSecondHint: (n: number) => `Изберете втора маса за спојување со T${n}...`,
-    receiptTagline: "Сметка", waiter: "Официант", round: "Рунда",
-    orderNum: "Нарачка", openedAt: "Отворено во", duration: "Траење",
-    itemsLabel: "Ставки", pcs: "ком", opened: "Отворено:", closed: "Затворено:",
-    thanks: "Ви благодариме за посетата!", cash: "Готовина", card: "Картичка", paid: "Платено",
+    mergeSecondHint: (n: number) =>
+      `Изберете втора маса за спојување со T${n}...`,
+    receiptTagline: "Сметка",
+    waiter: "Официант",
+    round: "Рунда",
+    orderNum: "Нарачка",
+    openedAt: "Отворено во",
+    duration: "Траење",
+    itemsLabel: "Ставки",
+    pcs: "ком",
+    opened: "Отворено:",
+    closed: "Затворено:",
+    thanks: "Ви благодариме за посетата!",
+    cash: "Готовина",
+    card: "Картичка",
+    paid: "Платено",
+    porosiLabel: "НАРАЧКА",
   },
 };
 type PosLang = keyof typeof posTranslations;
 
+// ─── ESC/POS Printer ──────────────────────────────────────────────────────────
 function buildEscPosBytes({
   restaurantName,
   tableLabel,
@@ -306,17 +439,11 @@ function buildEscPosBytes({
   const COL = 42;
   const enc = new TextEncoder();
   const bytes: number[] = [];
-
   const push = (...vals: number[]) => bytes.push(...vals);
   const text = (s: string) => bytes.push(...enc.encode(s));
   const lf = () => bytes.push(0x0a);
   const dashes = () => {
     text("-".repeat(COL));
-    lf();
-  };
-  const center = (s: string) => {
-    const pad = Math.max(0, Math.floor((COL - s.length) / 2));
-    text(" ".repeat(pad) + s);
     lf();
   };
   const cols = (left: string, right: string) => {
@@ -325,7 +452,6 @@ function buildEscPosBytes({
     text(l + " ".repeat(COL - l.length - right.length) + right);
     lf();
   };
-
   push(0x1b, 0x40);
   push(0x1b, 0x61, 0x01);
   push(0x1b, 0x45, 0x01);
@@ -337,7 +463,6 @@ function buildEscPosBytes({
   push(0x1b, 0x61, 0x00);
   lf();
   dashes();
-
   const now = new Date();
   const dateStr = now.toLocaleDateString("sq-MK", {
     day: "2-digit",
@@ -350,25 +475,23 @@ function buildEscPosBytes({
   });
   cols(`${dateStr}  ${timeStr}`, tableLabel);
   dashes();
-
   for (const item of items) {
-    const price = `${(item.price * item.qty).toFixed(0)} DEN`;
-    cols(`${item.qty}x ${item.name}`, price);
+    cols(
+      `${item.qty}x ${item.name}`,
+      `${(item.price * item.qty).toFixed(0)} DEN`,
+    );
   }
   dashes();
-
   push(0x1b, 0x45, 0x01);
   const total = items.reduce((s, i) => s + i.price * i.qty, 0);
   cols("TOTAL", `${total.toFixed(0)} DEN`);
   push(0x1b, 0x45, 0x00);
-
   const rl = posTranslations[(lang as PosLang) || "en"];
   const methodLabel =
     payMethod === "cash" ? rl.cash : payMethod === "card" ? rl.card : rl.paid;
   text(methodLabel);
   lf();
   dashes();
-
   push(0x1b, 0x61, 0x01);
   text(rl.thanks);
   lf();
@@ -376,7 +499,6 @@ function buildEscPosBytes({
   lf();
   lf();
   push(0x1d, 0x56, 0x42, 0x03);
-
   return new Uint8Array(bytes);
 }
 
@@ -388,7 +510,6 @@ async function sendToUsbPrinter(
     await device.open();
   } catch {}
   if (device.configuration === null) await device.selectConfiguration(1);
-
   let interfaceNum = -1;
   let endpointNum = -1;
   for (const iface of device.configuration!.interfaces) {
@@ -435,7 +556,6 @@ function printReceiptWindow({
     "width=340,height=800,toolbar=0,scrollbars=0,status=0,menubar=0",
   );
   if (!win) return;
-
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   const now = new Date();
   const dateStr = now.toLocaleDateString("sq-MK", {
@@ -449,8 +569,11 @@ function printReceiptWindow({
   });
   const rl2 = posTranslations[(lang as PosLang) || "en"];
   const methodLabel =
-    payMethod === "cash" ? rl2.cash : payMethod === "card" ? rl2.card : rl2.paid;
-
+    payMethod === "cash"
+      ? rl2.cash
+      : payMethod === "card"
+        ? rl2.card
+        : rl2.paid;
   let durationStr = "";
   if (startedAt) {
     const mins = Math.floor(
@@ -465,269 +588,66 @@ function printReceiptWindow({
         minute: "2-digit",
       })
     : null;
-
   const rows = items
     .map(
       (item) =>
-        `<tr>
-      <td class="item-qty">${item.qty}×</td>
-      <td class="item-name">${item.name}</td>
-      <td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td>
-    </tr>`,
+        `<tr><td class="item-qty">${item.qty}×</td><td class="item-name">${item.name}</td><td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td></tr>`,
     )
     .join("");
 
-  win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&display=swap');
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: 'Inter', 'Helvetica Neue', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    width: 80mm;
-    background: #fff;
-    color: #000;
-    -webkit-print-color-adjust: exact;
-  }
-  .header {
-    padding: 20px 16px 14px;
-    text-align: center;
-    border-bottom: 3px solid #000;
-  }
-  .brand {
-    font-size: 26px;
-    font-weight: 900;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    margin-bottom: 3px;
-    color: #000;
-  }
-  .tagline {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #000;
-  }
-  .meta-strip {
-    padding: 10px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1.5px dashed #000;
-  }
-  .table-section {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 2px;
-    color: #000;
-  }
-  .table-info {
-    font-size: 16px;
-    font-weight: 900;
-    color: #000;
-  }
-  .datetime {
-    text-align: right;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1.7;
-    color: #000;
-  }
-  .info-block {
-    padding: 10px 16px;
-    border-bottom: 1.5px dashed #000;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-  .info-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    font-weight: 700;
-    color: #000;
-  }
-  .items-section {
-    padding: 12px 16px 8px;
-  }
-  .items-label {
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #000;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-    border-bottom: 1.5px solid #000;
-  }
-  table { width: 100%; border-collapse: collapse; }
-  .item-qty {
-    width: 22px;
-    font-weight: 700;
-    vertical-align: top;
-    padding: 4px 0;
-    font-size: 12px;
-    color: #000;
-  }
-  .item-name {
-    padding: 4px 8px 4px 2px;
-    font-weight: 700;
-    vertical-align: top;
-    font-size: 12px;
-    line-height: 1.4;
-    color: #000;
-  }
-  .item-price {
-    text-align: right;
-    white-space: nowrap;
-    font-weight: 800;
-    vertical-align: top;
-    padding: 4px 0;
-    font-size: 12px;
-    color: #000;
-  }
-  .total-block {
-    margin: 10px 16px;
-    padding: 12px 0;
-    border-top: 3px solid #000;
-    border-bottom: 3px solid #000;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .total-label {
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #000;
-  }
-  .total-count {
-    font-size: 10px;
-    font-weight: 700;
-    margin-top: 3px;
-    color: #000;
-  }
-  .total-amount {
-    font-size: 28px;
-    font-weight: 900;
-    letter-spacing: -1px;
-    color: #000;
-  }
-  .total-currency {
-    font-size: 13px;
-    font-weight: 700;
-    margin-left: 3px;
-    color: #000;
-  }
-  .duration-row {
-    margin: 0 16px 10px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    font-weight: 700;
-    color: #000;
-    letter-spacing: 0.5px;
-  }
-  .footer {
-    padding: 14px 16px 20px;
-    text-align: center;
-    border-top: 1.5px dashed #000;
-  }
-  .thanks {
-    font-size: 14px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    margin-bottom: 5px;
-    color: #000;
-  }
-  .sub-footer {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: #000;
-  }
-  @media print {
-    body {
-      width: auto;
-      max-width: 80mm;
-      margin: 0 auto;
-    }
-    @page {
-      size: auto;
-      margin: 8mm;
-    }
-  }
-</style>
-</head>
-<body>
-
-  <div class="header">
-    <div class="brand">${restaurantName}</div>
-    <div class="tagline">${rl2.receiptTagline}</div>
-  </div>
-
-  <div class="meta-strip">
-    <div>
-      ${sectionName ? `<div class="table-section">${sectionName}</div>` : ""}
-      <div class="table-info">${tableLabel}</div>
-    </div>
-    <div class="datetime">
-      <div>${dateStr}</div>
-      <div>${timeStr}</div>
-    </div>
-  </div>
-
-  <div class="info-block">
-    ${waiterName ? `<div class="info-row"><span>${rl2.waiter}</span><span>${waiterName}</span></div>` : ""}
-    ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>${rl2.round}</span><span>${rl2.orderNum} #${roundNumber}</span></div>` : ""}
-    ${openedStr ? `<div class="info-row"><span>${rl2.openedAt}</span><span>${openedStr}</span></div>` : ""}
-    ${durationStr ? `<div class="info-row"><span>${rl2.duration}</span><span>${durationStr}</span></div>` : ""}
-  </div>
-
-  <div class="items-section">
-    <div class="items-label">${rl2.itemsLabel} · ${items.reduce((s, i) => s + i.qty, 0)} ${rl2.pcs}</div>
-    <table>${rows}</table>
-  </div>
-
-  <div class="total-block">
-    <div>
-      <div class="total-label">Total</div>
-      <div class="total-count">${items.reduce((s, i) => s + i.qty, 0)} ${rl2.itemsLabel}</div>
-    </div>
-    <div>
-      <span class="total-amount">${total.toLocaleString()}</span>
-      <span class="total-currency">DEN</span>
-    </div>
-  </div>
-
-  ${
-    openedStr && durationStr
-      ? `
-  <div class="duration-row">
-    <span>${rl2.opened} ${openedStr}</span>
-    <span>⏱ ${durationStr}</span>
-    <span>${rl2.closed} ${timeStr}</span>
-  </div>`
-      : ""
-  }
-
-  <div class="footer">
-    <div class="thanks">${rl2.thanks}</div>
-    <div class="sub-footer">${rl2.receiptTagline}</div>
-  </div>
-
-</body>
-</html>`);
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter','Helvetica Neue',sans-serif;font-size:13px;font-weight:700;width:80mm;background:#fff;color:#000;-webkit-print-color-adjust:exact;}
+.header{padding:20px 16px 14px;text-align:center;border-bottom:3px solid #000;}
+.brand{font-size:26px;font-weight:900;letter-spacing:4px;text-transform:uppercase;margin-bottom:3px;}
+.tagline{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;}
+.meta-strip{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px dashed #000;}
+.table-section{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;}
+.table-info{font-size:16px;font-weight:900;}
+.datetime{text-align:right;font-size:11px;font-weight:700;line-height:1.7;}
+.info-block{padding:10px 16px;border-bottom:1.5px dashed #000;display:flex;flex-direction:column;gap:5px;}
+.info-row{display:flex;justify-content:space-between;font-size:11px;font-weight:700;}
+.items-section{padding:12px 16px 8px;}
+.items-label{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1.5px solid #000;}
+table{width:100%;border-collapse:collapse;}
+.item-qty{width:22px;font-weight:700;vertical-align:top;padding:4px 0;font-size:12px;}
+.item-name{padding:4px 8px 4px 2px;font-weight:700;vertical-align:top;font-size:12px;line-height:1.4;}
+.item-price{text-align:right;white-space:nowrap;font-weight:800;vertical-align:top;padding:4px 0;font-size:12px;}
+.total-block{margin:10px 16px;padding:12px 0;border-top:3px solid #000;border-bottom:3px solid #000;display:flex;justify-content:space-between;align-items:center;}
+.total-label{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;}
+.total-count{font-size:10px;font-weight:700;margin-top:3px;}
+.total-amount{font-size:28px;font-weight:900;letter-spacing:-1px;}
+.total-currency{font-size:13px;font-weight:700;margin-left:3px;}
+.duration-row{margin:0 16px 10px;display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:0.5px;}
+.footer{padding:14px 16px 20px;text-align:center;border-top:1.5px dashed #000;}
+.thanks{font-size:14px;font-weight:900;letter-spacing:0.5px;margin-bottom:5px;}
+.sub-footer{font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;}
+@media print{body{width:auto;max-width:80mm;margin:0 auto;}@page{size:auto;margin:8mm;}}
+</style></head><body>
+<div class="header"><div class="brand">${restaurantName}</div><div class="tagline">${rl2.receiptTagline}</div></div>
+<div class="meta-strip">
+  <div>${sectionName ? `<div class="table-section">${sectionName}</div>` : ""}<div class="table-info">${tableLabel}</div></div>
+  <div class="datetime"><div>${dateStr}</div><div>${timeStr}</div></div>
+</div>
+<div class="info-block">
+  ${waiterName ? `<div class="info-row"><span>${rl2.waiter}</span><span>${waiterName}</span></div>` : ""}
+  ${roundNumber && roundNumber > 1 ? `<div class="info-row"><span>${rl2.round}</span><span>${rl2.orderNum} #${roundNumber}</span></div>` : ""}
+  ${openedStr ? `<div class="info-row"><span>${rl2.openedAt}</span><span>${openedStr}</span></div>` : ""}
+  ${durationStr ? `<div class="info-row"><span>${rl2.duration}</span><span>${durationStr}</span></div>` : ""}
+</div>
+<div class="items-section">
+  <div class="items-label">${rl2.itemsLabel} · ${items.reduce((s, i) => s + i.qty, 0)} ${rl2.pcs}</div>
+  <table>${rows}</table>
+</div>
+<div class="total-block">
+  <div><div class="total-label">Total</div><div class="total-count">${items.reduce((s, i) => s + i.qty, 0)} ${rl2.itemsLabel}</div></div>
+  <div><span class="total-amount">${total.toLocaleString()}</span><span class="total-currency">DEN</span></div>
+</div>
+${openedStr && durationStr ? `<div class="duration-row"><span>${rl2.opened} ${openedStr}</span><span>⏱ ${durationStr}</span><span>${rl2.closed} ${timeStr}</span></div>` : ""}
+<div class="footer"><div class="thanks">${rl2.thanks}</div><div class="sub-footer">${rl2.receiptTagline}</div></div>
+</body></html>`);
   win.document.close();
   win.focus();
   setTimeout(() => {
@@ -737,6 +657,7 @@ function printReceiptWindow({
   }, 400);
 }
 
+// ─── Waiter chime (3 distinct tones) ─────────────────────────────────────────
 function playWaiterChime(type: WaiterSignal["type"]) {
   try {
     const ctx = new (window.AudioContext ||
@@ -744,7 +665,6 @@ function playWaiterChime(type: WaiterSignal["type"]) {
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.55, ctx.currentTime);
     master.connect(ctx.destination);
-
     const notes: [number, number, number][] =
       type === "help"
         ? [
@@ -763,7 +683,6 @@ function playWaiterChime(type: WaiterSignal["type"]) {
               [990, 0.18, 0.16],
               [1320, 0.36, 0.28],
             ];
-
     notes.forEach(([freq, start, dur]) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -780,11 +699,45 @@ function playWaiterChime(type: WaiterSignal["type"]) {
       osc.start(ctx.currentTime + start);
       osc.stop(ctx.currentTime + start + dur + 0.05);
     });
-
     setTimeout(() => ctx.close(), 1500);
   } catch {}
 }
-// ─── Radial Quick-Add Menu ───────────────────────────────────────────────────
+
+// ─── Incoming order chime ─────────────────────────────────────────────────────
+function playIncomingChime() {
+  try {
+    const ctx = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.frequency.setValueAtTime(880, ctx.currentTime);
+    o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+    o.start();
+    o.stop(ctx.currentTime + 0.55);
+  } catch {}
+}
+// ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
+// ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
+
+// ─── safeParseCart ────────────────────────────────────────────────────────────
+function safeParseCart(cart: any): any[] {
+  if (Array.isArray(cart)) return cart;
+  if (typeof cart === "string") {
+    try {
+      return JSON.parse(cart);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+// ─── Radial Quick-Add Menu ────────────────────────────────────────────────────
 interface RadialMenuProps {
   x: number;
   y: number;
@@ -796,10 +749,10 @@ interface RadialMenuProps {
 function RadialMenu({ x, y, onSelect, onClose, isLight }: RadialMenuProps) {
   const options = [1, 2, 3, 4];
   const positions = [
-    { dx: 0, dy: -70 }, // top
-    { dx: -70, dy: 0 }, // left
-    { dx: 70, dy: 0 }, // right
-    { dx: 0, dy: 70 }, // bottom
+    { dx: 0, dy: -70 },
+    { dx: -70, dy: 0 },
+    { dx: 70, dy: 0 },
+    { dx: 0, dy: 70 },
   ];
   const [hovered, setHovered] = useState<number | null>(null);
 
@@ -836,12 +789,10 @@ function RadialMenu({ x, y, onSelect, onClose, isLight }: RadialMenuProps) {
         onPointerLeave={onClose}
         onContextMenu={(e) => e.preventDefault()}
       />
-
       <div
         className="fixed z-[201] pointer-events-none"
         style={{ left: x, top: y }}
       >
-        {/* connecting lines */}
         <svg
           className="absolute"
           style={{
@@ -866,8 +817,6 @@ function RadialMenu({ x, y, onSelect, onClose, isLight }: RadialMenuProps) {
             />
           ))}
         </svg>
-
-        {/* center ring */}
         <div
           className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-400"
           style={{
@@ -882,8 +831,6 @@ function RadialMenu({ x, y, onSelect, onClose, isLight }: RadialMenuProps) {
               "0 0 0 4px rgba(245,158,11,0.15), 0 8px 32px rgba(0,0,0,0.4)",
           }}
         />
-
-        {/* option nodes */}
         {options.map((qty, i) => {
           const { dx, dy } = positions[i];
           const active = hovered === i;
@@ -945,14 +892,8 @@ function RadialMenu({ x, y, onSelect, onClose, isLight }: RadialMenuProps) {
     </>
   );
 }
-function safeParseCart(cart: any): any[] {
-  if (Array.isArray(cart)) return cart;
-  if (typeof cart === "string") {
-    try { return JSON.parse(cart); } catch { return []; }
-  }
-  return [];
-}
 
+// ─── Main POS Component ───────────────────────────────────────────────────────
 export default function POS({ slug }: POSProps) {
   const RESTAURANT_SLUG = slug;
   const TABLES_KEY = `pos-${slug}-tables-v3`;
@@ -998,19 +939,17 @@ export default function POS({ slug }: POSProps) {
     tablesRef.current = tables;
   }, [tables]);
 
-  // Track which DB order IDs have already been merged into the table grid
-  // so we never double-count an order regardless of how many times dbOrders refetches
+  // Dedup ref — never merge  if (!dbOrders ||the same DB order twice
   const processedOrderIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     setTables((prev) => {
       if (prev.length === TABLE_COUNT) return prev;
-      if (prev.length < TABLE_COUNT) {
+      if (prev.length < TABLE_COUNT)
         return [
           ...prev,
           ...Array.from({ length: TABLE_COUNT - prev.length }, emptyTable),
         ];
-      }
       return prev.slice(0, TABLE_COUNT);
     });
   }, [TABLE_COUNT]);
@@ -1076,51 +1015,50 @@ export default function POS({ slug }: POSProps) {
   const pendingCount = dbOrders.filter(
     (o: any) => o.status === "pending",
   ).length;
-
-  // Sync DB orders into the table grid so it stays up-to-date even when
-  // Pusher is not configured (poll-based fallback for handleIncoming)
+  // ─── Unlock audio on first user interaction ───────────────────────────────
+  useEffect(() => {
+    const unlock = () => {
+      const ctx = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
+      ctx.resume().then(() => ctx.close());
+      window.removeEventListener("pointerdown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock);
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, []);
+  // Sync DB orders → table grid (poll-based fallback, deduped)
   useEffect(() => {
     if (!dbOrders || dbOrders.length === 0) return;
-    const newOrders = (dbOrders as any[]).filter(
-      (o) =>
-        (o.status === "pending" || o.status === "claimed") &&
-        !processedOrderIdsRef.current.has(o.id),
-    );
-    if (newOrders.length === 0) return;
 
-    setTables((prev) => {
-      const next = [...prev];
-      newOrders.forEach((order: any) => {
+    (dbOrders as any[])
+      .filter(
+        (o) =>
+          o.status === "pending" && !processedOrderIdsRef.current.has(o.id),
+      )
+      .forEach((order: any) => {
+        // Mark immediately so nothing else processes it
+        processedOrderIdsRef.current.add(order.id);
+
+        // Auto-claim if table already has a waiter
         const tableDigits = parseInt(
           String(order.tableNumber).replace(/\D/g, ""),
           10,
         );
         const tableIdx = tableDigits - 1;
-        if (tableIdx < 0 || tableIdx >= next.length) return;
-        const cart: any[] = safeParseCart(order.cart);
-        if (cart.length === 0) return;
-        const merged = [...next[tableIdx].items];
-        cart.forEach((it: any) => {
-          const ex = merged.find((m) => m.id === it.id);
-          if (ex) ex.qty += it.qty;
-          else merged.push({ ...it });
-        });
-        const prevRounds = next[tableIdx].rounds ?? [];
-        next[tableIdx] = {
-          ...next[tableIdx],
-          items: merged,
-          rounds: [
-            ...prevRounds,
-            { items: cart, sentAt: new Date(order.createdAt).getTime() },
-          ],
-          startedAt: next[tableIdx].startedAt ?? new Date(order.createdAt),
-          waiterId: order.waiterId ?? next[tableIdx].waiterId,
-          waiterName: order.waiterName ?? next[tableIdx].waiterName,
-        };
-        processedOrderIdsRef.current.add(order.id);
+        const existingWaiterId = tablesRef.current[tableIdx]?.waiterId;
+        const existingWaiterPin = waiters.find(
+          (w) => w.id === existingWaiterId,
+        )?.pinCode;
+        if (!existingWaiterId || !existingWaiterPin) return;
+
+        fetch(`/api/orders/${order.id}/claim`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pinCode: existingWaiterPin, restaurantId }),
+        })
+          .then(() => refetchOrders())
+          .catch(() => {});
       });
-      return next;
-    });
   }, [dbOrders]);
 
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -1134,118 +1072,6 @@ export default function POS({ slug }: POSProps) {
   const [splitTableIdx, setSplitTableIdx] = useState<number | null>(null);
   const [splitPersons, setSplitPersons] = useState<SplitPerson[]>([]);
   const [itemAssignments, setItemAssignments] = useState<(number | null)[]>([]);
-
-  const openSplitBill = (tableIdx: number) => {
-    const order = tables[tableIdx];
-    setSplitTableIdx(tableIdx);
-    setSplitPersons([
-      { name: "Person 1", colorIdx: 0, paid: false, payMethod: null },
-      { name: "Person 2", colorIdx: 1, paid: false, payMethod: null },
-    ]);
-    setItemAssignments(order.items.map(() => null));
-    setShowSplitModal(true);
-  };
-
-  const addSplitPerson = () => {
-    setSplitPersons((prev) => [
-      ...prev,
-      {
-        name: `Person ${prev.length + 1}`,
-        colorIdx: prev.length % SPLIT_COLORS.length,
-        paid: false,
-        payMethod: null,
-      },
-    ]);
-  };
-
-  const assignItem = (itemIdx: number, personIdx: number | null) => {
-    setItemAssignments((prev) => {
-      const next = [...prev];
-      next[itemIdx] = personIdx;
-      return next;
-    });
-  };
-
-  const personTotal = (personIdx: number): number => {
-    if (splitTableIdx === null) return 0;
-    const order = tables[splitTableIdx];
-    return order.items.reduce((sum, item, i) => {
-      if (itemAssignments[i] === personIdx) return sum + item.price * item.qty;
-      return sum;
-    }, 0);
-  };
-
-  const unassignedItems = (): { item: OrderItem; idx: number }[] => {
-    if (splitTableIdx === null) return [];
-    return tables[splitTableIdx].items
-      .map((item, idx) => ({ item, idx }))
-      .filter(({ idx }) => itemAssignments[idx] === null);
-  };
-
-  const unassignedTotal = (): number =>
-    unassignedItems().reduce((s, { item }) => s + item.price * item.qty, 0);
-
-  // FIX [5]: markPaid calls emptyTable() which now also clears waiter fields
-  const markPaid = (personIdx: number, method: "cash" | "card") => {
-    if (splitTableIdx !== null) {
-      const personItems = tables[splitTableIdx].items.filter(
-        (_, i) => itemAssignments[i] === personIdx,
-      );
-      const person = splitPersons[personIdx];
-      if (personItems.length > 0) {
-        handlePrint({
-          restaurantName: restaurant?.name ?? "Restaurant",
-          tableLabel: `Table ${splitTableIdx + 1} — ${person.name}`,
-          items: personItems,
-          payMethod: method,
-          waiterName: tables[splitTableIdx].waiterName,
-          sectionName: getTableSection(splitTableIdx),
-          startedAt: tables[splitTableIdx].startedAt,
-        });
-      }
-    }
-    setSplitPersons((prev) => {
-      const next = prev.map((p, i) =>
-        i === personIdx ? { ...p, paid: true, payMethod: method } : p,
-      );
-      const allPaid = next.every((p) => p.paid);
-      if (allPaid && splitTableIdx !== null) {
-        const allItems = tables[splitTableIdx].items;
-        const tableWaiterId = tables[splitTableIdx].waiterId ?? null;
-        // Save full table order to DB for profit tracking
-        if (allItems.length > 0 && restaurantId) {
-          fetch("/api/pos/checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              restaurantId,
-              tableNumber: splitTableIdx + 1,
-              items: allItems,
-              waiterId: tableWaiterId,
-            }),
-          }).catch(() => {});
-        }
-        setTables((t) => {
-          const updated = [...t];
-          updated[splitTableIdx] = emptyTable();
-          return updated;
-        });
-        fetch("/api/table/cart-cleared", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
-          }),
-        }).catch(() => {});
-        setJustPaid({ kind: "table", idx: splitTableIdx });
-        setTimeout(() => setJustPaid(null), 2500);
-        setShowSplitModal(false);
-        setActive(null);
-        setScreen("tables");
-      }
-      return next;
-    });
-  };
 
   const THEME_KEY = `pos-${slug}-theme`;
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -1263,12 +1089,17 @@ export default function POS({ slug }: POSProps) {
   const isLight = theme === "light";
 
   const [lang, setLang] = useState<PosLang>(() => {
-    const saved = localStorage.getItem("hajdeha-lang");
-    return (saved as PosLang) || "en";
+    try {
+      return (localStorage.getItem("hajdeha-lang") as PosLang) || "en";
+    } catch {
+      return "en";
+    }
   });
   const handleLangChange = (newLang: PosLang) => {
     setLang(newLang);
-    localStorage.setItem("hajdeha-lang", newLang);
+    try {
+      localStorage.setItem("hajdeha-lang", newLang);
+    } catch {}
   };
   const tr = posTranslations[lang];
 
@@ -1282,6 +1113,7 @@ export default function POS({ slug }: POSProps) {
     y: number;
   } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!("usb" in navigator)) return;
     (navigator as any).usb
@@ -1294,7 +1126,7 @@ export default function POS({ slug }: POSProps) {
 
   const connectPrinter = async () => {
     if (!("usb" in navigator)) {
-      alert("WebUSB not supported in this browser. Use Chrome or Edge.");
+      alert("WebUSB not supported. Use Chrome or Edge.");
       return;
     }
     try {
@@ -1317,7 +1149,6 @@ export default function POS({ slug }: POSProps) {
     sectionName?: string;
     roundNumber?: number;
     startedAt?: Date | null;
-    lang?: PosLang;
   }) => {
     if (data.items.length === 0) return;
     if (usbDevice) {
@@ -1337,6 +1168,7 @@ export default function POS({ slug }: POSProps) {
     printReceiptWindow({ ...data, lang });
   };
 
+  // ─── Theme tokens ───────────────────────────────────────────────────────────
   const t = isLight
     ? {
         appBg: "bg-[#FAFAF9]",
@@ -1435,7 +1267,6 @@ export default function POS({ slug }: POSProps) {
       text: "text-[#1A1A1A]",
       time: "text-red-600",
     },
-    // FIX [6]: unclaimed = has items but no waiter assigned yet
     unclaimed: {
       bg: "bg-sky-50",
       border: "border-sky-300",
@@ -1473,7 +1304,6 @@ export default function POS({ slug }: POSProps) {
       text: "text-white",
       time: "text-red-400",
     },
-    // FIX [6]: unclaimed style — sky/cyan so it stands out on the grid
     unclaimed: {
       bg: "bg-sky-500/15",
       border: "border-sky-400/50",
@@ -1510,12 +1340,10 @@ export default function POS({ slug }: POSProps) {
     () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
     [restaurant],
   );
-
   const categories = useMemo(() => {
     const cats = Array.from(new Set(menuItems.map((i) => i.category)));
     return ["All", ...cats];
   }, [menuItems]);
-
   const filteredItems = useMemo(
     () =>
       activeCategory === "All"
@@ -1549,12 +1377,10 @@ export default function POS({ slug }: POSProps) {
     if (sourceIdx === targetIdx) return;
     setTables((prev) => {
       const next = [...prev];
-      const source = next[sourceIdx];
-      const target = next[targetIdx];
       next[targetIdx] = {
-        ...target,
-        items: [...target.items, ...source.items],
-        startedAt: target.startedAt || source.startedAt,
+        ...next[targetIdx],
+        items: [...next[targetIdx].items, ...next[sourceIdx].items],
+        startedAt: next[targetIdx].startedAt || next[sourceIdx].startedAt,
       };
       next[sourceIdx] = emptyTable();
       return next;
@@ -1569,18 +1395,16 @@ export default function POS({ slug }: POSProps) {
     if (sourceIdx === targetIdx) return;
     setTables((prev) => {
       const next = [...prev];
-      const source = next[sourceIdx];
-      const target = next[targetIdx];
-      const merged = [...target.items];
-      source.items.forEach((sourceItem) => {
-        const existing = merged.find((i) => i.id === sourceItem.id);
-        if (existing) existing.qty += sourceItem.qty;
-        else merged.push({ ...sourceItem });
+      const merged = [...next[targetIdx].items];
+      next[sourceIdx].items.forEach((si) => {
+        const ex = merged.find((i) => i.id === si.id);
+        if (ex) ex.qty += si.qty;
+        else merged.push({ ...si });
       });
       next[targetIdx] = {
-        ...target,
+        ...next[targetIdx],
         items: merged,
-        startedAt: target.startedAt || source.startedAt,
+        startedAt: next[targetIdx].startedAt || next[sourceIdx].startedAt,
       };
       next[sourceIdx] = emptyTable();
       return next;
@@ -1659,6 +1483,115 @@ export default function POS({ slug }: POSProps) {
     }
   };
 
+  const openSplitBill = (tableIdx: number) => {
+    setSplitTableIdx(tableIdx);
+    setSplitPersons([
+      { name: "Person 1", colorIdx: 0, paid: false, payMethod: null },
+      { name: "Person 2", colorIdx: 1, paid: false, payMethod: null },
+    ]);
+    setItemAssignments(tables[tableIdx].items.map(() => null));
+    setShowSplitModal(true);
+  };
+
+  const addSplitPerson = () => {
+    setSplitPersons((prev) => [
+      ...prev,
+      {
+        name: `Person ${prev.length + 1}`,
+        colorIdx: prev.length % SPLIT_COLORS.length,
+        paid: false,
+        payMethod: null,
+      },
+    ]);
+  };
+
+  const assignItem = (itemIdx: number, personIdx: number | null) => {
+    setItemAssignments((prev) => {
+      const next = [...prev];
+      next[itemIdx] = personIdx;
+      return next;
+    });
+  };
+
+  const personTotal = (personIdx: number): number => {
+    if (splitTableIdx === null) return 0;
+    return tables[splitTableIdx].items.reduce(
+      (sum, item, i) =>
+        itemAssignments[i] === personIdx ? sum + item.price * item.qty : sum,
+      0,
+    );
+  };
+
+  const unassignedItems = (): { item: OrderItem; idx: number }[] => {
+    if (splitTableIdx === null) return [];
+    return tables[splitTableIdx].items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ idx }) => itemAssignments[idx] === null);
+  };
+
+  const unassignedTotal = (): number =>
+    unassignedItems().reduce((s, { item }) => s + item.price * item.qty, 0);
+
+  const markPaid = (personIdx: number, method: "cash" | "card") => {
+    if (splitTableIdx !== null) {
+      const personItems = tables[splitTableIdx].items.filter(
+        (_, i) => itemAssignments[i] === personIdx,
+      );
+      const person = splitPersons[personIdx];
+      if (personItems.length > 0) {
+        handlePrint({
+          restaurantName: restaurant?.name ?? "Restaurant",
+          tableLabel: `Table ${splitTableIdx + 1} — ${person.name}`,
+          items: personItems,
+          payMethod: method,
+          waiterName: tables[splitTableIdx].waiterName,
+          sectionName: getTableSection(splitTableIdx),
+          startedAt: tables[splitTableIdx].startedAt,
+        });
+      }
+    }
+    setSplitPersons((prev) => {
+      const next = prev.map((p, i) =>
+        i === personIdx ? { ...p, paid: true, payMethod: method } : p,
+      );
+      const allPaid = next.every((p) => p.paid);
+      if (allPaid && splitTableIdx !== null) {
+        const allItems = tables[splitTableIdx].items;
+        const tableWaiterId = tables[splitTableIdx].waiterId ?? null;
+        if (allItems.length > 0 && restaurantId) {
+          fetch("/api/pos/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              restaurantId,
+              tableNumber: splitTableIdx + 1,
+              items: allItems,
+              waiterId: tableWaiterId,
+            }),
+          }).catch(() => {});
+        }
+        setTables((t) => {
+          const updated = [...t];
+          updated[splitTableIdx] = emptyTable();
+          return updated;
+        });
+        fetch("/api/table/cart-cleared", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
+          }),
+        }).catch(() => {});
+        setJustPaid({ kind: "table", idx: splitTableIdx });
+        setTimeout(() => setJustPaid(null), 2500);
+        setShowSplitModal(false);
+        setActive(null);
+        setScreen("tables");
+      }
+      return next;
+    });
+  };
+
   const payOrder = () => {
     if (!active) return;
     const slot = active;
@@ -1688,7 +1621,6 @@ export default function POS({ slug }: POSProps) {
             ? tables[slot.idx].startedAt
             : personTabs[slot.idx]?.startedAt,
       });
-      // Save to DB for profit tracking (all POS checkouts, not just QR orders)
       if (slot.kind === "table" && restaurantId) {
         fetch("/api/pos/checkout", {
           method: "POST",
@@ -1730,14 +1662,16 @@ export default function POS({ slug }: POSProps) {
     setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // ─── openSlot: always shows PIN modal for table slots ─────────────────────
   const openSlot = (slot: ActiveSlot) => {
-    if (slot?.kind === "table" && waiters.length > 0) {
+    if (slot?.kind === "table") {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
       setShowTablePinModal(true);
       return;
     }
+    // person tabs — no PIN needed
     setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
@@ -1751,7 +1685,6 @@ export default function POS({ slug }: POSProps) {
     setShowClaimModal(true);
   };
 
-  // FIX [3]: confirmTablePin — navigate directly after success, never via openSlot
   const confirmTablePin = async () => {
     if (!tablePinSlot || tablePinSlot.kind !== "table") return;
     setTablePinLoading(true);
@@ -1770,14 +1703,26 @@ export default function POS({ slug }: POSProps) {
       const waiter: { id: number; name: string } = await res.json();
       const tableIdx = tablePinSlot.idx;
       const existingWaiterId = tables[tableIdx].waiterId;
-
-      // Block only if a DIFFERENT waiter already owns this table
       if (existingWaiterId && existingWaiterId !== waiter.id) {
-        setTablePinError(tr.thisTableBelongsTo(tables[tableIdx].waiterName || ""));
+        setTablePinError(
+          tr.thisTableBelongsTo(tables[tableIdx].waiterName || ""),
+        );
         return;
       }
 
-      // Assign waiter to table
+      // Claim any pending DB order for this table so orders panel syncs
+      const pendingOrder = (dbOrders as any[]).find(
+        (o) => o.status === "pending" && Number(o.tableNumber) === tableIdx + 1,
+      );
+      if (pendingOrder) {
+        await fetch(`/api/orders/${pendingOrder.id}/claim`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
+        }).catch(() => {});
+        refetchOrders();
+      }
+
       setTables((prev) => {
         const next = [...prev];
         next[tableIdx] = {
@@ -1790,7 +1735,6 @@ export default function POS({ slug }: POSProps) {
       setShowTablePinModal(false);
       setTablePinDigits("");
       setTablePinError("");
-      // Direct navigation — NOT openSlot() to avoid re-triggering PIN
       setActive(tablePinSlot);
       setScreen("menu");
       setActiveCategory("All");
@@ -1800,7 +1744,6 @@ export default function POS({ slug }: POSProps) {
       setTablePinLoading(false);
     }
   };
-
   const handleCreatePerson = () => {
     const trimmed = newPersonName.trim();
     if (!trimmed) return;
@@ -1849,43 +1792,20 @@ export default function POS({ slug }: POSProps) {
       localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
     } catch {}
   }, [sections, SECTIONS_KEY]);
-
   useEffect(() => {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
   }, [showNewPerson]);
 
+  // ─── Pusher realtime ────────────────────────────────────────────────────────
   useEffect(() => {
     let pusher: Pusher | null = null;
     let cancelled = false;
 
-    const playChime = () => {
-      try {
-        const ctx = new (window.AudioContext ||
-          (window as any).webkitAudioContext)();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.connect(g);
-        g.connect(ctx.destination);
-        o.frequency.setValueAtTime(880, ctx.currentTime);
-        o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
-        g.gain.setValueAtTime(0.0001, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
-        o.start();
-        o.stop(ctx.currentTime + 0.55);
-      } catch {}
-    };
-
-    // FIX [6]: QR orders land on the table immediately with NO waiter assigned.
-    // The table shows as "unclaimed" (sky color) until a waiter claims it.
     const handleIncoming = (data: any) => {
       const cart: OrderItem[] = data.cart || [];
       const tableNumber = data.tableNumber;
-
-      refetchOrders();
       const tableDigits = parseInt(String(tableNumber).replace(/\D/g, ""), 10);
       const tableIdx = tableDigits - 1;
-
       const existingRounds =
         tableIdx >= 0 && tableIdx < TABLE_COUNT
           ? (tablesRef.current[tableIdx]?.rounds ?? [])
@@ -1907,8 +1827,6 @@ export default function POS({ slug }: POSProps) {
             rounds: [...prevRounds, { items: cart, sentAt: Date.now() }],
             startedAt: next[tableIdx].startedAt ?? new Date(),
             section: next[tableIdx].section,
-            // Preserve existing waiter assignment if table was already claimed,
-            // otherwise leave undefined so table shows as unclaimed
             waiterId: next[tableIdx].waiterId,
             waiterName: next[tableIdx].waiterName,
           };
@@ -1918,6 +1836,15 @@ export default function POS({ slug }: POSProps) {
         setTimeout(() => setTableFlash(null), 4000);
       }
 
+      // Refetch then immediately mark all orders for this table as processed
+      // so the DB sync useEffect never double-adds them
+      refetchOrders().then((result: any) => {
+        const orders = result?.data ?? [];
+        orders
+          .filter((o: any) => Number(o.tableNumber) === tableDigits)
+          .forEach((o: any) => processedOrderIdsRef.current.add(o.id));
+      });
+
       setIncomingBanner({
         id: `${Date.now()}-${Math.random()}`,
         tableNumber,
@@ -1925,7 +1852,7 @@ export default function POS({ slug }: POSProps) {
         timestamp: data.timestamp || Date.now(),
         roundNumber,
       });
-      playChime();
+      playIncomingChime();
       if (navigator.vibrate) navigator.vibrate([60, 40, 120]);
       setTimeout(
         () =>
@@ -1935,19 +1862,34 @@ export default function POS({ slug }: POSProps) {
         12000,
       );
     };
-
     (async () => {
       try {
         const res = await fetch("/api/config/pusher");
-        if (!res.ok) return;
         const cfg = await res.json();
-        if (cancelled || !cfg.key || !cfg.cluster) return;
+        console.log("1. Pusher config:", cfg);
+        if (cancelled || !cfg.key || !cfg.cluster) {
+          console.log("2. STOPPING — no key/cluster");
+          return;
+        }
         pusher = new Pusher(cfg.key, { cluster: cfg.cluster });
+        pusher.connection.bind("connected", () =>
+          console.log("3. Pusher CONNECTED"),
+        );
+        pusher.connection.bind("error", (e: any) =>
+          console.log("3. Pusher ERROR:", e),
+        );
         const channel = pusher.subscribe(`pos-${RESTAURANT_SLUG}`);
-        channel.bind("incoming-order", handleIncoming);
+        channel.bind("pusher:subscription_succeeded", () =>
+          console.log("4. Subscribed to: pos-" + RESTAURANT_SLUG),
+        );
+        channel.bind("incoming-order", (data: any) => {
+          console.log("5. incoming-order received:", data);
+          handleIncoming(data);
+        });
         channel.bind(
           "waiter-request",
           (data: { tableNumber: number | string; type: string }) => {
+            console.log("5. waiter-request received:", data);
             const signal: WaiterSignal = {
               id: `${Date.now()}-${Math.random()}`,
               tableNumber: data.tableNumber,
@@ -1955,16 +1897,18 @@ export default function POS({ slug }: POSProps) {
               timestamp: Date.now(),
             };
             setWaiterSignals((prev) => [...prev, signal]);
-            setTimeout(() => {
-              setWaiterSignals((prev) =>
-                prev.filter((s) => s.id !== signal.id),
-              );
-            }, 30000);
+            setTimeout(
+              () =>
+                setWaiterSignals((prev) =>
+                  prev.filter((s) => s.id !== signal.id),
+                ),
+              30000,
+            );
             playWaiterChime(data.type as WaiterSignal["type"]);
           },
         );
       } catch (e) {
-        console.error("Pusher subscribe failed:", e);
+        console.error("Pusher setup failed:", e);
       }
     })();
 
@@ -1977,12 +1921,10 @@ export default function POS({ slug }: POSProps) {
     };
   }, [RESTAURANT_SLUG, TABLE_COUNT]);
 
-  // FIX [6]: tableStatus now returns "unclaimed" when table has items but no waiter
   const tableStatus = (
     o: TableOrder,
   ): "empty" | "unclaimed" | "fresh" | "mid" | "late" => {
     if (!o.startedAt || o.items.length === 0) return "empty";
-    // Has items but no waiter claimed it yet — show as unclaimed (sky blue)
     if (!o.waiterId) return "unclaimed";
     const mins = Math.floor(
       (Date.now() - new Date(o.startedAt).getTime()) / 60000,
@@ -1992,7 +1934,6 @@ export default function POS({ slug }: POSProps) {
     return "late";
   };
 
-  // Person tabs don't have waiters so keep the original 4-state version
   const personStatus = (o: PersonTab): "empty" | "fresh" | "mid" | "late" => {
     if (!o.startedAt || o.items.length === 0) return "empty";
     const mins = Math.floor(
@@ -2015,7 +1956,6 @@ export default function POS({ slug }: POSProps) {
   const allTotal =
     tables.reduce((s, t) => s + orderTotal(t), 0) +
     personTabs.reduce((s, p) => s + orderTotal(p), 0);
-
   const allActive =
     tables.filter((t) => t.items.length > 0).length +
     personTabs.filter((p) => p.items.length > 0).length;
@@ -2031,7 +1971,7 @@ export default function POS({ slug }: POSProps) {
         ::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div
         className={`flex-shrink-0 flex items-center gap-3 px-4 lg:px-6 py-3 lg:py-4 border-b ${t.border}`}
         style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
@@ -2065,13 +2005,10 @@ export default function POS({ slug }: POSProps) {
                 : tr.orderScreen}
           </p>
         </div>
+        {/* Printer */}
         <button
           onClick={usbDevice ? () => setUsbDevice(null) : connectPrinter}
-          title={
-            usbDevice
-              ? tr.printerConnected
-              : tr.connectPrinter
-          }
+          title={usbDevice ? tr.printerConnected : tr.connectPrinter}
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors relative ${t.backBtn}`}
         >
           <Printer
@@ -2084,7 +2021,7 @@ export default function POS({ slug }: POSProps) {
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
           )}
         </button>
-        {/* Language Switcher */}
+        {/* Language switcher */}
         <div className={`flex rounded-xl border ${t.border} p-0.5 gap-0.5`}>
           {(["en", "al", "mk"] as PosLang[]).map((l) => (
             <button
@@ -2096,6 +2033,7 @@ export default function POS({ slug }: POSProps) {
             </button>
           ))}
         </div>
+        {/* Theme toggle */}
         <button
           onClick={() => setTheme(isLight ? "dark" : "light")}
           className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
@@ -2106,6 +2044,7 @@ export default function POS({ slug }: POSProps) {
             <Sun className="h-4 w-4 lg:h-5 lg:w-5 text-amber-400" />
           )}
         </button>
+        {/* Orders panel button */}
         <button
           onClick={() => setShowOrdersPanel(true)}
           className={`relative h-8 w-8 lg:h-10 lg:w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${t.backBtn}`}
@@ -2137,12 +2076,12 @@ export default function POS({ slug }: POSProps) {
           )}
       </div>
 
-      {/* Waiter signal banners */}
+      {/* ── Waiter signal banners ── */}
       <AnimatePresence>
         {waiterSignals.length > 0 && (
           <div
-            className="absolute left-3 right-3 z-30 flex flex-col gap-2"
-            style={{ top: 64 }}
+            className="fixed left-3 right-3 z-[60] flex flex-col gap-2"
+            style={{ top: 72 }}
           >
             {waiterSignals.map((signal, i) => {
               const cfg =
@@ -2205,14 +2144,11 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* Incoming order banner */}
+      {/* ── Incoming order banner ── */}
       <AnimatePresence>
         {incomingBanner && (
           <motion.button
             key={incomingBanner.id}
-            // FIX [6]: banner tap — if waiters exist and order is pending, open claim modal.
-            // Otherwise navigate directly (openSlot now skips PIN for unclaimed tables
-            // since we want waiters to claim, not be blocked).
             onClick={() => {
               const tableNum = parseInt(
                 String(incomingBanner.tableNumber).replace(/\D/g, ""),
@@ -2222,9 +2158,9 @@ export default function POS({ slug }: POSProps) {
                 (o: any) =>
                   o.status === "pending" && Number(o.tableNumber) === tableNum,
               );
-              if (pendingOrder && waiters.length > 0) {
+              if (pendingOrder && waiters.length > 0)
                 openIncomingClaim(pendingOrder);
-              } else {
+              else {
                 const idx = tableNum - 1;
                 if (idx >= 0 && idx < TABLE_COUNT)
                   openSlot({ kind: "table", idx });
@@ -2235,7 +2171,7 @@ export default function POS({ slug }: POSProps) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -80, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 28 }}
-            className="absolute top-[60px] left-3 right-3 z-30 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl"
+            className="absolute top-[60px] left-3 right-3 z-60 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl"
             style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
           >
             <motion.div
@@ -2247,14 +2183,15 @@ export default function POS({ slug }: POSProps) {
             <div className="flex-1 min-w-0 text-left">
               <p className="text-sm font-bold leading-tight">
                 {incomingBanner.roundNumber > 1
-                  ? `⚡ Order ${incomingBanner.roundNumber} — Table ${incomingBanner.tableNumber}`
+                  ? `⚡ ${tr.orderNum} ${incomingBanner.roundNumber} — Table ${incomingBanner.tableNumber}`
                   : `${tr.newOrder} — Table ${incomingBanner.tableNumber}`}
               </p>
               <p
                 className="text-[11px] font-semibold opacity-80 truncate"
                 style={{ fontFamily: "'DM Mono', monospace" }}
               >
-                {incomingBanner.cart.reduce((s, i) => s + i.qty, 0)} items ·{" "}
+                {incomingBanner.cart.reduce((s, i) => s + i.qty, 0)}{" "}
+                {tr.itemsLabel} ·{" "}
                 {incomingBanner.cart.reduce((s, i) => s + i.price * i.qty, 0)}{" "}
                 DEN
               </p>
@@ -2263,13 +2200,15 @@ export default function POS({ slug }: POSProps) {
               className="text-[10px] font-bold opacity-70"
               style={{ fontFamily: "'DM Mono', monospace" }}
             >
-              {waiters.length > 0 ? "MERR →" : "SHIH →"}
+              {waiters.length > 0 ? `${tr.claimOrder} →` : "→"}
             </span>
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* SCREEN: TABLES */}
+      {/* ══════════════════════════════════════════════════════════════════════
+          SCREEN: TABLES
+      ══════════════════════════════════════════════════════════════════════ */}
       <AnimatePresence mode="wait">
         {screen === "tables" && (
           <motion.div
@@ -2280,7 +2219,7 @@ export default function POS({ slug }: POSProps) {
             transition={{ duration: 0.18 }}
             className="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-8 space-y-4 lg:space-y-6 max-w-[1400px] w-full mx-auto"
           >
-            {/* Table Management Actions */}
+            {/* Actions */}
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setShowTransferModal(true)}
@@ -2309,7 +2248,7 @@ export default function POS({ slug }: POSProps) {
               </button>
             </div>
 
-            {/* Section Filter */}
+            {/* Section filter */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               <button
                 onClick={() => setSelectedSection("all")}
@@ -2328,7 +2267,7 @@ export default function POS({ slug }: POSProps) {
               ))}
             </div>
 
-            {/* Tables Grid */}
+            {/* Tables grid */}
             <div>
               <p
                 className={`text-[10px] lg:text-[11px] ${t.textFaint} mb-2 lg:mb-3 px-0.5`}
@@ -2386,6 +2325,11 @@ export default function POS({ slug }: POSProps) {
                           )}
                           {table.items.length > 0 && (
                             <>
+                              {status === "unclaimed" && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500/30 text-sky-400">
+                                  {tr.claimOrder}
+                                </span>
+                              )}
                               <span
                                 className={`text-[10px] font-bold font-['DM_Mono'] ${c.time}`}
                               >
@@ -2421,26 +2365,16 @@ export default function POS({ slug }: POSProps) {
                                 transition={{ duration: 1.2, repeat: Infinity }}
                                 className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${c.dot}`}
                               />
-                              {/* Claim button — visible on unclaimed tables */}
+                              {/* Claim button on unclaimed tables — always opens PIN directly */}
                               {status === "unclaimed" && (
                                 <button
                                   data-testid={`button-claim-table-${idx}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const pendingOrder = (dbOrders as any[]).find(
-                                      (o) =>
-                                        o.tableNumber === idx + 1 &&
-                                        (o.status === "pending" || o.status === "claimed"),
-                                    );
-                                    if (waiters.length === 0) {
-                                      setActive({ kind: "table", idx });
-                                      setScreen("menu");
-                                      setActiveCategory("All");
-                                    } else if (pendingOrder) {
-                                      openIncomingClaim(pendingOrder);
-                                    } else {
-                                      openSlot({ kind: "table", idx });
-                                    }
+                                    setTablePinSlot({ kind: "table", idx });
+                                    setTablePinDigits("");
+                                    setTablePinError("");
+                                    setShowTablePinModal(true);
                                   }}
                                   className="absolute bottom-1.5 left-1.5 right-1.5 h-5 rounded-lg bg-sky-500 text-white text-[8px] font-bold flex items-center justify-center gap-0.5 active:bg-sky-600"
                                 >
@@ -2475,7 +2409,6 @@ export default function POS({ slug }: POSProps) {
                   {tr.newBtn}
                 </button>
               </div>
-
               {personTabs.length === 0 ? (
                 <div
                   className={`rounded-2xl border border-dashed ${t.borderDashed} flex items-center justify-center py-6 lg:py-10`}
@@ -2537,7 +2470,7 @@ export default function POS({ slug }: POSProps) {
                                 </p>
                               ) : (
                                 <p className={`text-xs ${t.textFaint} mt-0.5`}>
-                                  Bosh
+                                  Empty
                                 </p>
                               )}
                             </div>
@@ -2569,7 +2502,7 @@ export default function POS({ slug }: POSProps) {
               )}
             </div>
 
-            {/* Status legend */}
+            {/* Legend */}
             <div className="flex items-center gap-4 px-1 flex-wrap">
               {[
                 { dot: dotColors.fresh, label: "< 15min" },
@@ -2628,7 +2561,9 @@ export default function POS({ slug }: POSProps) {
           </motion.div>
         )}
 
-        {/* SCREEN: MENU + ORDER */}
+        {/* ══════════════════════════════════════════════════════════════════════
+            SCREEN: MENU + ORDER
+        ══════════════════════════════════════════════════════════════════════ */}
         {(screen === "menu" || screen === "order") &&
           active !== null &&
           currentOrder && (
@@ -2640,7 +2575,7 @@ export default function POS({ slug }: POSProps) {
               transition={{ duration: 0.18 }}
               className="flex-1 flex overflow-hidden"
             >
-              {/* MENU PANEL */}
+              {/* Menu panel */}
               <div
                 className={`flex-1 flex-col overflow-hidden ${screen === "order" ? "hidden lg:flex" : "flex"}`}
               >
@@ -2696,7 +2631,6 @@ export default function POS({ slug }: POSProps) {
                             onPointerUp={() => {
                               if (longPressTimer.current) {
                                 clearTimeout(longPressTimer.current);
-                                // short tap = add ×1 as before (only if no radial showing)
                                 if (!radialMenu) addItem(item);
                                 longPressTimer.current = null;
                               }
@@ -2709,11 +2643,7 @@ export default function POS({ slug }: POSProps) {
                             }}
                             onContextMenu={(e) => e.preventDefault()}
                             whileTap={{ scale: 0.95 }}
-                            className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all select-none ${
-                              inCart
-                                ? "bg-amber-500/15 border-amber-500/50"
-                                : t.cartItemInactive
-                            }`}
+                            className={`relative p-3 lg:p-4 rounded-xl text-left border transition-all select-none ${inCart ? "bg-amber-500/15 border-amber-500/50" : t.cartItemInactive}`}
                           >
                             {inCart && (
                               <div className="absolute top-2 right-2 h-5 w-5 lg:h-6 lg:w-6 rounded-full bg-amber-500 flex items-center justify-center">
@@ -2738,7 +2668,6 @@ export default function POS({ slug }: POSProps) {
                                 DEN
                               </span>
                             </p>
-                            {/* long-press hint dot */}
                             <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-0.5 opacity-20">
                               <div className="h-0.5 w-0.5 rounded-full bg-current" />
                               <div className="h-0.5 w-0.5 rounded-full bg-current" />
@@ -2752,7 +2681,7 @@ export default function POS({ slug }: POSProps) {
                 </div>
               </div>
 
-              {/* ORDER PANEL */}
+              {/* Order panel */}
               <div
                 className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
               >
@@ -2771,21 +2700,16 @@ export default function POS({ slug }: POSProps) {
                     {orderCount(currentOrder)} ITEMS
                   </span>
                 </div>
-
                 <div className="flex-1 overflow-y-auto p-4 lg:p-5">
                   {currentOrder.items.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-12">
                       <ShoppingBag className={`h-8 w-8 ${t.textFaint}`} />
-                      <p className={`${t.textFaint} text-sm`}>Asnjë artikull</p>
-                      <p className={`${t.textFaint} text-xs hidden lg:block`}>
-                        Klikoni një artikull nga menyja për ta shtuar
-                      </p>
+                      <p className={`${t.textFaint} text-sm`}>No items yet</p>
                     </div>
                   ) : (
                     (() => {
                       const rounds: OrderRound[] =
                         (currentOrder as TableOrder).rounds ?? [];
-
                       const itemCard = (item: OrderItem, isNew: boolean) => (
                         <div
                           key={item.id}
@@ -2833,7 +2757,7 @@ export default function POS({ slug }: POSProps) {
                         </div>
                       );
 
-                      if (rounds.length <= 1) {
+                      if (rounds.length <= 1)
                         return (
                           <>
                             {currentOrder.items.map((item) =>
@@ -2841,7 +2765,6 @@ export default function POS({ slug }: POSProps) {
                             )}
                           </>
                         );
-                      }
 
                       const itemFirstRound = (id: number): number => {
                         for (let i = 0; i < rounds.length; i++) {
@@ -2850,7 +2773,6 @@ export default function POS({ slug }: POSProps) {
                         }
                         return -1;
                       };
-
                       const groups = new Map<number, OrderItem[]>();
                       for (const item of currentOrder.items) {
                         const r = itemFirstRound(item.id);
@@ -2897,7 +2819,9 @@ export default function POS({ slug }: POSProps) {
                                         ⚡
                                       </motion.span>
                                     )}
-                                    {isNew ? `POROSI ${rIdx + 1}` : `POROSI 1`}
+                                    {isNew
+                                      ? `${tr.porosiLabel} ${rIdx + 1}`
+                                      : `${tr.porosiLabel} 1`}
                                     <span className="font-normal opacity-60 ml-1">
                                       {roundTime}
                                     </span>
@@ -2915,7 +2839,6 @@ export default function POS({ slug }: POSProps) {
                     })()
                   )}
                 </div>
-
                 {currentOrder.items.length > 0 && (
                   <div
                     className={`flex-shrink-0 p-4 lg:p-5 border-t ${t.border} space-y-3`}
@@ -2947,7 +2870,6 @@ export default function POS({ slug }: POSProps) {
                         </p>
                       </div>
                     </div>
-
                     {payConfirm ? (
                       <div className="flex gap-2">
                         <button
@@ -2990,7 +2912,7 @@ export default function POS({ slug }: POSProps) {
           )}
       </AnimatePresence>
 
-      {/* ═══════════════════════════ MODALS ═══════════════s��════ p�══════ */}
+      {/* ══════════════════════════ MODALS ══════════════════════════════════ */}
 
       {/* Split Bill Modal */}
       <AnimatePresence>
@@ -3132,7 +3054,7 @@ export default function POS({ slug }: POSProps) {
                           className={`rounded-xl border border-dashed ${t.borderDashed} p-3 text-center`}
                         >
                           <p className={`text-xs ${t.textFaint}`}>
-                            Unassigned:{" "}
+                            {tr.unassigned}{" "}
                             <span className="text-amber-400 font-bold">
                               {totalUnassigned} DEN
                             </span>{" "}
@@ -3207,7 +3129,7 @@ export default function POS({ slug }: POSProps) {
                               </div>
                             ) : (
                               <p className={`text-[10px] ${t.textFaint}`}>
-                                Nothing assigned
+                                {tr.nothingAssigned}
                               </p>
                             )}
                           </div>
@@ -3273,11 +3195,8 @@ export default function POS({ slug }: POSProps) {
                       key={idx}
                       disabled={!canSelect}
                       onClick={() => {
-                        if (transferSource === null) {
-                          setTransferSource(idx);
-                        } else {
-                          handleTransfer(transferSource, idx);
-                        }
+                        if (transferSource === null) setTransferSource(idx);
+                        else handleTransfer(transferSource, idx);
                       }}
                       className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${isSource ? "bg-blue-500/20 border-blue-500/50" : !canSelect ? `${t.surface} ${t.border} opacity-30` : `${t.surface} ${t.border} hover:bg-blue-500/10`}`}
                     >
@@ -3346,11 +3265,8 @@ export default function POS({ slug }: POSProps) {
                       key={idx}
                       disabled={!canSelect}
                       onClick={() => {
-                        if (mergeSource === null) {
-                          setMergeSource(idx);
-                        } else {
-                          handleMerge(mergeSource, idx);
-                        }
+                        if (mergeSource === null) setMergeSource(idx);
+                        else handleMerge(mergeSource, idx);
                       }}
                       className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 border transition-all ${isSource ? "bg-purple-500/20 border-purple-500/50" : !canSelect ? `${t.surface} ${t.border} opacity-30` : `${t.surface} ${t.border} hover:bg-purple-500/10`}`}
                     >
@@ -3378,7 +3294,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* Sections Manager Modal */}
+      {/* Sections Modal */}
       <AnimatePresence>
         {showSectionsModal && (
           <>
@@ -3449,16 +3365,14 @@ export default function POS({ slug }: POSProps) {
                   return (
                     <button
                       key={idx}
-                      onClick={() => {
+                      onClick={() =>
                         setDraftSections((prev) =>
                           prev.map((s) => {
-                            if (s.name === activeDraftSection) {
+                            if (s.name === activeDraftSection)
                               return isAssignedHere
                                 ? {
                                     ...s,
-                                    tables: s.tables.filter(
-                                      (tableId) => tableId !== idx,
-                                    ),
+                                    tables: s.tables.filter((t) => t !== idx),
                                   }
                                 : {
                                     ...s,
@@ -3466,16 +3380,13 @@ export default function POS({ slug }: POSProps) {
                                       (a, b) => a - b,
                                     ),
                                   };
-                            }
                             return {
                               ...s,
-                              tables: s.tables.filter(
-                                (tableId) => tableId !== idx,
-                              ),
+                              tables: s.tables.filter((t) => t !== idx),
                             };
                           }),
-                        );
-                      }}
+                        )
+                      }
                       className={`aspect-square rounded-xl flex flex-col items-center justify-center border transition-all text-xs font-bold ${isAssignedHere ? sectionColor : isAssignedElsewhere ? `${t.surface} ${elseColor} opacity-50` : `${t.surface} ${t.border} ${t.textMuted}`}`}
                     >
                       T{idx + 1}
@@ -3565,9 +3476,7 @@ export default function POS({ slug }: POSProps) {
               <p className={`text-base font-bold ${t.text} mb-1`}>
                 {tr.newPersonTitle}
               </p>
-              <p className={`text-xs ${t.textDim} mb-4`}>
-                {tr.enterNameHint}
-              </p>
+              <p className={`text-xs ${t.textDim} mb-4`}>{tr.enterNameHint}</p>
               <input
                 ref={nameInputRef}
                 value={newPersonName}
@@ -3602,7 +3511,7 @@ export default function POS({ slug }: POSProps) {
         )}
       </AnimatePresence>
 
-      {/* Table Waiter PIN Modal */}
+      {/* Table PIN Modal */}
       <AnimatePresence>
         {showTablePinModal && tablePinSlot?.kind === "table" && (
           <>
@@ -3710,7 +3619,6 @@ export default function POS({ slug }: POSProps) {
               "0",
               "⌫",
             ];
-
             const handleNumpad = (key: string) => {
               if (key === "⌫") {
                 setPinDigits((prev) => prev.slice(0, -1));
@@ -3720,8 +3628,6 @@ export default function POS({ slug }: POSProps) {
                 setClaimError("");
               }
             };
-
-            // FIX [7]: After claim success, assign waiter to table locally and navigate directly
             const handleConfirmClaim = async () => {
               if (pinDigits.length !== 3 || claimLoading) return;
               setClaimLoading(true);
@@ -3735,8 +3641,6 @@ export default function POS({ slug }: POSProps) {
                 if (res.ok) {
                   const claimed = await res.json();
                   const tableIdx = tableNum - 1;
-
-                  // Assign waiter to local table state
                   if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
                     setTables((prev) => {
                       const next = [...prev];
@@ -3748,14 +3652,11 @@ export default function POS({ slug }: POSProps) {
                       return next;
                     });
                   }
-
                   setShowClaimModal(false);
                   setClaimModalOrder(null);
                   setClaimTarget(null);
                   setPinDigits("");
                   refetchOrders();
-
-                  // Navigate directly — PIN already verified, skip openSlot()
                   if (tableIdx >= 0 && tableIdx < TABLE_COUNT) {
                     setActive({ kind: "table", idx: tableIdx });
                     setScreen("menu");
@@ -3771,7 +3672,6 @@ export default function POS({ slug }: POSProps) {
                 setClaimLoading(false);
               }
             };
-
             return (
               <>
                 <motion.div
@@ -3895,7 +3795,7 @@ export default function POS({ slug }: POSProps) {
                       className="w-full h-14 rounded-2xl bg-amber-500 text-black font-bold text-sm disabled:opacity-40 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                       data-testid="button-confirm-incoming-claim"
                     >
-                      {claimLoading ? ( 
+                      {claimLoading ? (
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{
@@ -3949,7 +3849,9 @@ export default function POS({ slug }: POSProps) {
                 style={{ borderColor: isLight ? "#e5e7eb" : "#292524" }}
               >
                 <div>
-                  <h2 className={`text-base font-bold ${t.text}`}>{tr.ordersTitle}</h2>
+                  <h2 className={`text-base font-bold ${t.text}`}>
+                    {tr.ordersTitle}
+                  </h2>
                   <p className={`text-xs ${t.textMuted}`}>
                     {
                       dbOrders.filter((o: any) => o.status !== "completed")
@@ -4032,19 +3934,21 @@ export default function POS({ slug }: POSProps) {
                           </span>
                         </div>
                         <div className="space-y-1">
-                          {safeParseCart(order.cart).map((item: any, idx: number) => (
-                            <div
-                              key={idx}
-                              className="flex justify-between text-xs"
-                            >
-                              <span className={t.textMuted}>
-                                {item.qty}× {item.name}
-                              </span>
-                              <span className={`font-semibold ${t.text}`}>
-                                {item.price * item.qty} DEN
-                              </span>
-                            </div>
-                          ))}
+                          {safeParseCart(order.cart).map(
+                            (item: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="flex justify-between text-xs"
+                              >
+                                <span className={t.textMuted}>
+                                  {item.qty}× {item.name}
+                                </span>
+                                <span className={`font-semibold ${t.text}`}>
+                                  {item.price * item.qty} DEN
+                                </span>
+                              </div>
+                            ),
+                          )}
                           <div
                             className={`flex justify-between text-xs font-bold pt-1 border-t ${isLight ? "border-gray-200" : "border-stone-700"}`}
                           >
@@ -4052,8 +3956,6 @@ export default function POS({ slug }: POSProps) {
                             <span className="text-amber-500">{total} DEN</span>
                           </div>
                         </div>
-
-                        {/* FIX [8]: Orders Panel claim — navigate directly after success */}
                         {order.status === "pending" &&
                           (claimTarget === order.id ? (
                             <div className="space-y-2">
@@ -4117,8 +4019,6 @@ export default function POS({ slug }: POSProps) {
                                         const claimed = await res.json();
                                         const tableIdx =
                                           Number(order.tableNumber) - 1;
-
-                                        // Assign waiter to local table state
                                         if (
                                           tableIdx >= 0 &&
                                           tableIdx < TABLE_COUNT
@@ -4133,12 +4033,9 @@ export default function POS({ slug }: POSProps) {
                                             return next;
                                           });
                                         }
-
                                         setClaimTarget(null);
                                         setPinDigits("");
                                         refetchOrders();
-
-                                        // Navigate directly — no second PIN
                                         if (
                                           tableIdx >= 0 &&
                                           tableIdx < TABLE_COUNT
@@ -4181,7 +4078,6 @@ export default function POS({ slug }: POSProps) {
                               {tr.claimOrderBtn}
                             </button>
                           ))}
-
                         {order.status === "claimed" && (
                           <button
                             onClick={async () => {
@@ -4204,6 +4100,7 @@ export default function POS({ slug }: POSProps) {
           </>
         )}
       </AnimatePresence>
+
       {/* Radial Quick-Add Menu */}
       {radialMenu && (
         <RadialMenu
