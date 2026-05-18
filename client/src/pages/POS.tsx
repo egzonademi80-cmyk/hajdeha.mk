@@ -1662,9 +1662,16 @@ export default function POS({ slug }: POSProps) {
     setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // ─── openSlot: always shows PIN modal for table slots ─────────────────────
+  // ─── openSlot: shows PIN modal only if waiters exist ─────────────────────
   const openSlot = (slot: ActiveSlot) => {
     if (slot?.kind === "table") {
+      // If no waiters configured, skip PIN and go directly to menu
+      if (waiters.length === 0) {
+        setActive(slot);
+        setScreen("menu");
+        setActiveCategory("All");
+        return;
+      }
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
@@ -2365,8 +2372,8 @@ export default function POS({ slug }: POSProps) {
                                 transition={{ duration: 1.2, repeat: Infinity }}
                                 className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${c.dot}`}
                               />
-                              {/* Claim button on unclaimed tables — always opens PIN directly */}
-                              {status === "unclaimed" && (
+                              {/* Claim button on unclaimed tables — opens PIN only if waiters exist */}
+                              {status === "unclaimed" && waiters.length > 0 && (
                                 <button
                                   data-testid={`button-claim-table-${idx}`}
                                   onClick={(e) => {
