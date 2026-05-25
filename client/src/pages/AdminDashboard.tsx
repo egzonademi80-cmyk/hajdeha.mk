@@ -299,16 +299,18 @@ function AnalyticsPanel({ restaurantId }: { restaurantId: number }) {
 }
 
 function WaiterEarningsPanel({ restaurantId }: { restaurantId: number }) {
-  const { data, isLoading } = useQuery<{ waiterId: number; waiterName: string; total: number }[]>({
+  const { data: raw, isLoading } = useQuery<{ earnings: { waiterId: number; waiterName: string; total: number }[]; days: string[] }>({
     queryKey: [`waiter-earnings-${restaurantId}`],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/waiter-earnings?restaurantId=${restaurantId}`);
-      if (!res.ok) return [];
+      const res = await fetch(`/api/admin/waiter-earnings?restaurantId=${restaurantId}&period=day`);
+      if (!res.ok) return { earnings: [], days: [] };
       return res.json();
     },
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+
+  const data = raw?.earnings ?? [];
 
   if (isLoading)
     return (

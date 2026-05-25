@@ -67,6 +67,16 @@ import {
 import { api } from "@shared/routes";
 import { apiRequest, getToken } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 // ── dnd-kit ───────────────────────────────────────────────────────────────────
 import {
@@ -1162,75 +1172,192 @@ function MenuItemDialog({
   );
 }
 
-// ── Waiters Section ──────────────────────────────────────────────────────────
+// ── Waiter Earnings Section ───────────────────────────────────────────────────
+const WAITER_COLORS = [
+  "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#84cc16",
+];
+
+type EarningPeriod = "day" | "week" | "month";
+
+interface WaiterEarning {
+  waiterId: number | null;
+  waiterName: string;
+  total: number;
+  byDay: { date: string; total: number }[];
+}
+
+function downloadCSV(earnings: WaiterEarning[], days: string[], period: EarningPeriod) {
+  const periodLabel = period === "day" ? "Today" : period === "week" ? "Last 7 Days" : "Last 30 Days";
+  const headers = ["Waiter", ...days.map((d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })), "TOTAL"];
+  const rows = [...earnings]
+    .sort((a, b) => b.total - a.total)
+    .map((e) => [
+      e.waiterName,
+      ...e.byDay.map((d) => d.total.toString()),
+      e.total.toString(),
+    ]);
+  const csv = [
+    [`Waiter Earnings — ${periodLabel}`],
+    headers,
+    ...rows,
+  ].map((r) => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `waiter-earnings-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function WaiterEarningsSection({ restaurantId }: { restaurantId: number }) {
-  const { data: earnings = [], isLoading } = useQuery<{ waiterId: number; waiterName: string; total: number }[]>({
-    queryKey: ["/api/admin/waiter-earnings", restaurantId],
+  const [period, setPeriod] = useState<EarningPeriod>("day");
+
+  const { data, isLoading } = useQuery<{ earnings: WaiterEarning[]; days: string[] }>({
+    queryKey: ["/api/admin/waiter-earnings", restaurantId, period],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/waiter-earnings?restaurantId=${restaurantId}`, { credentials: "include" });
-      if (!res.ok) return [];
+      const res = await fetch(
+        `/api/admin/waiter-earnings?restaurantId=${restaurantId}&period=${period}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return { earnings: [], days: [] };
       return res.json();
     },
     refetchInterval: 30000,
   });
 
+  const earnings = data?.earnings ?? [];
+  const days = data?.days ?? [];
   const grandTotal = earnings.reduce((s, e) => s + e.total, 0);
-  const today = new Date().toLocaleDateString("sq-MK", { day: "2-digit", month: "long", year: "numeric" });
+
+  // Build chart data — one row per day, one key per waiter
+  const chartData = days.map((date) => {
+    const label =
+      period === "day"
+        ? new Date(date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+        : new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    const row: Record<string, string | number> = { date: label };
+    earnings.forEach((e) => {
+      const found = e.byDay.find((d) => d.date === date);
+      row[e.waiterName] = found?.total ?? 0;
+    });
+    return row;
+  });
+
+  const periodLabels: Record<EarningPeriod, string> = {
+    day: "Today",
+    week: "Last 7 days",
+    month: "Last 30 days",
+  };
 
   return (
     <section className="bg-card rounded-2xl border border-border p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
             <Receipt className="h-5 w-5 text-emerald-600" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-foreground">Të ardhurat e sotme</h2>
-            <p className="text-xs text-muted-foreground">{today}</p>
+            <h2 className="text-base font-bold text-foreground">Waiter Earnings</h2>
+            <p className="text-xs text-muted-foreground">{periodLabels[period]}</p>
           </div>
         </div>
-        {grandTotal > 0 && (
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground font-mono">TOTAL</p>
-            <p className="text-lg font-bold text-emerald-600 font-mono">{grandTotal} DEN</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Period tabs */}
+          <div className="flex rounded-lg border border-border overflow-hidden text-xs font-semibold">
+            {(["day", "week", "month"] as EarningPeriod[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 transition-colors ${period === p ? "bg-emerald-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+              >
+                {p === "day" ? "Day" : p === "week" ? "Week" : "Month"}
+              </button>
+            ))}
           </div>
-        )}
+          {/* Download */}
+          {earnings.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => downloadCSV(earnings, days, period)}
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </Button>
+          )}
+        </div>
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Duke ngarkuar…</p>}
+      {/* Grand total */}
+      {grandTotal > 0 && (
+        <div className="flex gap-4 flex-wrap">
+          <div className="rounded-xl bg-emerald-500/10 px-4 py-2">
+            <p className="text-xs text-muted-foreground font-mono">TOTAL</p>
+            <p className="text-xl font-bold text-emerald-600 font-mono">{grandTotal.toLocaleString()} DEN</p>
+          </div>
+        </div>
+      )}
+
+      {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
 
       {!isLoading && earnings.length === 0 && (
         <div className="rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center">
-          <p className="text-sm text-muted-foreground">Nuk ka porosi të kryera sot ende.</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Të dhënat shfaqen pasi kamarierët marrin dhe kryejnë porositë.</p>
+          <p className="text-sm text-muted-foreground">No completed orders in this period.</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Data appears after waiters claim and complete orders.</p>
         </div>
       )}
 
       {earnings.length > 0 && (
-        <div className="space-y-2">
-          {[...earnings].sort((a, b) => b.total - a.total).map((e, idx) => {
-            const pct = grandTotal > 0 ? (e.total / grandTotal) * 100 : 0;
-            return (
-              <div key={e.waiterId} className="rounded-xl border border-border bg-background px-4 py-3 space-y-2" data-testid={`row-earnings-${e.waiterId}`}>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0 font-bold text-xs text-emerald-600">
-                      #{idx + 1}
-                    </div>
-                    <p className="text-sm font-semibold text-foreground truncate">{e.waiterName}</p>
-                  </div>
-                  <p className="text-sm font-bold text-emerald-600 font-mono flex-shrink-0">{e.total} DEN</p>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-emerald-500 transition-all duration-700"
-                    style={{ width: `${pct}%` }}
+        <>
+          {/* Bar Chart */}
+          {period !== "day" && (
+            <div className="w-full" style={{ height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" unit=" DEN" width={72} />
+                  <Tooltip
+                    formatter={(value: number) => [`${value.toLocaleString()} DEN`]}
+                    contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                   />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {earnings.map((e, i) => (
+                    <Bar key={e.waiterName} dataKey={e.waiterName} fill={WAITER_COLORS[i % WAITER_COLORS.length]} radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Ranked list */}
+          <div className="space-y-2">
+            {[...earnings].sort((a, b) => b.total - a.total).map((e, idx) => {
+              const pct = grandTotal > 0 ? (e.total / grandTotal) * 100 : 0;
+              const color = WAITER_COLORS[earnings.indexOf(e) % WAITER_COLORS.length];
+              return (
+                <div key={e.waiterId ?? "none"} className="rounded-xl border border-border bg-background px-4 py-3 space-y-2" data-testid={`row-earnings-${e.waiterId}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xs text-white" style={{ background: color }}>
+                        #{idx + 1}
+                      </div>
+                      <p className="text-sm font-semibold text-foreground truncate">{e.waiterName}</p>
+                    </div>
+                    <p className="text-sm font-bold font-mono flex-shrink-0" style={{ color }}>{e.total.toLocaleString()} DEN</p>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </section>
   );

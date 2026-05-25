@@ -815,34 +815,56 @@ export async function registerRoutes(
       const restaurantId = parseInt(req.query.restaurantId as string);
       if (isNaN(restaurantId))
         return res.status(400).json({ message: "restaurantId required" });
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const period = (req.query.period as string) || "day";
+      const now = new Date();
+      const from = new Date();
+      if (period === "week") {
+        from.setDate(now.getDate() - 6);
+      } else if (period === "month") {
+        from.setDate(now.getDate() - 29);
+      }
+      from.setHours(0, 0, 0, 0);
+
       const allOrders = await storage.getOrders(restaurantId);
-      const todayOrders = allOrders.filter(
+      const filtered = allOrders.filter(
         (o) =>
           (o.status === "claimed" || o.status === "completed") &&
-          new Date(o.createdAt) >= today,
+          new Date(o.createdAt) >= from,
       );
+
       const waiterList = await storage.getWaiters(restaurantId);
       const waiterMap = new Map(waiterList.map((w) => [w.id, w.name]));
-      const earningsMap = new Map<number | null, number>();
-      for (const order of todayOrders) {
+
+      // Build: { waiterId -> { total, byDay: { "YYYY-MM-DD" -> total } } }
+      const earningsMap = new Map<number | null, { total: number; byDay: Map<string, number> }>();
+      for (const order of filtered) {
         const key = order.waiterId ?? null;
+        const dateKey = new Date(order.createdAt).toISOString().slice(0, 10);
         const cart = JSON.parse(order.cart);
-        const total = cart.reduce(
-          (s: number, i: any) => s + i.price * i.qty,
-          0,
-        );
-        earningsMap.set(key, (earningsMap.get(key) ?? 0) + total);
+        const total = cart.reduce((s: number, i: any) => s + i.price * i.qty, 0);
+        if (!earningsMap.has(key)) earningsMap.set(key, { total: 0, byDay: new Map() });
+        const entry = earningsMap.get(key)!;
+        entry.total += total;
+        entry.byDay.set(dateKey, (entry.byDay.get(dateKey) ?? 0) + total);
       }
-      const earnings = Array.from(earningsMap.entries()).map(
-        ([waiterId, total]) => ({
-          waiterId,
-          waiterName: waiterId ? (waiterMap.get(waiterId) ?? "Unknown") : "Pa kamarier",
-          total,
-        }),
-      );
-      return res.json(earnings);
+
+      // Build date labels for the period
+      const days: string[] = [];
+      const periodDays = period === "month" ? 30 : period === "week" ? 7 : 1;
+      for (let i = periodDays - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(now.getDate() - i);
+        days.push(d.toISOString().slice(0, 10));
+      }
+
+      const earnings = Array.from(earningsMap.entries()).map(([waiterId, { total, byDay }]) => ({
+        waiterId,
+        waiterName: waiterId ? (waiterMap.get(waiterId) ?? "Unknown") : "Pa kamarier",
+        total,
+        byDay: days.map((date) => ({ date, total: byDay.get(date) ?? 0 })),
+      }));
+
+      return res.json({ earnings, days });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
