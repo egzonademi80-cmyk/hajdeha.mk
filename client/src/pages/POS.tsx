@@ -38,6 +38,8 @@ interface MenuItem {
 interface OrderItem {
   id: number;
   name: string;
+  nameAl?: string;
+  nameMk?: string;
   price: number;
   qty: number;
 }
@@ -475,9 +477,11 @@ function buildEscPosBytes({
   });
   cols(`${dateStr}  ${timeStr}`, tableLabel);
   dashes();
+  const itemName = (item: OrderItem) =>
+    (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) || item.name;
   for (const item of items) {
     cols(
-      `${item.qty}x ${item.name}`,
+      `${item.qty}x ${itemName(item)}`,
       `${(item.price * item.qty).toFixed(0)} DEN`,
     );
   }
@@ -588,10 +592,12 @@ function printReceiptWindow({
       minute: "2-digit",
     })
     : null;
+  const getItemName = (item: OrderItem) =>
+    (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) || item.name;
   const rows = items
     .map(
       (item) =>
-        `<tr><td class="item-qty">${item.qty}×</td><td class="item-name">${item.name}</td><td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td></tr>`,
+        `<tr><td class="item-qty">${item.qty}×</td><td class="item-name">${getItemName(item)}</td><td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td></tr>`,
     )
     .join("");
 
@@ -1417,7 +1423,7 @@ export default function POS({ slug }: POSProps) {
 
   const getTableSection = (tableIdx: number): string => {
     const section = sections.find((s) => s.tables.includes(tableIdx));
-    return section?.name || "Other";
+    return section?.name || tr.tableTag;
   };
 
   const visibleTables = useMemo(() => {
@@ -1436,6 +1442,8 @@ export default function POS({ slug }: POSProps) {
         items.push({
           id: item.id,
           name: item.name,
+          nameAl: item.nameAl ?? undefined,
+          nameMk: item.nameMk ?? undefined,
           price: parsePrice(item.price),
           qty: 1,
         });
