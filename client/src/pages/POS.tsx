@@ -1662,16 +1662,16 @@ export default function POS({ slug }: POSProps) {
     setPersonTabs((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // ─── openSlot: always shows PIN modal for table slots ─────────────────────
+  // ─── openSlot: shows PIN modal only if restaurant has waiters ────────────
   const openSlot = (slot: ActiveSlot) => {
-    if (slot?.kind === "table") {
+    if (slot?.kind === "table" && waiters.length > 0) {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
       setShowTablePinModal(true);
       return;
     }
-    // person tabs — no PIN needed
+    // no waiters configured, or person tabs — no PIN needed
     setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
