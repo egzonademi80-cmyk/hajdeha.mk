@@ -104,10 +104,23 @@ const CATEGORY_NAMES: Record<string, { al: string; mk: string }> = {
   wine: { al: "Verë", mk: "Вино" },
   beer: { al: "Birrë", mk: "Пиво" },
   cocktails: { al: "Kokteje", mk: "Коктели" },
+  cocktail: { al: "Koktej", mk: "Коктел" },
   juices: { al: "Lëngje", mk: "Сокови" },
   juice: { al: "Lëng", mk: "Сок" },
   tea: { al: "Çaj", mk: "Чај" },
   water: { al: "Ujë", mk: "Вода" },
+  "hot drinks": { al: "Pije të nxehta", mk: "Топли пијалоци" },
+  "hot drink": { al: "Pije e nxehtë", mk: "Топол пијалок" },
+  hookah: { al: "Nargile", mk: "Наргиле" },
+  hookahs: { al: "Nargile", mk: "Наргилиња" },
+  shisha: { al: "Nargile", mk: "Шише" },
+  wraps: { al: "Rrotullimet", mk: "Ролни" },
+  wrap: { al: "Rrotullim", mk: "Ролна" },
+  tacos: { al: "Tako", mk: "Такос" },
+  appetizers: { al: "Antipastet", mk: "Предјадења" },
+  appetizer: { al: "Antipaste", mk: "Предјадење" },
+  "main course": { al: "Pjata kryesore", mk: "Главно јадење" },
+  breakfasts: { al: "Mëngjesin", mk: "Појадоци" },
 };
 
 function getCategoryDisplay(cat: string, lang: Lang): string {
