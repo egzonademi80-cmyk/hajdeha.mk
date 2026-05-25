@@ -3619,7 +3619,7 @@ export default function PublicMenu() {
                   {t.ourLocation}
                 </h3>
                 <RestaurantMap
-                  location={restaurant.location || "Tetovë Center, 1200"}
+                  location={restaurant.location || "Macedonia"}
                   name={restaurant.name}
                   latitude={
                     restaurant.latitude ? String(restaurant.latitude) : null
@@ -3631,7 +3631,7 @@ export default function PublicMenu() {
                 <div className="flex items-start gap-3 bg-stone-50 dark:bg-stone-700/50 p-3.5 rounded-xl border border-stone-100 dark:border-stone-600">
                   <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                   <p className="text-stone-700 dark:text-stone-300 font-medium text-sm">
-                    {restaurant.location || "Tetovë Center, 1200"}
+                    {restaurant.location || "Macedonia"}
                   </p>
                 </div>
               </div>

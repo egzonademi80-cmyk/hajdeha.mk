@@ -32,7 +32,7 @@ import { DarkModeToggle } from "@/components/DarkModeToggle";
 
 const translations: Record<string, any> = {
   en: {
-    hero: "The Digital Menu Platform of Tetovë.",
+    hero: "The Digital Menu Platform of Macedonia.",
     subHero: "Browse menus and calculate your bill before you order.",
     searchPlaceholder:
       "Search for restaurants or dishes (e.g. Pizza, Burger)...",
@@ -40,12 +40,12 @@ const translations: Record<string, any> = {
     localRestaurants: "Local Restaurants",
     found: "Found",
     matches: "matches",
-    explore: "Explore the taste of Tetovë",
+    explore: "Explore the taste of Macedonia",
     noResults: "No results matching your search.",
     noRestaurants: "No restaurants have joined HAJDE HA yet.",
     whyUs: "Why Choose HAJDE HA?",
     whyUsSub:
-      "The modern way to experience dining in Tetovë. Simple, efficient, and contactless.",
+      "The modern way to experience dining in Macedonia. Simple, efficient, and contactless.",
     digitalMenus: "Digital Menus",
     digitalMenusDesc:
       "Access high-quality menus instantly from any smartphone. No physical menus needed.",
@@ -58,12 +58,12 @@ const translations: Record<string, any> = {
     listRestaurant: "Want to list your restaurant?",
     noRestaurantsOpen: "No restaurants are opened now.",
     joinPlatform:
-      "Join the fastest growing digital menu platform in Tetovë. Help your customers browse faster and better.",
+      "Join the fastest growing digital menu platform in Macedonia. Help your customers browse faster and better.",
     emailUs: "Email Us",
     callSupport: "Call Support",
     contactTitle: "Get Your Restaurant Online",
     contactSubtitle:
-      "Join the digital menu revolution in Tetovë. Fill out the form below and we'll get back to you within 24 hours.",
+      "Join the digital menu revolution in Macedonia. Fill out the form below and we'll get back to you within 24 hours.",
     fullName: "Full Name",
     emailAddr: "Email Address",
     restaurantName: "Restaurant Name",
@@ -85,7 +85,7 @@ const translations: Record<string, any> = {
     km: "km",
     step1: "Select a Restaurant",
     step1Desc:
-      "Browse our curated list of the best local restaurants in Tetovë.",
+      "Browse our curated list of the best local restaurants in Macedonia.",
     step2: "Explore the Menu",
     step2Desc:
       "See dishes with photos, detailed descriptions, and up-to-date prices.",
@@ -97,7 +97,7 @@ const translations: Record<string, any> = {
       "Visit the restaurant or call them directly to place your order with confidence.",
   },
   al: {
-    hero: "Platforma e Menusë Digjitale e Tetovës.",
+    hero: "Platforma e Menusë Digjitale e Maqedonisë.",
     subHero:
       "Shfletoni menutë dhe llogaritni faturën tuaj para se të porosisni.",
     searchPlaceholder: "Kërko për restorante ose pjata (p.sh. Pica, Burger)...",
@@ -105,12 +105,12 @@ const translations: Record<string, any> = {
     localRestaurants: "Restorantet Lokale",
     found: "U gjetën",
     matches: "përputhje",
-    explore: "Eksploroni shijen e Tetovës",
+    explore: "Eksploroni shijen e Maqedonisë",
     noResults: "Nuk u gjet asnjë rezultat që përputhet me kërkimin tuaj.",
     noRestaurants: "Ende asnjë restorant nuk i është bashkuar HAJDE HA.",
     whyUs: "Pse të zgjidhni HAJDE HA?",
     whyUsSub:
-      "Mënyra moderne për të përjetuar ngrënien në Tetovë. E thjeshtë, efikase dhe pa kontakt.",
+      "Mënyra moderne për të përjetuar ngrënien në Maqedoni. E thjeshtë, efikase dhe pa kontakt.",
     digitalMenus: "Menu Digjitale",
     digitalMenusDesc:
       "Qasuni menjëherë në menu cilësore nga çdo smartphone. Nuk ka nevojë për menu fizike.",
@@ -123,12 +123,12 @@ const translations: Record<string, any> = {
     listRestaurant: "Dëshironi të listoni restorantin tuaj?",
     noRestaurantsOpen: "Asnjë restorant nuk është i hapur tani.",
     joinPlatform:
-      "Bashkohuni me platformën e menusë digjitale me rritjen më të shpejtë në Tetovë.",
+      "Bashkohuni me platformën e menusë digjitale me rritjen më të shpejtë në Maqedoni.",
     emailUs: "Na dërgoni email",
     callSupport: "Telefoni Mbështetjen",
     contactTitle: "Vendosni Restorantin tuaj Online",
     contactSubtitle:
-      "Bashkohuni me revolucionin e menusë digjitale në Tetovë. Plotësoni formularin dhe ne do t'ju kontaktojmë brenda 24 orëve.",
+      "Bashkohuni me revolucionin e menusë digjitale në Maqedoni. Plotësoni formularin dhe ne do t'ju kontaktojmë brenda 24 orëve.",
     fullName: "Emri i plotë",
     emailAddr: "Adresa e Email-it",
     restaurantName: "Emri i Restorantit",
@@ -149,7 +149,7 @@ const translations: Record<string, any> = {
     distance: "distanca",
     km: "km",
     step1: "Zgjidhni një restorant",
-    step1Desc: "Shfletoni listën tonë të restoranteve më të mira në Tetovë.",
+    step1Desc: "Shfletoni listën tonë të restoranteve më të mira në Maqedoni.",
     step2: "Shfletoni menunë",
     step2Desc: "Shikoni pjatat me foto, përshkrime dhe çmime të sakta.",
     step3: "Llogaritni faturën",
@@ -160,7 +160,7 @@ const translations: Record<string, any> = {
       "Vizitoni restorantin ose telefononi direkt për të bërë porosinë tuaj.",
   },
   mk: {
-    hero: "Дигитална платформа за мени во Тетово.",
+    hero: "Дигитална платформа за мени во Македонија.",
     subHero:
       "Прелистувајте менија и пресметајте ја вашата сметка пред да нарачате.",
     searchPlaceholder:
@@ -169,12 +169,12 @@ const translations: Record<string, any> = {
     localRestaurants: "Локални ресторани",
     found: "Пронајдени",
     matches: "резултати",
-    explore: "Истражете го вкусот на Тетово",
+    explore: "Истражете го вкусот на Македонија",
     noResults: "Нема резултати што одговараат на вашето пребарување.",
     noRestaurants: "Ниту еден ресторан сè уште не се приклучил на HAJDE HA.",
     whyUs: "Зошто да изберете HAJDE HA?",
     whyUsSub:
-      "Модерен начин за јадење во Тетово. Едноставно, ефикасно и без контакт.",
+      "Модерен начин за јадење во Македонија. Едноставно, ефикасно и без контакт.",
     digitalMenus: "Дигитални менија",
     digitalMenusDesc:
       "Пристапете до квалитетни менија веднаш од кој било паметен телефон. Нема потреба од физички менија.",
@@ -187,12 +187,12 @@ const translations: Record<string, any> = {
     listRestaurant: "Сакате да го наведете вашиот ресторан?",
     noRestaurantsOpen: "Ниту еден ресторан не е отворен сега.",
     joinPlatform:
-      "Придружете се на најбрзо растечката дигитална платформа за менија во Тетово.",
+      "Придружете се на најбрзо растечката дигитална платформа за менија во Македонија.",
     emailUs: "Пишете ни",
     callSupport: "Повикајте поддршка",
     contactTitle: "Ставете го вашиот ресторан онлајн",
     contactSubtitle:
-      "Придружете се на дигиталната револуција во Тетово. Пополнете го формуларот и ќе ве контактираме во рок од 24 часа.",
+      "Придружете се на дигиталната револуција во Македонија. Пополнете го формуларот и ќе ве контактираме во рок од 24 часа.",
     fullName: "Целосно име",
     emailAddr: "Е-пошта",
     restaurantName: "Име на ресторан",
@@ -213,7 +213,7 @@ const translations: Record<string, any> = {
     distance: "оддалеченост",
     km: "км",
     step1: "Изберете ресторан",
-    step1Desc: "Прелистајте ја нашата листа на најдобри ресторани во Тетово.",
+    step1Desc: "Прелистајте ја нашата листа на најдобри ресторани во Македонија.",
     step2: "Прелистајте го менито",
     step2Desc: "Погледнете ги јадењата со слики, описи и точни цени.",
     step3: "Пресметајте ја сметката",
@@ -943,7 +943,7 @@ export default function Home() {
 
                 <div className="mt-12 pt-12 border-t border-white/10 dark:border-stone-700">
                   <p className="text-sm text-primary-foreground/60 dark:text-stone-300 leading-relaxed transition-colors duration-300">
-                    Based in Tetovë, supporting local businesses transition to
+                    Based in Macedonia, supporting local businesses transition to
                     the digital era.
                   </p>
                 </div>
@@ -1088,7 +1088,7 @@ export default function Home() {
       </section>
 
       <footer className="py-12 border-t text-center text-stone-400 text-sm">
-        <p>© 2026 HAJDE HA - Tetovë Digital Menu Platform</p>
+        <p>© 2026 HAJDE HA - Macedonia Digital Menu Platform</p>
       </footer>
 
       {/* ── PWA Install Banner ── */}

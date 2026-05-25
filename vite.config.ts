@@ -17,7 +17,7 @@ export default defineConfig({
       manifest: {
         name: "HAJDE HA",
         short_name: "HAJDE HA",
-        description: "Platforma e Menusë Dixhitale e Tetovës",
+        description: "Platforma e Menusë Dixhitale e Maqedonisë",
         theme_color: "#E8450A",
         background_color: "#ffffff",
         display: "standalone",
