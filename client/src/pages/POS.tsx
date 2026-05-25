@@ -985,7 +985,7 @@ export default function POS({ slug }: POSProps) {
 
   const restaurantId = restaurant?.id;
 
-  const { data: waiters = [] } = useQuery<
+  const { data: waiters = [], isFetched: waitersFetched } = useQuery<
     { id: number; name: string; pinCode: string }[]
   >({
     queryKey: ["/api/admin/waiters", restaurantId],
@@ -1664,14 +1664,16 @@ export default function POS({ slug }: POSProps) {
 
   // ─── openSlot: shows PIN modal only if restaurant has waiters ────────────
   const openSlot = (slot: ActiveSlot) => {
-    if (slot?.kind === "table" && waiters.length > 0) {
+    // Show PIN if: it's a table slot AND either (a) waiters exist, or (b) we
+    // haven't finished loading yet (safe default while query is in-flight)
+    if (slot?.kind === "table" && (!waitersFetched || waiters.length > 0)) {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
       setShowTablePinModal(true);
       return;
     }
-    // no waiters configured, or person tabs — no PIN needed
+    // confirmed no waiters, or person tab — no PIN needed
     setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
