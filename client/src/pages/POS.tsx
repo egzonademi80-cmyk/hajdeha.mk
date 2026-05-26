@@ -1892,8 +1892,7 @@ export default function POS({ slug }: POSProps) {
             section: next[tableIdx].section,
             waiterId: next[tableIdx].waiterId,
             waiterName: next[tableIdx].waiterName,
-            customerNote:
-              data.customerNote || next[tableIdx].customerNote || null,
+            customerNote: data.customerNote || null,
           };
           return next;
         });
