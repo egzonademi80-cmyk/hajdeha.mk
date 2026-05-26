@@ -1876,6 +1876,7 @@ function AIWaiterPanel({
 export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const channelName = `table-${restaurantSlug}-${tableNumber}`;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
 
@@ -2804,7 +2805,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                           <img
                             src={item.imageUrl}
                             alt={getItemName(item, lang)}
-                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover flex-shrink-0"
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover flex-shrink-0 cursor-zoom-in"
+                            onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.imageUrl!); }}
                           />
                         ) : (
                           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 text-xl">
@@ -3219,6 +3221,27 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             setShowTutorial(false);
           }}
         />
+      )}
+
+      {/* ── Image Lightbox ── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white bg-black/40 rounded-full w-9 h-9 flex items-center justify-center text-xl hover:bg-black/70 transition-colors"
+            onClick={() => setLightboxUrl(null)}
+          >
+            ✕
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Menu item"
+            className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );
