@@ -814,6 +814,57 @@ export async function registerRoutes(
     }
   });
 
+  // === TABLE ASSIGNMENTS (persist waiter-table claims) ===
+  app.get("/api/pos/table-assignments", async (req, res) => {
+    try {
+      const restaurantId = parseInt(req.query.restaurantId as string);
+      if (isNaN(restaurantId)) return res.status(400).json({ message: "restaurantId required" });
+      const rows = await storage.getTableAssignments(restaurantId);
+      return res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/pos/assign-table", async (req, res) => {
+    try {
+      const { restaurantId, tableNumber, waiterId } = req.body;
+      if (!restaurantId || !tableNumber || !waiterId)
+        return res.status(400).json({ message: "Missing fields" });
+      await storage.upsertTableAssignment(Number(restaurantId), Number(tableNumber), Number(waiterId));
+      const restaurant = await storage.getRestaurant(Number(restaurantId));
+      if (restaurant) {
+        const waiter = await storage.getWaiter(Number(waiterId));
+        await safeTrigger(`pos-${restaurant.slug}`, "table-assigned", {
+          tableNumber: Number(tableNumber),
+          waiterId: Number(waiterId),
+          waiterName: waiter?.name ?? "",
+        });
+      }
+      return res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/pos/assign-table", async (req, res) => {
+    try {
+      const { restaurantId, tableNumber } = req.body;
+      if (!restaurantId || !tableNumber)
+        return res.status(400).json({ message: "Missing fields" });
+      await storage.deleteTableAssignment(Number(restaurantId), Number(tableNumber));
+      const restaurant = await storage.getRestaurant(Number(restaurantId));
+      if (restaurant) {
+        await safeTrigger(`pos-${restaurant.slug}`, "table-released", {
+          tableNumber: Number(tableNumber),
+        });
+      }
+      return res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // === VERIFY WAITER PIN (for POS table claim) ===
   app.post("/api/pos/verify-pin", async (req, res) => {
     try {

@@ -6,6 +6,7 @@ import {
   menuItems,
   waiters,
   orders,
+  tableAssignments,
   type User,
   type InsertUser,
   type Restaurant,
@@ -16,6 +17,7 @@ import {
   type InsertWaiter,
   type Order,
   type InsertOrder,
+  type TableAssignment,
 } from "../shared/schema.js";
 
 export interface IStorage {
@@ -54,6 +56,11 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   claimOrder(id: number, waiterId: number): Promise<Order>;
   completeOrder(id: number): Promise<Order>;
+
+  // Table assignment operations
+  getTableAssignments(restaurantId: number): Promise<(TableAssignment & { waiterName: string })[]>;
+  upsertTableAssignment(restaurantId: number, tableNumber: number, waiterId: number): Promise<void>;
+  deleteTableAssignment(restaurantId: number, tableNumber: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -201,6 +208,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return updated;
+  }
+
+  // Table assignment methods
+  async getTableAssignments(restaurantId: number): Promise<(TableAssignment & { waiterName: string })[]> {
+    const rows = await db
+      .select({
+        id: tableAssignments.id,
+        restaurantId: tableAssignments.restaurantId,
+        tableNumber: tableAssignments.tableNumber,
+        waiterId: tableAssignments.waiterId,
+        waiterName: waiters.name,
+      })
+      .from(tableAssignments)
+      .innerJoin(waiters, eq(tableAssignments.waiterId, waiters.id))
+      .where(eq(tableAssignments.restaurantId, restaurantId));
+    return rows;
+  }
+
+  async upsertTableAssignment(restaurantId: number, tableNumber: number, waiterId: number): Promise<void> {
+    await db
+      .delete(tableAssignments)
+      .where(and(eq(tableAssignments.restaurantId, restaurantId), eq(tableAssignments.tableNumber, tableNumber)));
+    await db.insert(tableAssignments).values({ restaurantId, tableNumber, waiterId });
+  }
+
+  async deleteTableAssignment(restaurantId: number, tableNumber: number): Promise<void> {
+    await db
+      .delete(tableAssignments)
+      .where(and(eq(tableAssignments.restaurantId, restaurantId), eq(tableAssignments.tableNumber, tableNumber)));
   }
 }
 

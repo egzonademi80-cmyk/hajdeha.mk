@@ -114,6 +114,23 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const tableAssignments = pgTable(
+  "table_assignments",
+  {
+    id: serial("id").primaryKey(),
+    restaurantId: integer("restaurant_id")
+      .notNull()
+      .references(() => restaurants.id, { onDelete: "cascade" }),
+    tableNumber: integer("table_number").notNull(),
+    waiterId: integer("waiter_id")
+      .notNull()
+      .references(() => waiters.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    taIdx: index("ta_restaurant_table_idx").on(table.restaurantId, table.tableNumber),
+  }),
+);
+
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   restaurants: many(restaurants),
@@ -208,3 +225,4 @@ export type Waiter = typeof waiters.$inferSelect;
 export type InsertWaiter = z.infer<typeof insertWaiterSchema>;
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type TableAssignment = typeof tableAssignments.$inferSelect;

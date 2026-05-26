@@ -1056,6 +1056,18 @@ export default function POS({ slug }: POSProps) {
     refetchInterval: 8000,
   });
 
+  const { data: tableAssignmentsData = [], refetch: refetchAssignments } = useQuery({
+    queryKey: ["/api/pos/table-assignments", restaurantId],
+    queryFn: async () => {
+      if (!restaurantId) return [] as { tableNumber: number; waiterId: number; waiterName: string }[];
+      const res = await fetch(`/api/pos/table-assignments?restaurantId=${restaurantId}`);
+      if (!res.ok) return [] as { tableNumber: number; waiterId: number; waiterName: string }[];
+      return res.json() as Promise<{ tableNumber: number; waiterId: number; waiterName: string }[]>;
+    },
+    enabled: !!restaurantId,
+    staleTime: 0,
+  });
+
   const pendingCount = dbOrders.filter(
     (o: any) => o.status === "pending",
   ).length;
@@ -1070,6 +1082,24 @@ export default function POS({ slug }: POSProps) {
     window.addEventListener("pointerdown", unlock);
     return () => window.removeEventListener("pointerdown", unlock);
   }, []);
+  // Hydrate table assignments from DB on load (so waiter claims survive refresh)
+  useEffect(() => {
+    if (!tableAssignmentsData.length) return;
+    setTables((prev) => {
+      let changed = false;
+      const next = [...prev];
+      tableAssignmentsData.forEach(({ tableNumber, waiterId, waiterName }) => {
+        const idx = tableNumber - 1;
+        if (idx < 0 || idx >= next.length) return;
+        if (next[idx].waiterId !== waiterId) {
+          next[idx] = { ...next[idx], waiterId, waiterName };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [tableAssignmentsData]);
+
   // Sync customerNote from DB orders → table state (so notes survive refresh)
   useEffect(() => {
     if (!dbOrders) return;
@@ -1655,6 +1685,13 @@ export default function POS({ slug }: POSProps) {
             channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
           }),
         }).catch(() => {});
+        if (restaurantId) {
+          fetch("/api/pos/assign-table", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ restaurantId, tableNumber: splitTableIdx + 1 }),
+          }).catch(() => {});
+        }
         setJustPaid({ kind: "table", idx: splitTableIdx });
         setTimeout(() => setJustPaid(null), 2500);
         setShowSplitModal(false);
@@ -1720,6 +1757,13 @@ export default function POS({ slug }: POSProps) {
           channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
         }),
       }).catch(() => {});
+      if (restaurantId) {
+        fetch("/api/pos/assign-table", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restaurantId, tableNumber: slot.idx + 1 }),
+        }).catch(() => {});
+      }
     } else {
       setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
     }
@@ -1794,6 +1838,16 @@ export default function POS({ slug }: POSProps) {
         };
         return next;
       });
+
+      // Persist assignment to DB — survives refresh and syncs to other devices
+      if (restaurantId) {
+        await fetch("/api/pos/assign-table", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ restaurantId, tableNumber: tableIdx + 1, waiterId: waiter.id }),
+        }).catch(() => {});
+        refetchAssignments();
+      }
 
       // Claim any pending DB order for this table so orders panel syncs
       const pendingOrder = (dbOrders as any[]).find(
@@ -1957,6 +2011,20 @@ export default function POS({ slug }: POSProps) {
         channel.bind("incoming-order", (data: any) => {
           console.log("5. incoming-order received:", data);
           handleIncoming(data);
+        });
+        channel.bind("table-assigned", (data: { tableNumber: number; waiterId: number; waiterName: string }) => {
+          setTables((prev) => {
+            const idx = data.tableNumber - 1;
+            if (idx < 0 || idx >= prev.length) return prev;
+            if (prev[idx].waiterId === data.waiterId) return prev;
+            const next = [...prev];
+            next[idx] = { ...next[idx], waiterId: data.waiterId, waiterName: data.waiterName };
+            return next;
+          });
+          refetchAssignments();
+        });
+        channel.bind("table-released", (data: { tableNumber: number }) => {
+          refetchAssignments();
         });
         channel.bind(
           "waiter-request",
