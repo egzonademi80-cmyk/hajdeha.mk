@@ -714,36 +714,46 @@ function playIncomingChime() {
   try {
     const ctx = new (window.AudioContext ||
       (window as any).webkitAudioContext)();
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.9, ctx.currentTime);
-    master.connect(ctx.destination);
+    const now = ctx.currentTime;
 
-    // Repeating urgent "ding-ding-ding" pattern — 5 rounds over ~4 seconds
-    const pattern: [number, number][] = [];
-    const beepFreqs = [1046, 1318, 1046, 1318]; // C6, E6 alternating
-    const beepDur = 0.13;
-    const beepGap = 0.18;
-    const roundGap = 0.55;
-    for (let round = 0; round < 5; round++) {
-      beepFreqs.forEach((freq, i) => {
-        const t = round * (beepFreqs.length * beepGap + roundGap) + i * beepGap;
-        pattern.push([freq, t]);
+    // Strike a single bell tone using real bell harmonics + exponential decay
+    function strikeBell(startTime: number, fundamental: number, volume: number) {
+      // Real bell = fundamental + 2 overtones at specific intervals
+      const partials: [number, number][] = [
+        [fundamental,          1.0],   // fundamental
+        [fundamental * 2.756,  0.6],   // major 10th above
+        [fundamental * 5.404,  0.25],  // upper partial
+      ];
+      partials.forEach(([freq, relVol]) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(volume * relVol, startTime + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.4);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 1.5);
       });
     }
 
-    pattern.forEach(([freq, start]) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-      gain.gain.setValueAtTime(0, ctx.currentTime + start);
-      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + beepDur);
-      osc.connect(gain);
-      gain.connect(master);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + beepDur + 0.05);
-    });
+    // Pattern: 3 quick strikes → pause → 3 strikes → pause → 3 strikes
+    // Sounds like a restaurant counter bell being hit urgently
+    const strikes = [
+      [0.00, 820, 0.85],
+      [0.28, 820, 0.85],
+      [0.56, 820, 0.85],
+      [1.40, 900, 0.90],
+      [1.68, 900, 0.90],
+      [1.96, 900, 0.90],
+      [2.80, 980, 0.95],
+      [3.08, 980, 0.95],
+      [3.36, 980, 0.95],
+    ] as [number, number, number][];
+
+    strikes.forEach(([t, freq, vol]) => strikeBell(now + t, freq, vol));
 
     setTimeout(() => ctx.close(), 5500);
   } catch { }
