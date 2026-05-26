@@ -237,7 +237,7 @@ export async function registerRoutes(
 
   app.post("/api/table/place-order", async (req, res) => {
     try {
-      const { channel, cart, tableNumber } = req.body;
+      const { channel, cart, tableNumber, customerNote } = req.body;
 
       if (!channel) {
         return res.status(400).json({ message: "Missing channel" });
@@ -271,6 +271,7 @@ export async function registerRoutes(
             await safeTrigger(`pos-${slug}`, "incoming-order", {
               cart: safeCart,
               tableNumber,
+              customerNote: customerNote || null,
               timestamp: Date.now(),
             });
             // Always persist to DB so waiter PIN claiming works
@@ -280,6 +281,7 @@ export async function registerRoutes(
                 restaurantId: restaurant.id,
                 tableNumber: tableNum,
                 cart: JSON.stringify(safeCart),
+                customerNote: customerNote || null,
                 status: "pending",
                 waiterId: null,
               });

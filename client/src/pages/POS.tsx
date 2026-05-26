@@ -3742,6 +3742,12 @@ export default function POS({ slug }: POSProps) {
                       </div>
                     ))}
                   </div>
+                  {order.customerNote && (
+                    <div className="mx-4 mt-2 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+                      <span className="text-amber-400 text-sm flex-shrink-0">📝</span>
+                      <p className="text-xs text-amber-300 leading-snug">{order.customerNote}</p>
+                    </div>
+                  )}
                   <div className="px-5 pt-4 pb-2">
                     <p
                       className={`text-[10px] font-bold ${t.textDim} mb-2 text-center`}

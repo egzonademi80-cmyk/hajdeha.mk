@@ -2320,6 +2320,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     ].join("\n");
   };
 
+  const [customerNote, setCustomerNote] = useState("");
+
   // Send order to backend, open WhatsApp, fire success effects
   const handleSendOrder = async () => {
     if (orderConfirming || orderConfirmedDone || cart.length === 0) return;
@@ -2334,6 +2336,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
           tableNumber: displayTable,
           restaurantName: restaurant?.name ?? "",
           total: cart.reduce((s, i) => s + i.price * i.qty, 0),
+          customerNote: customerNote.trim() || null,
           timestamp: Date.now(),
         }),
       });
@@ -3109,6 +3112,20 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       "max(16px, env(safe-area-inset-bottom, 16px))",
                   }}
                 >
+                  {/* Customer note */}
+                  <textarea
+                    value={customerNote}
+                    onChange={(e) => setCustomerNote(e.target.value)}
+                    maxLength={200}
+                    rows={2}
+                    placeholder={
+                      lang === "al" ? "Shënime (p.sh. pa akull, alergjik ndaj arrave...)" :
+                      lang === "mk" ? "Забелешка (пр. без мраз, алергичен на орев...)" :
+                      "Note (e.g. no ice, allergic to nuts...)"
+                    }
+                    className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+
                   {/* Total row */}
                   <div className="flex items-center justify-between px-1">
                     <span className="text-sm text-muted-foreground">

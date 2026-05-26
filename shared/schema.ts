@@ -108,6 +108,7 @@ export const orders = pgTable("orders", {
     .references(() => restaurants.id, { onDelete: "cascade" }),
   tableNumber: integer("table_number").notNull(),
   cart: text("cart").notNull(),
+  customerNote: text("customer_note"),
   status: text("status").notNull().default("pending"),
   waiterId: integer("waiter_id").references(() => waiters.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
