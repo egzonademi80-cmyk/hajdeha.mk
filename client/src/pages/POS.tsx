@@ -3959,6 +3959,12 @@ export default function POS({ slug }: POSProps) {
                             <span className="text-amber-500">{total} DEN</span>
                           </div>
                         </div>
+                        {order.customerNote && (
+                          <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+                            <span className="text-amber-400 text-sm flex-shrink-0">📝</span>
+                            <p className={`text-xs leading-snug ${isLight ? "text-amber-700" : "text-amber-300"}`}>{order.customerNote}</p>
+                          </div>
+                        )}
                         {order.status === "pending" &&
                           (claimTarget === order.id ? (
                             <div className="space-y-2">
