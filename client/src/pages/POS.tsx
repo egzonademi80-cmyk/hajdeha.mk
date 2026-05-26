@@ -1056,17 +1056,32 @@ export default function POS({ slug }: POSProps) {
     refetchInterval: 8000,
   });
 
-  const { data: tableAssignmentsData = [], refetch: refetchAssignments } = useQuery({
-    queryKey: ["/api/pos/table-assignments", restaurantId],
-    queryFn: async () => {
-      if (!restaurantId) return [] as { tableNumber: number; waiterId: number; waiterName: string }[];
-      const res = await fetch(`/api/pos/table-assignments?restaurantId=${restaurantId}`);
-      if (!res.ok) return [] as { tableNumber: number; waiterId: number; waiterName: string }[];
-      return res.json() as Promise<{ tableNumber: number; waiterId: number; waiterName: string }[]>;
-    },
-    enabled: !!restaurantId,
-    staleTime: 0,
-  });
+  const { data: tableAssignmentsData = [], refetch: refetchAssignments } =
+    useQuery({
+      queryKey: ["/api/pos/table-assignments", restaurantId],
+      queryFn: async () => {
+        if (!restaurantId)
+          return [] as {
+            tableNumber: number;
+            waiterId: number;
+            waiterName: string;
+          }[];
+        const res = await fetch(
+          `/api/pos/table-assignments?restaurantId=${restaurantId}`,
+        );
+        if (!res.ok)
+          return [] as {
+            tableNumber: number;
+            waiterId: number;
+            waiterName: string;
+          }[];
+        return res.json() as Promise<
+          { tableNumber: number; waiterId: number; waiterName: string }[]
+        >;
+      },
+      enabled: !!restaurantId,
+      staleTime: 0,
+    });
 
   const pendingCount = dbOrders.filter(
     (o: any) => o.status === "pending",
@@ -1104,9 +1119,7 @@ export default function POS({ slug }: POSProps) {
   useEffect(() => {
     if (!dbOrders) return;
     (dbOrders as any[])
-      .filter(
-        (o: any) => o.status === "pending" || o.status === "claimed",
-      )
+      .filter((o: any) => o.status === "pending" || o.status === "claimed")
       .forEach((order: any) => {
         const tableDigits = parseInt(
           String(order.tableNumber).replace(/\D/g, ""),
@@ -1432,6 +1445,11 @@ export default function POS({ slug }: POSProps) {
   const [screen, setScreen] = useState<Screen>("tables");
   const [payConfirm, setPayConfirm] = useState(false);
   const [justPaid, setJustPaid] = useState<ActiveSlot>(null);
+  const [pendingWaiter, setPendingWaiter] = useState<{
+    id: number;
+    name: string;
+    tableIdx: number;
+  } | null>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -1545,11 +1563,40 @@ export default function POS({ slug }: POSProps) {
       return { ...order, items, startedAt: order.startedAt ?? new Date() };
     };
     if (active.kind === "table") {
+      const wasEmpty = tables[active.idx].items.length === 0;
       setTables((prev) => {
         const next = [...prev];
         next[active.idx] = add(next[active.idx]) as TableOrder;
+        if (
+          wasEmpty &&
+          pendingWaiter &&
+          pendingWaiter.tableIdx === active.idx
+        ) {
+          next[active.idx] = {
+            ...next[active.idx],
+            waiterId: pendingWaiter.id,
+            waiterName: pendingWaiter.name,
+          };
+        }
         return next;
       });
+      if (
+        wasEmpty &&
+        pendingWaiter &&
+        pendingWaiter.tableIdx === active.idx &&
+        restaurantId
+      ) {
+        fetch("/api/pos/assign-table", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            restaurantId,
+            tableNumber: active.idx + 1,
+            waiterId: pendingWaiter.id,
+          }),
+        }).catch(() => {});
+        setPendingWaiter(null);
+      }
     } else {
       setPersonTabs((prev) => {
         const next = [...prev];
@@ -1689,7 +1736,10 @@ export default function POS({ slug }: POSProps) {
           fetch("/api/pos/assign-table", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ restaurantId, tableNumber: splitTableIdx + 1 }),
+            body: JSON.stringify({
+              restaurantId,
+              tableNumber: splitTableIdx + 1,
+            }),
           }).catch(() => {});
         }
         setJustPaid({ kind: "table", idx: splitTableIdx });
@@ -1829,37 +1879,46 @@ export default function POS({ slug }: POSProps) {
       }
 
       // Always assign waiter to this table (empty or not)
-      setTables((prev) => {
-        const next = [...prev];
-        next[tableIdx] = {
-          ...next[tableIdx],
-          waiterId: waiter.id,
-          waiterName: waiter.name,
-        };
-        return next;
-      });
+      const tableIsEmpty = tables[tableIdx].items.length === 0;
 
-      // Persist assignment to DB — survives refresh and syncs to other devices
-      if (restaurantId) {
-        await fetch("/api/pos/assign-table", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ restaurantId, tableNumber: tableIdx + 1, waiterId: waiter.id }),
-        }).catch(() => {});
-        refetchAssignments();
-      }
+      if (!tableIsEmpty) {
+        setTables((prev) => {
+          const next = [...prev];
+          next[tableIdx] = {
+            ...next[tableIdx],
+            waiterId: waiter.id,
+            waiterName: waiter.name,
+          };
+          return next;
+        });
 
-      // Claim any pending DB order for this table so orders panel syncs
-      const pendingOrder = (dbOrders as any[]).find(
-        (o) => o.status === "pending" && Number(o.tableNumber) === tableIdx + 1,
-      );
-      if (pendingOrder) {
-        await fetch(`/api/orders/${pendingOrder.id}/claim`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
-        }).catch(() => {});
-        refetchOrders();
+        if (restaurantId) {
+          await fetch("/api/pos/assign-table", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              restaurantId,
+              tableNumber: tableIdx + 1,
+              waiterId: waiter.id,
+            }),
+          }).catch(() => {});
+          refetchAssignments();
+        }
+
+        const pendingOrder = (dbOrders as any[]).find(
+          (o) =>
+            o.status === "pending" && Number(o.tableNumber) === tableIdx + 1,
+        );
+        if (pendingOrder) {
+          await fetch(`/api/orders/${pendingOrder.id}/claim`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
+          }).catch(() => {});
+          refetchOrders();
+        }
+      } else {
+        setPendingWaiter({ id: waiter.id, name: waiter.name, tableIdx });
       }
 
       setShowTablePinModal(false);
@@ -2012,17 +2071,28 @@ export default function POS({ slug }: POSProps) {
           console.log("5. incoming-order received:", data);
           handleIncoming(data);
         });
-        channel.bind("table-assigned", (data: { tableNumber: number; waiterId: number; waiterName: string }) => {
-          setTables((prev) => {
-            const idx = data.tableNumber - 1;
-            if (idx < 0 || idx >= prev.length) return prev;
-            if (prev[idx].waiterId === data.waiterId) return prev;
-            const next = [...prev];
-            next[idx] = { ...next[idx], waiterId: data.waiterId, waiterName: data.waiterName };
-            return next;
-          });
-          refetchAssignments();
-        });
+        channel.bind(
+          "table-assigned",
+          (data: {
+            tableNumber: number;
+            waiterId: number;
+            waiterName: string;
+          }) => {
+            setTables((prev) => {
+              const idx = data.tableNumber - 1;
+              if (idx < 0 || idx >= prev.length) return prev;
+              if (prev[idx].waiterId === data.waiterId) return prev;
+              const next = [...prev];
+              next[idx] = {
+                ...next[idx],
+                waiterId: data.waiterId,
+                waiterName: data.waiterName,
+              };
+              return next;
+            });
+            refetchAssignments();
+          },
+        );
         channel.bind("table-released", (data: { tableNumber: number }) => {
           refetchAssignments();
         });
@@ -2118,7 +2188,10 @@ export default function POS({ slug }: POSProps) {
       >
         {screen !== "tables" && (
           <button
-            onClick={() => setScreen(screen === "order" ? "menu" : "tables")}
+            onClick={() => {
+              if (screen === "menu") setPendingWaiter(null);
+              setScreen(screen === "order" ? "menu" : "tables");
+            }}
             className={`h-8 w-8 lg:h-10 lg:w-10 rounded-full ${t.backBtn} flex items-center justify-center flex-shrink-0 transition-colors`}
           >
             <ChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
