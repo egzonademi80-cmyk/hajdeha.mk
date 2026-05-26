@@ -479,7 +479,8 @@ function buildEscPosBytes({
   cols(`${dateStr}  ${timeStr}`, tableLabel);
   dashes();
   const itemName = (item: OrderItem) =>
-    (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) || item.name;
+    (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) ||
+    item.name;
   for (const item of items) {
     cols(
       `${item.qty}x ${itemName(item)}`,
@@ -513,7 +514,7 @@ async function sendToUsbPrinter(
 ): Promise<void> {
   try {
     await device.open();
-  } catch { }
+  } catch {}
   if (device.configuration === null) await device.selectConfiguration(1);
   let interfaceNum = -1;
   let endpointNum = -1;
@@ -530,7 +531,7 @@ async function sendToUsbPrinter(
   if (interfaceNum === -1) throw new Error("No bulk OUT endpoint found");
   try {
     await device.claimInterface(interfaceNum);
-  } catch { }
+  } catch {}
   await device.transferOut(endpointNum, data.buffer as ArrayBuffer);
 }
 
@@ -589,12 +590,13 @@ function printReceiptWindow({
   }
   const openedStr = startedAt
     ? new Date(startedAt).toLocaleTimeString("sq-MK", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : null;
   const getItemName = (item: OrderItem) =>
-    (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) || item.name;
+    (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) ||
+    item.name;
   const rows = items
     .map(
       (item) =>
@@ -675,21 +677,21 @@ function playWaiterChime(type: WaiterSignal["type"]) {
     const notes: [number, number, number][] =
       type === "help"
         ? [
-          [880, 0, 0.18],
-          [660, 0.2, 0.28],
-          [660, 0.42, 0.28],
-        ]
+            [880, 0, 0.18],
+            [660, 0.2, 0.28],
+            [660, 0.42, 0.28],
+          ]
         : type === "bill-cash"
           ? [
-            [660, 0, 0.16],
-            [880, 0.18, 0.16],
-            [1108, 0.36, 0.28],
-          ]
+              [660, 0, 0.16],
+              [880, 0.18, 0.16],
+              [1108, 0.36, 0.28],
+            ]
           : [
-            [660, 0, 0.16],
-            [990, 0.18, 0.16],
-            [1320, 0.36, 0.28],
-          ];
+              [660, 0, 0.16],
+              [990, 0.18, 0.16],
+              [1320, 0.36, 0.28],
+            ];
     notes.forEach(([freq, start, dur]) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -707,7 +709,7 @@ function playWaiterChime(type: WaiterSignal["type"]) {
       osc.stop(ctx.currentTime + start + dur + 0.05);
     });
     setTimeout(() => ctx.close(), 1500);
-  } catch { }
+  } catch {}
 }
 
 // ─── Incoming order chime ─────────────────────────────────────────────────────
@@ -720,8 +722,8 @@ function playIncomingChime() {
     // Soft hotel front-desk bell: warm sine + gentle overtone, long natural decay
     function softDing(startTime: number) {
       const pairs: [number, number][] = [
-        [784,  0.45],   // G5 — warm fundamental
-        [1568, 0.10],   // G6 — subtle octave overtone
+        [784, 0.45], // G5 — warm fundamental
+        [1568, 0.1], // G6 — subtle octave overtone
       ];
       pairs.forEach(([freq, vol]) => {
         const osc = ctx.createOscillator();
@@ -744,7 +746,7 @@ function playIncomingChime() {
     softDing(now + 2.4);
 
     setTimeout(() => ctx.close(), 6000);
-  } catch { }
+  } catch {}
 }
 // ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
 // ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
@@ -941,7 +943,7 @@ export default function POS({ slug }: POSProps) {
     try {
       const saved = localStorage.getItem(SECTIONS_KEY);
       if (saved) return JSON.parse(saved) as TableSection[];
-    } catch { }
+    } catch {}
     return defaultSections;
   });
 
@@ -956,7 +958,7 @@ export default function POS({ slug }: POSProps) {
         const parsed = JSON.parse(saved) as TableOrder[];
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch { }
+    } catch {}
     return Array.from({ length: TABLE_COUNT }, emptyTable);
   });
   const tablesRef = useRef(tables);
@@ -983,7 +985,7 @@ export default function POS({ slug }: POSProps) {
     try {
       const saved = localStorage.getItem(PERSONS_KEY);
       if (saved) return JSON.parse(saved) as PersonTab[];
-    } catch { }
+    } catch {}
     return [];
   });
 
@@ -1009,21 +1011,25 @@ export default function POS({ slug }: POSProps) {
   const [tablePinLoading, setTablePinLoading] = useState(false);
 
   const restaurantId = restaurant?.id;
-
-  const { data: waiters = [], isFetched: waitersFetched } = useQuery<
-    { id: number; name: string; pinCode: string }[]
-  >({
+  const waitersQuery = useQuery({
     queryKey: ["/api/admin/waiters", restaurantId],
     queryFn: async () => {
-      if (!restaurantId) return [];
+      if (!restaurantId)
+        return [] as { id: number; name: string; pinCode: string }[];
       const res = await fetch(
         `/api/admin/waiters?action=list&restaurantId=${restaurantId}`,
       );
-      if (!res.ok) return [];
-      return res.json();
+      if (!res.ok) return [] as { id: number; name: string; pinCode: string }[];
+      return res.json() as Promise<
+        { id: number; name: string; pinCode: string }[]
+      >;
     },
     enabled: !!restaurantId,
+    staleTime: 0,
   });
+
+  const waiters = waitersQuery.data ?? [];
+  const waitersFetched = waitersQuery.isSuccess;
 
   const { data: dbOrders = [], refetch: refetchOrders } = useQuery({
     queryKey: ["/api/orders", restaurantId],
@@ -1055,15 +1061,24 @@ export default function POS({ slug }: POSProps) {
   useEffect(() => {
     if (!dbOrders || dbOrders.length === 0) return;
     (dbOrders as any[])
-      .filter((o: any) => o.customerNote && (o.status === "pending" || o.status === "claimed"))
+      .filter(
+        (o: any) =>
+          o.customerNote && (o.status === "pending" || o.status === "claimed"),
+      )
       .forEach((order: any) => {
-        const tableDigits = parseInt(String(order.tableNumber).replace(/\D/g, ""), 10);
+        const tableDigits = parseInt(
+          String(order.tableNumber).replace(/\D/g, ""),
+          10,
+        );
         const tableIdx = tableDigits - 1;
         if (tableIdx < 0) return;
         setTables((prev) => {
           if (prev[tableIdx]?.customerNote === order.customerNote) return prev;
           const next = [...prev];
-          next[tableIdx] = { ...next[tableIdx], customerNote: order.customerNote };
+          next[tableIdx] = {
+            ...next[tableIdx],
+            customerNote: order.customerNote,
+          };
           return next;
         });
       });
@@ -1100,7 +1115,7 @@ export default function POS({ slug }: POSProps) {
           body: JSON.stringify({ pinCode: existingWaiterPin, restaurantId }),
         })
           .then(() => refetchOrders())
-          .catch(() => { });
+          .catch(() => {});
       });
   }, [dbOrders]);
 
@@ -1121,13 +1136,13 @@ export default function POS({ slug }: POSProps) {
     try {
       const saved = localStorage.getItem(THEME_KEY);
       if (saved === "light" || saved === "dark") return saved;
-    } catch { }
+    } catch {}
     return "dark";
   });
   useEffect(() => {
     try {
       localStorage.setItem(THEME_KEY, theme);
-    } catch { }
+    } catch {}
   }, [theme]);
   const isLight = theme === "light";
 
@@ -1142,7 +1157,7 @@ export default function POS({ slug }: POSProps) {
     setLang(newLang);
     try {
       localStorage.setItem("hajdeha-lang", newLang);
-    } catch { }
+    } catch {}
   };
   const tr = posTranslations[lang];
 
@@ -1164,7 +1179,7 @@ export default function POS({ slug }: POSProps) {
       .then((devices: USBDevice[]) => {
         if (devices.length > 0) setUsbDevice(devices[0]);
       })
-      .catch(() => { });
+      .catch(() => {});
   }, []);
 
   const connectPrinter = async () => {
@@ -1214,72 +1229,72 @@ export default function POS({ slug }: POSProps) {
   // ─── Theme tokens ───────────────────────────────────────────────────────────
   const t = isLight
     ? {
-      appBg: "bg-[#FAFAF9]",
-      panelBg: "bg-white",
-      text: "text-[#1A1A1A]",
-      textSoft: "text-[#3A3A3A]",
-      textMuted: "text-[#7A7A7A]",
-      textFaint: "text-[#A8A8A8]",
-      textDim: "text-[#BFBDB9]",
-      border: "border-[#E8E6E3]",
-      borderSoft: "border-[#EFEDEA]",
-      borderDashed: "border-[#D8D4CF]",
-      surface: "bg-[#F4F2EF]",
-      surfaceSoft: "bg-[#EDEAE5]",
-      surfaceHover: "hover:bg-[#ECE9E5]",
-      chipInactive:
-        "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
-      cartItemActive: "bg-amber-100 border-amber-400",
-      cartItemInactive:
-        "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
-      backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
-      modalBg: "bg-white",
-      modalOverlay: "bg-black/50",
-      inputBgStyle: "#F4F2EF",
-      inputTextStyle: "#1A1A1A",
-      inputBorder: "border-[#E0DDD8]",
-      cancelBtn: "bg-[#EDEAE5] text-[#7A7A7A] hover:bg-[#E2DED9]",
-      deletePersonBtn: "bg-[#EDEAE5] hover:bg-red-100 text-[#7A7A7A]",
-      personIconEmpty: "bg-[#EDEAE5] text-[#A8A8A8]",
-      qtyControlBg: "bg-[#EDEAE5]",
-      qtyBtnText: "text-[#5A5A5A] hover:bg-[#D8D4CF]",
-      actionBtn: "bg-blue-50 text-blue-600 hover:bg-blue-100",
-      actionBtnAlt: "bg-purple-50 text-purple-600 hover:bg-purple-100",
-    }
+        appBg: "bg-[#FAFAF9]",
+        panelBg: "bg-white",
+        text: "text-[#1A1A1A]",
+        textSoft: "text-[#3A3A3A]",
+        textMuted: "text-[#7A7A7A]",
+        textFaint: "text-[#A8A8A8]",
+        textDim: "text-[#BFBDB9]",
+        border: "border-[#E8E6E3]",
+        borderSoft: "border-[#EFEDEA]",
+        borderDashed: "border-[#D8D4CF]",
+        surface: "bg-[#F4F2EF]",
+        surfaceSoft: "bg-[#EDEAE5]",
+        surfaceHover: "hover:bg-[#ECE9E5]",
+        chipInactive:
+          "bg-[#EDEAE5] text-[#5A5A5A] hover:bg-[#E2DED9] hover:text-[#1A1A1A]",
+        cartItemActive: "bg-amber-100 border-amber-400",
+        cartItemInactive:
+          "bg-[#F4F2EF] border-[#E8E6E3] hover:bg-[#EDEAE5] hover:border-[#D8D4CF]",
+        backBtn: "bg-[#EDEAE5] hover:bg-[#E2DED9] text-[#1A1A1A]",
+        modalBg: "bg-white",
+        modalOverlay: "bg-black/50",
+        inputBgStyle: "#F4F2EF",
+        inputTextStyle: "#1A1A1A",
+        inputBorder: "border-[#E0DDD8]",
+        cancelBtn: "bg-[#EDEAE5] text-[#7A7A7A] hover:bg-[#E2DED9]",
+        deletePersonBtn: "bg-[#EDEAE5] hover:bg-red-100 text-[#7A7A7A]",
+        personIconEmpty: "bg-[#EDEAE5] text-[#A8A8A8]",
+        qtyControlBg: "bg-[#EDEAE5]",
+        qtyBtnText: "text-[#5A5A5A] hover:bg-[#D8D4CF]",
+        actionBtn: "bg-blue-50 text-blue-600 hover:bg-blue-100",
+        actionBtnAlt: "bg-purple-50 text-purple-600 hover:bg-purple-100",
+      }
     : {
-      appBg: "bg-[#0F0F0F]",
-      panelBg: "bg-[#0B0B0B]",
-      text: "text-white",
-      textSoft: "text-white/85",
-      textMuted: "text-white/40",
-      textFaint: "text-white/25",
-      textDim: "text-white/30",
-      border: "border-white/10",
-      borderSoft: "border-white/5",
-      borderDashed: "border-white/10",
-      surface: "bg-white/[0.04]",
-      surfaceSoft: "bg-white/[0.08]",
-      surfaceHover: "hover:bg-white/[0.06]",
-      chipInactive:
-        "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
-      cartItemActive: "bg-amber-500/15 border-amber-500/50",
-      cartItemInactive:
-        "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
-      backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
-      modalBg: "bg-[#1A1A1A]",
-      modalOverlay: "bg-black/70",
-      inputBgStyle: "#2A2A2A",
-      inputTextStyle: "#FFFFFF",
-      inputBorder: "border-white/12",
-      cancelBtn: "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]",
-      deletePersonBtn: "bg-white/[0.06] hover:bg-red-500/20 text-white/30",
-      personIconEmpty: "bg-white/[0.06] text-white/30",
-      qtyControlBg: "bg-white/[0.06]",
-      qtyBtnText:
-        "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
-      actionBtn: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30",
-      actionBtnAlt: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30",
-    };
+        appBg: "bg-[#0F0F0F]",
+        panelBg: "bg-[#0B0B0B]",
+        text: "text-white",
+        textSoft: "text-white/85",
+        textMuted: "text-white/40",
+        textFaint: "text-white/25",
+        textDim: "text-white/30",
+        border: "border-white/10",
+        borderSoft: "border-white/5",
+        borderDashed: "border-white/10",
+        surface: "bg-white/[0.04]",
+        surfaceSoft: "bg-white/[0.08]",
+        surfaceHover: "hover:bg-white/[0.06]",
+        chipInactive:
+          "bg-white/[0.06] text-white/40 hover:bg-white/[0.10] hover:text-white/60",
+        cartItemActive: "bg-amber-500/15 border-amber-500/50",
+        cartItemInactive:
+          "bg-white/[0.04] border-white/10 hover:bg-white/[0.06] hover:border-white/15",
+        backBtn: "bg-white/[0.08] hover:bg-white/[0.12] text-white",
+        modalBg: "bg-[#1A1A1A]",
+        modalOverlay: "bg-black/70",
+        inputBgStyle: "#2A2A2A",
+        inputTextStyle: "#FFFFFF",
+        inputBorder: "border-white/12",
+        cancelBtn: "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]",
+        deletePersonBtn: "bg-white/[0.06] hover:bg-red-500/20 text-white/30",
+        personIconEmpty: "bg-white/[0.06] text-white/30",
+        qtyControlBg: "bg-white/[0.06]",
+        qtyBtnText:
+          "text-white/50 hover:bg-white/[0.10] active:bg-white/[0.10]",
+        actionBtn: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30",
+        actionBtnAlt: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30",
+      };
 
   const statusColorsLight = {
     empty: {
@@ -1357,17 +1372,17 @@ export default function POS({ slug }: POSProps) {
   };
   const dotColors = isLight
     ? {
-      fresh: "bg-emerald-500",
-      mid: "bg-amber-500",
-      late: "bg-red-500",
-      unclaimed: "bg-sky-500",
-    }
+        fresh: "bg-emerald-500",
+        mid: "bg-amber-500",
+        late: "bg-red-500",
+        unclaimed: "bg-sky-500",
+      }
     : {
-      fresh: "bg-emerald-400",
-      mid: "bg-amber-400",
-      late: "bg-red-400",
-      unclaimed: "bg-sky-400",
-    };
+        fresh: "bg-emerald-400",
+        mid: "bg-amber-400",
+        late: "bg-red-400",
+        unclaimed: "bg-sky-400",
+      };
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
@@ -1613,7 +1628,7 @@ export default function POS({ slug }: POSProps) {
               items: allItems,
               waiterId: tableWaiterId,
             }),
-          }).catch(() => { });
+          }).catch(() => {});
         }
         setTables((t) => {
           const updated = [...t];
@@ -1626,7 +1641,7 @@ export default function POS({ slug }: POSProps) {
           body: JSON.stringify({
             channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
           }),
-        }).catch(() => { });
+        }).catch(() => {});
         setJustPaid({ kind: "table", idx: splitTableIdx });
         setTimeout(() => setJustPaid(null), 2500);
         setShowSplitModal(false);
@@ -1676,7 +1691,7 @@ export default function POS({ slug }: POSProps) {
             items: receiptItems,
             waiterId: tables[slot.idx].waiterId ?? null,
           }),
-        }).catch(() => { });
+        }).catch(() => {});
       }
     }
     if (slot.kind === "table") {
@@ -1691,7 +1706,7 @@ export default function POS({ slug }: POSProps) {
         body: JSON.stringify({
           channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
         }),
-      }).catch(() => { });
+      }).catch(() => {});
     } else {
       setPersonTabs((prev) => prev.filter((_, i) => i !== slot.idx));
     }
@@ -1709,16 +1724,13 @@ export default function POS({ slug }: POSProps) {
 
   // ─── openSlot: shows PIN modal only if restaurant has waiters ────────────
   const openSlot = (slot: ActiveSlot) => {
-    // Show PIN if: it's a table slot AND either (a) waiters exist, or (b) we
-    // haven't finished loading yet (safe default while query is in-flight)
-    if (slot?.kind === "table" && (!waitersFetched || waiters.length > 0)) {
+    if (slot?.kind === "table" && waitersFetched && waiters.length > 0) {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
       setShowTablePinModal(true);
       return;
     }
-    // confirmed no waiters, or person tab — no PIN needed
     setActive(slot);
     setScreen("menu");
     setActiveCategory("All");
@@ -1750,12 +1762,25 @@ export default function POS({ slug }: POSProps) {
       const waiter: { id: number; name: string } = await res.json();
       const tableIdx = tablePinSlot.idx;
       const existingWaiterId = tables[tableIdx].waiterId;
+
+      // If table already belongs to a different waiter, block access
       if (existingWaiterId && existingWaiterId !== waiter.id) {
         setTablePinError(
           tr.thisTableBelongsTo(tables[tableIdx].waiterName || ""),
         );
         return;
       }
+
+      // Always assign waiter to this table (empty or not)
+      setTables((prev) => {
+        const next = [...prev];
+        next[tableIdx] = {
+          ...next[tableIdx],
+          waiterId: waiter.id,
+          waiterName: waiter.name,
+        };
+        return next;
+      });
 
       // Claim any pending DB order for this table so orders panel syncs
       const pendingOrder = (dbOrders as any[]).find(
@@ -1766,19 +1791,10 @@ export default function POS({ slug }: POSProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
-        }).catch(() => { });
+        }).catch(() => {});
         refetchOrders();
       }
 
-      setTables((prev) => {
-        const next = [...prev];
-        next[tableIdx] = {
-          ...next[tableIdx],
-          waiterId: waiter.id,
-          waiterName: waiter.name,
-        };
-        return next;
-      });
       setShowTablePinModal(false);
       setTablePinDigits("");
       setTablePinError("");
@@ -1827,17 +1843,17 @@ export default function POS({ slug }: POSProps) {
   useEffect(() => {
     try {
       localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
-    } catch { }
+    } catch {}
   }, [tables, TABLES_KEY]);
   useEffect(() => {
     try {
       localStorage.setItem(PERSONS_KEY, JSON.stringify(personTabs));
-    } catch { }
+    } catch {}
   }, [personTabs, PERSONS_KEY]);
   useEffect(() => {
     try {
       localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
-    } catch { }
+    } catch {}
   }, [sections, SECTIONS_KEY]);
   useEffect(() => {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
@@ -1876,7 +1892,8 @@ export default function POS({ slug }: POSProps) {
             section: next[tableIdx].section,
             waiterId: next[tableIdx].waiterId,
             waiterName: next[tableIdx].waiterName,
-            customerNote: data.customerNote || next[tableIdx].customerNote || null,
+            customerNote:
+              data.customerNote || next[tableIdx].customerNote || null,
           };
           return next;
         });
@@ -1886,12 +1903,7 @@ export default function POS({ slug }: POSProps) {
 
       // Refetch then immediately mark all orders for this table as processed
       // so the DB sync useEffect never double-adds them
-      refetchOrders().then((result: any) => {
-        const orders = result?.data ?? [];
-        orders
-          .filter((o: any) => Number(o.tableNumber) === tableDigits)
-          .forEach((o: any) => processedOrderIdsRef.current.add(o.id));
-      });
+      refetchOrders().then(() => {});
 
       setIncomingBanner({
         id: `${Date.now()}-${Math.random()}`,
@@ -1965,7 +1977,7 @@ export default function POS({ slug }: POSProps) {
       try {
         pusher?.unsubscribe(`pos-${RESTAURANT_SLUG}`);
         pusher?.disconnect();
-      } catch { }
+      } catch {}
     };
   }, [RESTAURANT_SLUG, TABLE_COUNT]);
 
@@ -2106,21 +2118,21 @@ export default function POS({ slug }: POSProps) {
               const cfg =
                 signal.type === "bill-cash"
                   ? {
-                    grad: "from-emerald-600 to-emerald-500",
-                    icon: "💵",
-                    label: `${tr.cashBill} — Table ${signal.tableNumber}`,
-                  }
+                      grad: "from-emerald-600 to-emerald-500",
+                      icon: "💵",
+                      label: `${tr.cashBill} — Table ${signal.tableNumber}`,
+                    }
                   : signal.type === "bill-card"
                     ? {
-                      grad: "from-blue-600 to-blue-500",
-                      icon: "💳",
-                      label: `${tr.cardBill} — Table ${signal.tableNumber}`,
-                    }
+                        grad: "from-blue-600 to-blue-500",
+                        icon: "💳",
+                        label: `${tr.cardBill} — Table ${signal.tableNumber}`,
+                      }
                     : {
-                      grad: "from-amber-500 to-amber-400",
-                      icon: "🔔",
-                      label: `${tr.needHelp} — Table ${signal.tableNumber}`,
-                    };
+                        grad: "from-amber-500 to-amber-400",
+                        icon: "🔔",
+                        label: `${tr.needHelp} — Table ${signal.tableNumber}`,
+                      };
               return (
                 <motion.button
                   key={signal.id}
@@ -2296,7 +2308,7 @@ export default function POS({ slug }: POSProps) {
                   ? `ALL TABLES (${TABLE_COUNT})`
                   : selectedSection.toUpperCase()}
               </p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 lg:gap-4">
+              <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 lg:grid-cols-10 gap-2">
                 {visibleTables.map((idx) => {
                   const table = tables[idx];
                   const status = tableStatus(table);
@@ -2318,12 +2330,13 @@ export default function POS({ slug }: POSProps) {
                         duration: 1.6,
                         repeat: tableFlash === idx ? 2 : 0,
                       }}
-                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${wasJustPaid
-                        ? "bg-emerald-500/20 border-emerald-500/40"
-                        : tableFlash === idx
-                          ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
-                          : `${c.bg} ${c.border}`
-                        }`}
+                      className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border relative transition-all duration-500 ${
+                        wasJustPaid
+                          ? "bg-emerald-500/20 border-emerald-500/40"
+                          : tableFlash === idx
+                            ? "bg-amber-500/30 border-amber-400 ring-2 ring-amber-400/60"
+                            : `${c.bg} ${c.border}`
+                      }`}
                     >
                       {wasJustPaid ? (
                         <CheckCircle className="h-6 w-6 text-emerald-400" />
@@ -2385,7 +2398,9 @@ export default function POS({ slug }: POSProps) {
                               />
                               {/* Claim button on unclaimed tables — always opens PIN directly */}
                               {status === "unclaimed" && (
-                                <button
+                                <div
+                                  role="button"
+                                  tabIndex={0}
                                   data-testid={`button-claim-table-${idx}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2394,11 +2409,20 @@ export default function POS({ slug }: POSProps) {
                                     setTablePinError("");
                                     setShowTablePinModal(true);
                                   }}
-                                  className="absolute bottom-1.5 left-1.5 right-1.5 h-5 rounded-lg bg-sky-500 text-white text-[8px] font-bold flex items-center justify-center gap-0.5 active:bg-sky-600"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.stopPropagation();
+                                      setTablePinSlot({ kind: "table", idx });
+                                      setTablePinDigits("");
+                                      setTablePinError("");
+                                      setShowTablePinModal(true);
+                                    }
+                                  }}
+                                  className="absolute bottom-1.5 left-1.5 right-1.5 h-5 rounded-lg bg-sky-500 text-white text-[8px] font-bold flex items-center justify-center gap-0.5 active:bg-sky-600 cursor-pointer"
                                 >
                                   <KeyRound className="h-2.5 w-2.5" />
                                   {tr.claimOrder}
-                                </button>
+                                </div>
                               )}
                             </>
                           )}
@@ -2699,7 +2723,6 @@ export default function POS({ slug }: POSProps) {
                 </div>
               </div>
 
-
               <div
                 className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
               >
@@ -2858,9 +2881,17 @@ export default function POS({ slug }: POSProps) {
                   )}
                 </div>
                 {(currentOrder as TableOrder).customerNote && (
-                  <div className={`flex-shrink-0 mx-4 mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2`}>
-                    <span className="text-amber-400 text-sm flex-shrink-0">📝</span>
-                    <p className={`text-xs leading-snug ${isLight ? "text-amber-700" : "text-amber-300"}`}>{(currentOrder as TableOrder).customerNote}</p>
+                  <div
+                    className={`flex-shrink-0 mx-4 mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2`}
+                  >
+                    <span className="text-amber-400 text-sm flex-shrink-0">
+                      📝
+                    </span>
+                    <p
+                      className={`text-xs leading-snug ${isLight ? "text-amber-700" : "text-amber-300"}`}
+                    >
+                      {(currentOrder as TableOrder).customerNote}
+                    </p>
                   </div>
                 )}
                 {currentOrder.items.length > 0 && (
@@ -3011,9 +3042,9 @@ export default function POS({ slug }: POSProps) {
                         const pc =
                           assignedPerson !== null
                             ? SPLIT_COLORS[
-                            splitPersons[assignedPerson]?.colorIdx %
-                            SPLIT_COLORS.length
-                            ]
+                                splitPersons[assignedPerson]?.colorIdx %
+                                  SPLIT_COLORS.length
+                              ]
                             : null;
                         return (
                           <div
@@ -3056,7 +3087,7 @@ export default function POS({ slug }: POSProps) {
                               {splitPersons.map((person, pIdx) => {
                                 const pColor =
                                   SPLIT_COLORS[
-                                  person.colorIdx % SPLIT_COLORS.length
+                                    person.colorIdx % SPLIT_COLORS.length
                                   ];
                                 const isSelected = assignedPerson === pIdx;
                                 return (
@@ -3348,14 +3379,15 @@ export default function POS({ slug }: POSProps) {
                   <button
                     key={section.name}
                     onClick={() => setActiveDraftSection(section.name)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${activeDraftSection === section.name
-                      ? section.name === "Indoor"
-                        ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
-                        : section.name === "Outdoor"
-                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-                          : "bg-purple-500/20 border-purple-500/50 text-purple-400"
-                      : `${t.surface} ${t.border} ${t.textMuted}`
-                      }`}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                      activeDraftSection === section.name
+                        ? section.name === "Indoor"
+                          ? "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                          : section.name === "Outdoor"
+                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                            : "bg-purple-500/20 border-purple-500/50 text-purple-400"
+                        : `${t.surface} ${t.border} ${t.textMuted}`
+                    }`}
                   >
                     {section.name}
                     <span className="ml-1 opacity-60">
@@ -3394,15 +3426,15 @@ export default function POS({ slug }: POSProps) {
                             if (s.name === activeDraftSection)
                               return isAssignedHere
                                 ? {
-                                  ...s,
-                                  tables: s.tables.filter((t) => t !== idx),
-                                }
+                                    ...s,
+                                    tables: s.tables.filter((t) => t !== idx),
+                                  }
                                 : {
-                                  ...s,
-                                  tables: [...s.tables, idx].sort(
-                                    (a, b) => a - b,
-                                  ),
-                                };
+                                    ...s,
+                                    tables: [...s.tables, idx].sort(
+                                      (a, b) => a - b,
+                                    ),
+                                  };
                             return {
                               ...s,
                               tables: s.tables.filter((t) => t !== idx),
@@ -3559,13 +3591,17 @@ export default function POS({ slug }: POSProps) {
               <div className="flex items-center gap-2 mb-1">
                 <KeyRound className="h-4 w-4 text-amber-400" />
                 <p className={`text-base font-bold ${t.text}`}>
-                  {tables[tablePinSlot.idx].waiterId
-                    ? `Table ${tablePinSlot.idx + 1} · ${tables[tablePinSlot.idx].waiterName}`
-                    : `Table ${tablePinSlot.idx + 1}`}
+                  Table {tablePinSlot.idx + 1}
+                  {tables[tablePinSlot.idx].waiterName && (
+                    <span className="text-amber-400">
+                      {" "}
+                      · {tables[tablePinSlot.idx].waiterName}
+                    </span>
+                  )}
                 </p>
               </div>
               <p className={`text-xs ${t.textDim} mb-4`}>
-                {tables[tablePinSlot.idx].waiterId
+                {tables[tablePinSlot.idx].items.length > 0
                   ? tr.enterPinContinue
                   : tr.enterPinClaim}
               </p>
@@ -3770,8 +3806,12 @@ export default function POS({ slug }: POSProps) {
                   </div>
                   {order.customerNote && (
                     <div className="mx-4 mt-2 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
-                      <span className="text-amber-400 text-sm flex-shrink-0">📝</span>
-                      <p className="text-xs text-amber-300 leading-snug">{order.customerNote}</p>
+                      <span className="text-amber-400 text-sm flex-shrink-0">
+                        📝
+                      </span>
+                      <p className="text-xs text-amber-300 leading-snug">
+                        {order.customerNote}
+                      </p>
                     </div>
                   )}
                   <div className="px-5 pt-4 pb-2">
