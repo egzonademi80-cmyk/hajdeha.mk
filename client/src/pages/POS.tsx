@@ -56,6 +56,7 @@ interface TableOrder {
   section?: string;
   waiterId?: number;
   waiterName?: string;
+  customerNote?: string | null;
 }
 
 interface PersonTab {
@@ -1050,6 +1051,24 @@ export default function POS({ slug }: POSProps) {
     window.addEventListener("pointerdown", unlock);
     return () => window.removeEventListener("pointerdown", unlock);
   }, []);
+  // Sync customerNote from DB orders → table state (so notes survive refresh)
+  useEffect(() => {
+    if (!dbOrders || dbOrders.length === 0) return;
+    (dbOrders as any[])
+      .filter((o: any) => o.customerNote && (o.status === "pending" || o.status === "claimed"))
+      .forEach((order: any) => {
+        const tableDigits = parseInt(String(order.tableNumber).replace(/\D/g, ""), 10);
+        const tableIdx = tableDigits - 1;
+        if (tableIdx < 0) return;
+        setTables((prev) => {
+          if (prev[tableIdx]?.customerNote === order.customerNote) return prev;
+          const next = [...prev];
+          next[tableIdx] = { ...next[tableIdx], customerNote: order.customerNote };
+          return next;
+        });
+      });
+  }, [dbOrders]);
+
   // Sync DB orders → table grid (poll-based fallback, deduped)
   useEffect(() => {
     if (!dbOrders || dbOrders.length === 0) return;
@@ -1857,6 +1876,7 @@ export default function POS({ slug }: POSProps) {
             section: next[tableIdx].section,
             waiterId: next[tableIdx].waiterId,
             waiterName: next[tableIdx].waiterName,
+            customerNote: data.customerNote || next[tableIdx].customerNote || null,
           };
           return next;
         });
@@ -2837,6 +2857,12 @@ export default function POS({ slug }: POSProps) {
                     })()
                   )}
                 </div>
+                {(currentOrder as TableOrder).customerNote && (
+                  <div className={`flex-shrink-0 mx-4 mb-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2`}>
+                    <span className="text-amber-400 text-sm flex-shrink-0">📝</span>
+                    <p className={`text-xs leading-snug ${isLight ? "text-amber-700" : "text-amber-300"}`}>{(currentOrder as TableOrder).customerNote}</p>
+                  </div>
+                )}
                 {currentOrder.items.length > 0 && (
                   <div
                     className={`flex-shrink-0 p-4 lg:p-5 border-t ${t.border} space-y-3`}
