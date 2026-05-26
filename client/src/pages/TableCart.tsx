@@ -2321,6 +2321,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   };
 
   const [customerNote, setCustomerNote] = useState("");
+  const [showNoteInput, setShowNoteInput] = useState(false);
 
   // Send order to backend, open WhatsApp, fire success effects
   const handleSendOrder = async () => {
@@ -2358,6 +2359,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       fireConfetti();
       playSuccessChime();
       if (navigator.vibrate) navigator.vibrate([50, 30, 100]);
+      setCustomerNote("");
+      setShowNoteInput(false);
       setOrderConfirmedDone(true);
     } catch {
       setOrderConfirming(false);
@@ -3113,18 +3116,41 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                   }}
                 >
                   {/* Customer note */}
-                  <textarea
-                    value={customerNote}
-                    onChange={(e) => setCustomerNote(e.target.value)}
-                    maxLength={200}
-                    rows={2}
-                    placeholder={
-                      lang === "al" ? "Shënime (p.sh. pa akull, alergjik ndaj arrave...)" :
-                      lang === "mk" ? "Забелешка (пр. без мраз, алергичен на орев...)" :
-                      "Note (e.g. no ice, allergic to nuts...)"
-                    }
-                    className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
+                  {!showNoteInput ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowNoteInput(true)}
+                      className="w-full flex items-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors text-left"
+                    >
+                      <span className="text-base leading-none">📝</span>
+                      {lang === "al" ? "Shto shënim..." : lang === "mk" ? "Додади забелешка..." : "Add a note..."}
+                    </button>
+                  ) : (
+                    <div className="relative">
+                      <textarea
+                        autoFocus
+                        value={customerNote}
+                        onChange={(e) => setCustomerNote(e.target.value)}
+                        maxLength={200}
+                        rows={3}
+                        placeholder={
+                          lang === "al" ? "Shënime (p.sh. pa akull, alergjik ndaj arrave...)" :
+                          lang === "mk" ? "Забелешка (пр. без мраз, алергичен на орев...)" :
+                          "Note (e.g. no ice, allergic to nuts...)"
+                        }
+                        className="w-full rounded-xl border border-primary/40 bg-muted/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                      {customerNote.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNoteInput(false)}
+                          className="absolute top-2 right-2 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Total row */}
                   <div className="flex items-center justify-between px-1">
