@@ -237,7 +237,7 @@ export async function registerRoutes(
 
   app.post("/api/table/place-order", async (req, res) => {
     try {
-      const { channel, cart, tableNumber, customerNote } = req.body;
+      const { channel, cart, tableNumber, customerNote, waiterId } = req.body;
 
       if (!channel) {
         return res.status(400).json({ message: "Missing channel" });
@@ -282,8 +282,8 @@ export async function registerRoutes(
                 tableNumber: tableNum,
                 cart: JSON.stringify(safeCart),
                 customerNote: customerNote || null,
-                status: "pending",
-                waiterId: null,
+                status: waiterId ? "claimed" : "pending",
+                waiterId: waiterId || null,
               });
             }
           }
@@ -328,6 +328,26 @@ export async function registerRoutes(
       console.error("call-waiter error:", err);
       res.status(500).json({ message: err.message });
     }
+  });
+
+  // === PUBLIC WAITER CHECK ===
+  app.get("/api/waiters/check", async (req, res) => {
+    const slug = req.query.slug as string;
+    if (!slug) return res.status(400).json({ message: "slug required" });
+    const restaurant = await storage.getRestaurantBySlug(slug);
+    if (!restaurant) return res.status(404).json({ message: "Not found" });
+    const list = await storage.getWaiters(restaurant.id);
+    return res.json({ hasWaiters: list.length > 0 });
+  });
+
+  app.post("/api/waiters/validate-pin", async (req, res) => {
+    const { slug, pinCode } = req.body;
+    if (!slug || !pinCode) return res.status(400).json({ message: "slug and pinCode required" });
+    const restaurant = await storage.getRestaurantBySlug(slug);
+    if (!restaurant) return res.status(404).json({ message: "Not found" });
+    const waiter = await storage.getWaiterByPin(restaurant.id, String(pinCode));
+    if (!waiter) return res.status(401).json({ message: "Invalid PIN" });
+    return res.json({ id: waiter.id, name: waiter.name });
   });
 
   // === ANALYTICS ROUTES ===
