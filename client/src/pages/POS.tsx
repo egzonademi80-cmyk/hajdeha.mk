@@ -1072,11 +1072,10 @@ export default function POS({ slug }: POSProps) {
   }, []);
   // Sync customerNote from DB orders → table state (so notes survive refresh)
   useEffect(() => {
-    if (!dbOrders || dbOrders.length === 0) return;
+    if (!dbOrders) return;
     (dbOrders as any[])
       .filter(
-        (o: any) =>
-          o.customerNote && (o.status === "pending" || o.status === "claimed"),
+        (o: any) => o.status === "pending" || o.status === "claimed",
       )
       .forEach((order: any) => {
         const tableDigits = parseInt(
@@ -1085,12 +1084,13 @@ export default function POS({ slug }: POSProps) {
         );
         const tableIdx = tableDigits - 1;
         if (tableIdx < 0) return;
+        const note = order.customerNote ?? null;
         setTables((prev) => {
-          if (prev[tableIdx]?.customerNote === order.customerNote) return prev;
+          if (prev[tableIdx]?.customerNote === note) return prev;
           const next = [...prev];
           next[tableIdx] = {
             ...next[tableIdx],
-            customerNote: order.customerNote,
+            customerNote: note,
           };
           return next;
         });
