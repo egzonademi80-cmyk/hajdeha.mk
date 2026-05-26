@@ -3241,7 +3241,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                 <img
                   src={lightboxItem.imageUrl!}
                   alt={getItemName(lightboxItem, lang)}
-                  className="w-full h-64 sm:h-72 object-cover"
+                  className="w-full max-h-[55vh] object-contain bg-black"
                 />
                 <button
                   className="absolute top-3 right-3 text-white bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-black/70 transition-colors"
