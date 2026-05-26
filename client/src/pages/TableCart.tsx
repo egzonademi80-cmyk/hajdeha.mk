@@ -2323,65 +2323,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const [customerNote, setCustomerNote] = useState("");
   const [showNoteInput, setShowNoteInput] = useState(false);
 
-  // Waiter PIN gate
-  const [hasWaiters, setHasWaiters] = useState<boolean | null>(null);
-  const [pinVerified, setPinVerified] = useState(false);
-  const [assignedWaiter, setAssignedWaiter] = useState<{ id: number; name: string } | null>(null);
-  const [pinEntry, setPinEntry] = useState("");
-  const [pinError, setPinError] = useState(false);
-  const [pinChecking, setPinChecking] = useState(false);
-
-  // Check if this restaurant has waiters (for PIN gate)
-  useEffect(() => {
-    if (!restaurantSlug) return;
-    fetch(`/api/waiters/check?slug=${restaurantSlug}`)
-      .then((r) => r.json())
-      .then((d) => setHasWaiters(d.hasWaiters ?? false))
-      .catch(() => setHasWaiters(false));
-  }, [restaurantSlug]);
-
-  const handlePinDigit = (digit: string) => {
-    if (pinChecking) return;
-    setPinError(false);
-    setPinEntry((prev) => {
-      const next = (prev + digit).slice(0, 3);
-      if (next.length === 3) {
-        validatePin(next);
-      }
-      return next;
-    });
-  };
-
-  const handlePinBack = () => {
-    if (pinChecking) return;
-    setPinError(false);
-    setPinEntry((prev) => prev.slice(0, -1));
-  };
-
-  const validatePin = async (code: string) => {
-    setPinChecking(true);
-    try {
-      const res = await fetch("/api/waiters/validate-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: restaurantSlug, pinCode: code }),
-      });
-      if (!res.ok) {
-        setPinError(true);
-        setPinEntry("");
-      } else {
-        const data = await res.json();
-        setAssignedWaiter({ id: data.id, name: data.name });
-        setPinVerified(true);
-      }
-    } catch {
-      setPinError(true);
-      setPinEntry("");
-    } finally {
-      setPinChecking(false);
-    }
-  };
-
   // Send order to backend, open WhatsApp, fire success effects
   const handleSendOrder = async () => {
     if (orderConfirming || orderConfirmedDone || cart.length === 0) return;
@@ -2397,7 +2338,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
           restaurantName: restaurant?.name ?? "",
           total: cart.reduce((s, i) => s + i.price * i.qty, 0),
           customerNote: customerNote.trim() || null,
-          waiterId: assignedWaiter?.id ?? null,
           timestamp: Date.now(),
         }),
       });
@@ -2517,81 +2457,6 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       <div className="h-[100dvh] w-full bg-background flex flex-col items-center justify-center gap-4 p-8 text-center">
         <UtensilsCrossed className="h-12 w-12 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground max-w-xs">{tr.notFound}</p>
-      </div>
-    );
-  }
-
-  // PIN gate — show before menu if restaurant has waiters and PIN not yet verified
-  if (!isLoading && restaurant && hasWaiters === true && !pinVerified) {
-    const dots = Array.from({ length: 3 }, (_, i) => i < pinEntry.length);
-    const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
-    return (
-      <div className="h-[100dvh] w-screen flex flex-col items-center justify-center bg-background px-6">
-        <style>{`html,body{overscroll-behavior:none}`}</style>
-
-        {/* Logo + name */}
-        <div className="flex flex-col items-center gap-3 mb-10">
-          {restaurant.photoUrl ? (
-            <img src={restaurant.photoUrl} alt={restaurant.name}
-              className="w-16 h-16 rounded-2xl object-cover shadow-md" />
-          ) : (
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl">🍽️</div>
-          )}
-          <div className="text-center">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-1">
-              {lang === "al" ? "Mirë se vini" : lang === "mk" ? "Добредојдовте" : "Welcome to"}
-            </p>
-            <h1 className="text-xl font-bold text-foreground">{restaurant.name}</h1>
-          </div>
-        </div>
-
-        {/* Instruction */}
-        <p className="text-sm text-muted-foreground text-center mb-8">
-          {lang === "al"
-            ? "Futni PIN-in e kamarierit për të vazhduar"
-            : lang === "mk"
-            ? "Внесете го PIN-от на келнерот за да продолжите"
-            : "Enter the waiter PIN to continue"}
-        </p>
-
-        {/* Dots */}
-        <div className="flex gap-5 mb-8">
-          {dots.map((filled, i) => (
-            <div key={i}
-              className={`w-4 h-4 rounded-full transition-all duration-150 ${
-                filled ? "bg-primary scale-110" : "bg-muted border-2 border-border"
-              } ${pinError ? "bg-destructive border-destructive" : ""}`}
-            />
-          ))}
-        </div>
-
-        {/* Error */}
-        {pinError && (
-          <p className="text-xs text-destructive font-medium mb-4 -mt-4">
-            {lang === "al" ? "PIN i pasaktë" : lang === "mk" ? "Неточен PIN" : "Incorrect PIN"}
-          </p>
-        )}
-
-        {/* Number pad */}
-        <div className="grid grid-cols-3 gap-3 w-full max-w-[260px]">
-          {keys.map((k, i) => {
-            if (k === "") return <div key={i} />;
-            const isBack = k === "⌫";
-            return (
-              <button key={k + i}
-                onClick={() => isBack ? handlePinBack() : handlePinDigit(k)}
-                disabled={pinChecking}
-                className={`h-16 rounded-2xl text-xl font-semibold transition-all active:scale-95 select-none ${
-                  isBack
-                    ? "bg-muted text-muted-foreground"
-                    : "bg-card border border-border text-foreground shadow-sm"
-                } disabled:opacity-50`}
-              >
-                {pinChecking && !isBack ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : k}
-              </button>
-            );
-          })}
-        </div>
       </div>
     );
   }
