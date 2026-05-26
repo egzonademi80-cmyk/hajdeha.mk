@@ -716,46 +716,33 @@ function playIncomingChime() {
       (window as any).webkitAudioContext)();
     const now = ctx.currentTime;
 
-    // Strike a single bell tone using real bell harmonics + exponential decay
-    function strikeBell(startTime: number, fundamental: number, volume: number) {
-      // Real bell = fundamental + 2 overtones at specific intervals
-      const partials: [number, number][] = [
-        [fundamental,          1.0],   // fundamental
-        [fundamental * 2.756,  0.6],   // major 10th above
-        [fundamental * 5.404,  0.25],  // upper partial
+    // Soft hotel front-desk bell: warm sine + gentle overtone, long natural decay
+    function softDing(startTime: number) {
+      const pairs: [number, number][] = [
+        [784,  0.45],   // G5 — warm fundamental
+        [1568, 0.10],   // G6 — subtle octave overtone
       ];
-      partials.forEach(([freq, relVol]) => {
+      pairs.forEach(([freq, vol]) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, startTime);
         gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(volume * relVol, startTime + 0.005);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 1.4);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.003);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 2.8);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(startTime);
-        osc.stop(startTime + 1.5);
+        osc.stop(startTime + 3.0);
       });
     }
 
-    // Pattern: 3 quick strikes → pause → 3 strikes → pause → 3 strikes
-    // Sounds like a restaurant counter bell being hit urgently
-    const strikes = [
-      [0.00, 820, 0.85],
-      [0.28, 820, 0.85],
-      [0.56, 820, 0.85],
-      [1.40, 900, 0.90],
-      [1.68, 900, 0.90],
-      [1.96, 900, 0.90],
-      [2.80, 980, 0.95],
-      [3.08, 980, 0.95],
-      [3.36, 980, 0.95],
-    ] as [number, number, number][];
+    // 3 gentle dings spaced 1.2 seconds apart
+    softDing(now + 0.0);
+    softDing(now + 1.2);
+    softDing(now + 2.4);
 
-    strikes.forEach(([t, freq, vol]) => strikeBell(now + t, freq, vol));
-
-    setTimeout(() => ctx.close(), 5500);
+    setTimeout(() => ctx.close(), 6000);
   } catch { }
 }
 // ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
