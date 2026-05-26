@@ -1028,8 +1028,21 @@ export default function POS({ slug }: POSProps) {
     staleTime: 0,
   });
 
+  // Public check — works even when POS is not logged in
+  const hasWaitersQuery = useQuery({
+    queryKey: ["/api/waiters/check", RESTAURANT_SLUG],
+    queryFn: async () => {
+      const res = await fetch(`/api/waiters/check?slug=${RESTAURANT_SLUG}`);
+      if (!res.ok) return { hasWaiters: false };
+      return res.json() as Promise<{ hasWaiters: boolean }>;
+    },
+    enabled: !!RESTAURANT_SLUG,
+    staleTime: 60_000,
+  });
+
   const waiters = waitersQuery.data ?? [];
-  const waitersFetched = waitersQuery.isSuccess;
+  const waitersFetched = hasWaitersQuery.isSuccess;
+  const hasWaiters = hasWaitersQuery.data?.hasWaiters ?? false;
 
   const { data: dbOrders = [], refetch: refetchOrders } = useQuery({
     queryKey: ["/api/orders", restaurantId],
@@ -1724,7 +1737,7 @@ export default function POS({ slug }: POSProps) {
 
   // ─── openSlot: shows PIN modal only if restaurant has waiters ────────────
   const openSlot = (slot: ActiveSlot) => {
-    if (slot?.kind === "table" && waitersFetched && waiters.length > 0) {
+    if (slot?.kind === "table" && waitersFetched && hasWaiters) {
       setTablePinSlot(slot);
       setTablePinDigits("");
       setTablePinError("");
