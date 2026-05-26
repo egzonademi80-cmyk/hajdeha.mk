@@ -229,6 +229,9 @@ function IsOpen(openingTime?: string, closingTime?: string) {
   if (!openingTime || !closingTime) return true;
   const d = new Date();
   const currentTime = `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  if (closingTime <= openingTime) {
+    return currentTime >= openingTime || currentTime <= closingTime;
+  }
   return currentTime >= openingTime && currentTime <= closingTime;
 }
 
