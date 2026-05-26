@@ -2876,9 +2876,23 @@ export default function POS({ slug }: POSProps) {
                 </div>
               </div>
 
-              <div
-                className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
-              >
+                {screen === "menu" && currentOrder.items.length > 0 && (
+                  <button
+                    onClick={() => setScreen("order")}
+                    className="lg:hidden fixed bottom-6 right-4 z-30 flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-amber-500 text-black font-bold text-sm shadow-2xl active:scale-95 transition-transform"
+                  >
+                    <ShoppingBag className="h-4 w-4" />
+                    <span>{orderTotal(currentOrder)} DEN</span>
+                    <span className="opacity-60">·</span>
+                    <span className="h-5 w-5 rounded-full bg-black/20 flex items-center justify-center text-[11px] font-bold">
+                      {orderCount(currentOrder)}
+                    </span>
+                  </button>
+                )}
+
+                <div
+                  className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
+                >
                 <div
                   className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}
                 >
