@@ -2834,13 +2834,13 @@ function SurpriseMe({
 
 export default function PublicMenu() {
   const { slug } = useParams<{ slug: string }>();
-  // ✅ lang read once via initializer function — no localStorage on every render
   const [lang] = useState<"en" | "al" | "mk">(
     () => (localStorage.getItem(LANG_KEY) as any) || "en",
   );
   const t = translations[lang];
   const { isDark, toggleDarkMode } = useDarkMode();
   const { toast } = useToast();
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const {
     data: restaurant,
@@ -3488,8 +3488,9 @@ export default function PublicMenu() {
                         <img
                           src={item.imageUrl}
                           loading="lazy"
-                          className="w-20 h-20 sm:w-24 sm:h-28 rounded-xl object-cover shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform duration-200"
+                          className="w-20 h-20 sm:w-24 sm:h-28 rounded-xl object-cover shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform duration-200 cursor-zoom-in"
                           alt={item.name}
+                          onClick={(e) => { e.stopPropagation(); setLightboxUrl(item.imageUrl!); }}
                         />
                       )}
                       <div className="flex-1 min-w-0">
@@ -3840,6 +3841,27 @@ export default function PublicMenu() {
           <p>{t.poweredBy}</p>
         </footer>
       </div>
+
+      {/* ── Image Lightbox ── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white bg-black/40 rounded-full w-9 h-9 flex items-center justify-center text-xl hover:bg-black/70 transition-colors"
+            onClick={() => setLightboxUrl(null)}
+          >
+            ✕
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Menu item"
+            className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 }
