@@ -714,17 +714,38 @@ function playIncomingChime() {
   try {
     const ctx = new (window.AudioContext ||
       (window as any).webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.frequency.setValueAtTime(880, ctx.currentTime);
-    o.frequency.setValueAtTime(1320, ctx.currentTime + 0.12);
-    g.gain.setValueAtTime(0.0001, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
-    o.start();
-    o.stop(ctx.currentTime + 0.55);
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.9, ctx.currentTime);
+    master.connect(ctx.destination);
+
+    // Repeating urgent "ding-ding-ding" pattern — 5 rounds over ~4 seconds
+    const pattern: [number, number][] = [];
+    const beepFreqs = [1046, 1318, 1046, 1318]; // C6, E6 alternating
+    const beepDur = 0.13;
+    const beepGap = 0.18;
+    const roundGap = 0.55;
+    for (let round = 0; round < 5; round++) {
+      beepFreqs.forEach((freq, i) => {
+        const t = round * (beepFreqs.length * beepGap + roundGap) + i * beepGap;
+        pattern.push([freq, t]);
+      });
+    }
+
+    pattern.forEach(([freq, start]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      gain.gain.setValueAtTime(0, ctx.currentTime + start);
+      gain.gain.linearRampToValueAtTime(1, ctx.currentTime + start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + beepDur);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + beepDur + 0.05);
+    });
+
+    setTimeout(() => ctx.close(), 5500);
   } catch { }
 }
 // ─── Waiter chime — 3 distinct tones for help / cash bill / card bill ─────────
