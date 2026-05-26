@@ -1876,7 +1876,7 @@ function AIWaiterPanel({
 export default function TableCart({ restaurantSlug, tableNumber }: Props) {
   const channelName = `table-${restaurantSlug}-${tableNumber}`;
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [lightboxItem, setLightboxItem] = useState<{ imageUrl: string; name: string; description?: string; price?: string } | null>(null);
+  const [lightboxItem, setLightboxItem] = useState<MenuItem | null>(null);
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
 
@@ -2806,7 +2806,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             src={item.imageUrl}
                             alt={getItemName(item, lang)}
                             className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover flex-shrink-0 cursor-zoom-in"
-                            onClick={(e) => { e.stopPropagation(); setLightboxItem({ imageUrl: item.imageUrl!, name: getItemName(item, lang), description: getItemDesc(item, lang) || undefined, price: item.price ? `${parsePrice(item.price)} DEN` : undefined }); }}
+                            onClick={(e) => { e.stopPropagation(); setLightboxItem(item); }}
                           />
                         ) : (
                           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 text-xl">
@@ -3224,47 +3224,93 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
       )}
 
       {/* ── Image Lightbox ── */}
-      {lightboxItem && (
-        <div
-          className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center p-0 sm:p-6"
-          style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(0,0,0,0.65)" }}
-          onClick={() => setLightboxItem(null)}
-        >
+      {lightboxItem && (() => {
+        const lbQty = cart.reduce((s, i) => i.id === lightboxItem.id ? s + i.qty : s, 0);
+        const lbMyQty = cart.find(i => i.id === lightboxItem.id && i.addedBy === myId)?.qty ?? 0;
+        return (
           <div
-            className="w-full sm:max-w-sm bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center p-0 sm:p-6"
+            style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(0,0,0,0.65)" }}
+            onClick={() => setLightboxItem(null)}
           >
-            <div className="relative">
-              <img
-                src={lightboxItem.imageUrl}
-                alt={lightboxItem.name}
-                className="w-full h-64 sm:h-72 object-cover"
-              />
-              <button
-                className="absolute top-3 right-3 text-white bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-black/70 transition-colors"
-                onClick={() => setLightboxItem(null)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-5">
-              <h2 className="text-lg font-bold text-stone-900 dark:text-stone-100 leading-tight">
-                {lightboxItem.name}
-              </h2>
-              {lightboxItem.description && (
-                <p className="text-sm text-stone-500 dark:text-stone-400 mt-1.5 leading-relaxed">
-                  {lightboxItem.description}
-                </p>
-              )}
-              {lightboxItem.price && (
-                <p className="text-primary font-bold text-xl mt-3">
-                  {lightboxItem.price}
-                </p>
-              )}
+            <div
+              className="w-full sm:max-w-sm bg-white dark:bg-stone-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border-2 border-primary"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative">
+                <img
+                  src={lightboxItem.imageUrl!}
+                  alt={getItemName(lightboxItem, lang)}
+                  className="w-full h-64 sm:h-72 object-cover"
+                />
+                <button
+                  className="absolute top-3 right-3 text-white bg-black/40 rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-black/70 transition-colors"
+                  onClick={() => setLightboxItem(null)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-5">
+                <h2 className="text-lg font-bold text-stone-900 dark:text-stone-100 leading-tight">
+                  {getItemName(lightboxItem, lang)}
+                </h2>
+                {getItemDesc(lightboxItem, lang) && (
+                  <p className="text-sm text-stone-500 dark:text-stone-400 mt-1.5 leading-relaxed">
+                    {getItemDesc(lightboxItem, lang)}
+                  </p>
+                )}
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-primary font-bold text-xl">
+                    {lightboxItem.price ? `${parsePrice(lightboxItem.price)} DEN` : ""}
+                  </p>
+                  <AnimatePresence mode="wait">
+                    {lbQty > 0 ? (
+                      <motion.div
+                        key="stepper"
+                        initial={{ scale: 0.85, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.85, opacity: 0 }}
+                        transition={{ duration: 0.12 }}
+                        className="flex items-center gap-2 bg-muted rounded-2xl px-2 py-1.5"
+                      >
+                        <button
+                          onClick={() => updateQty(lightboxItem.id, -1, myId)}
+                          disabled={lbMyQty === 0}
+                          className="h-8 w-8 rounded-xl flex items-center justify-center active:bg-black/10 dark:active:bg-white/10 disabled:opacity-30"
+                        >
+                          <Minus className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                        <span className="text-base font-bold text-foreground w-6 text-center">
+                          {lbQty}
+                        </span>
+                        <button
+                          onClick={() => addItem(lightboxItem)}
+                          className="h-8 w-8 rounded-xl flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                        >
+                          <Plus className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <motion.button
+                        key="add"
+                        initial={{ scale: 0.85, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.85, opacity: 0 }}
+                        whileTap={{ scale: 0.88 }}
+                        transition={{ duration: 0.12 }}
+                        onClick={() => addItem(lightboxItem)}
+                        className="h-10 w-10 rounded-2xl bg-primary flex items-center justify-center shadow-sm active:brightness-90 transition-all"
+                      >
+                        <Plus className="h-5 w-5 text-primary-foreground" />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
