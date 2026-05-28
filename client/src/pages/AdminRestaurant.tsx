@@ -887,7 +887,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
           <Label className="text-sm text-foreground">
             How orders are received
           </Label>
-          <div className="grid grid-cols-2 gap-2 mt-1.5">
+          <div className="grid grid-cols-3 gap-2 mt-1.5">
             <button
               type="button"
               onClick={() =>
@@ -899,7 +899,7 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
                   : "border-border bg-background text-muted-foreground hover:border-foreground/30"
               }`}
             >
-              💬 WhatsApp / Call
+              💬 WhatsApp
             </button>
             <button
               type="button"
@@ -912,12 +912,27 @@ const RestaurantDetailsForm = memo(function RestaurantDetailsForm({
                   : "border-border bg-background text-muted-foreground hover:border-foreground/30"
               }`}
             >
-              📲 Tablet POS (live)
+              📲 Tablet POS
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setFormData((p) => ({ ...p, orderMode: "menu-only" }))
+              }
+              className={`h-12 rounded-lg border text-sm font-semibold transition-all ${
+                formData.orderMode === "menu-only"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:border-foreground/30"
+              }`}
+            >
+              👁️ Menu Only
             </button>
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5">
             {formData.orderMode === "tablet"
               ? `Open /pos/${restaurant.slug} on your tablet to receive orders live.`
+              : formData.orderMode === "menu-only"
+              ? "Customers can browse the menu and call the waiter, but cannot place orders."
               : "Customers' orders open WhatsApp on their phone."}
           </p>
         </div>

@@ -2320,6 +2320,8 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     ].join("\n");
   };
 
+  const menuOnly = (restaurant as any)?.orderMode === "menu-only";
+
   const [customerNote, setCustomerNote] = useState("");
   const [showNoteInput, setShowNoteInput] = useState(false);
 
@@ -2711,7 +2713,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               {connected ? "LIVE" : "OFF"}
             </span>
           </div>
-          {itemCount > 0 && (
+          {itemCount > 0 && !menuOnly && (
             <button
               data-testid="button-toggle-cart"
               onClick={() => setView(view === "cart" ? "menu" : "cart")}
@@ -2835,6 +2837,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             </span>
                           </p>
                         </div>
+                        {!menuOnly && (
                         <div className="flex-shrink-0">
                           <AnimatePresence mode="wait">
                             {qty > 0 ? (
@@ -2882,13 +2885,14 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                             )}
                           </AnimatePresence>
                         </div>
+                        )}
                       </motion.div>
                     );
                   })}
                 </div>
               </div>
               <AnimatePresence>
-                {itemCount > 0 && (
+                {itemCount > 0 && !menuOnly && (
                   <motion.div
                     initial={{ y: 80, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
