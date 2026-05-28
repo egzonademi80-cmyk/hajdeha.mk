@@ -56,6 +56,7 @@ export interface IStorage {
   createOrder(order: InsertOrder): Promise<Order>;
   claimOrder(id: number, waiterId: number): Promise<Order>;
   completeOrder(id: number): Promise<Order>;
+  completeOrdersForTable(restaurantId: number, tableNumber: number): Promise<void>;
 
   // Table assignment operations
   getTableAssignments(restaurantId: number): Promise<(TableAssignment & { waiterName: string })[]>;
@@ -208,6 +209,19 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return updated;
+  }
+
+  async completeOrdersForTable(restaurantId: number, tableNumber: number): Promise<void> {
+    await db
+      .update(orders)
+      .set({ status: "completed" })
+      .where(
+        and(
+          eq(orders.restaurantId, restaurantId),
+          eq(orders.tableNumber, tableNumber),
+          // only close open orders — leave already-completed ones alone
+        ),
+      );
   }
 
   // Table assignment methods

@@ -699,16 +699,23 @@ export async function registerRoutes(
   app.post("/api/pos/checkout", async (req, res) => {
     try {
       const { restaurantId, tableNumber, items, waiterId } = req.body;
-      if (!restaurantId || !tableNumber || !Array.isArray(items) || items.length === 0)
+      if (!restaurantId || !tableNumber)
         return res.status(400).json({ message: "Missing fields" });
-      const order = await storage.createOrder({
-        restaurantId: Number(restaurantId),
-        tableNumber: Number(tableNumber),
-        cart: JSON.stringify(items),
-        status: "completed",
-        waiterId: waiterId ?? null,
-      });
-      return res.status(201).json(order);
+      // Always mark all open orders for this table as completed so the
+      // DB poll never re-stamps their note onto the now-empty table
+      await storage.completeOrdersForTable(Number(restaurantId), Number(tableNumber));
+      // Only create a new completed order when there are actual items (for profit tracking)
+      if (Array.isArray(items) && items.length > 0) {
+        const order = await storage.createOrder({
+          restaurantId: Number(restaurantId),
+          tableNumber: Number(tableNumber),
+          cart: JSON.stringify(items),
+          status: "completed",
+          waiterId: waiterId ?? null,
+        });
+        return res.status(201).json(order);
+      }
+      return res.json({ ok: true });
     } catch (err: any) {
       console.error("POS checkout error:", err);
       res.status(500).json({ message: err.message });

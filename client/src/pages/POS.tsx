@@ -130,6 +130,7 @@ const emptyTable = (): TableOrder => ({
   startedAt: null,
   waiterId: undefined,
   waiterName: undefined,
+  customerNote: null,
 });
 
 function parsePrice(price: string): number {
@@ -1708,7 +1709,7 @@ export default function POS({ slug }: POSProps) {
       if (allPaid && splitTableIdx !== null) {
         const allItems = tables[splitTableIdx].items;
         const tableWaiterId = tables[splitTableIdx].waiterId ?? null;
-        if (allItems.length > 0 && restaurantId) {
+        if (restaurantId) {
           fetch("/api/pos/checkout", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1781,18 +1782,20 @@ export default function POS({ slug }: POSProps) {
             ? tables[slot.idx].startedAt
             : personTabs[slot.idx]?.startedAt,
       });
-      if (slot.kind === "table" && restaurantId) {
-        fetch("/api/pos/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            restaurantId,
-            tableNumber: slot.idx + 1,
-            items: receiptItems,
-            waiterId: tables[slot.idx].waiterId ?? null,
-          }),
-        }).catch(() => {});
-      }
+    }
+    // Always call checkout for table payments so all open DB orders get marked
+    // completed — prevents the 8-second poll from re-stamping stale notes
+    if (slot.kind === "table" && restaurantId) {
+      fetch("/api/pos/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurantId,
+          tableNumber: slot.idx + 1,
+          items: receiptItems,
+          waiterId: tables[slot.idx].waiterId ?? null,
+        }),
+      }).catch(() => {});
     }
     if (slot.kind === "table") {
       setTables((prev) => {
