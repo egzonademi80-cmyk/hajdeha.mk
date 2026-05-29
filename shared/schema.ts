@@ -76,21 +76,6 @@ export const menuItems = pgTable(
   }),
 );
 
-export const pageViews = pgTable(
-  "page_views",
-  {
-    id: serial("id").primaryKey(),
-    restaurantId: integer("restaurant_id")
-      .notNull()
-      .references(() => restaurants.id, { onDelete: "cascade" }),
-    viewedAt: timestamp("viewed_at").defaultNow().notNull(),
-    dateStr: text("date_str").notNull(),
-  },
-  (table) => ({
-    restaurantIdIdx: index("pv_restaurant_id_idx").on(table.restaurantId),
-    dateIdx: index("pv_date_idx").on(table.dateStr),
-  }),
-);
 
 export const waiters = pgTable("waiters", {
   id: serial("id").primaryKey(),
@@ -139,7 +124,6 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const restaurantsRelations = relations(restaurants, ({ one, many }) => ({
   user: one(users, { fields: [restaurants.userId], references: [users.id] }),
   menuItems: many(menuItems),
-  pageViews: many(pageViews),
   waiters: many(waiters),
   orders: many(orders),
 }));
@@ -170,13 +154,6 @@ export const menuItemsRelations = relations(menuItems, ({ one }) => ({
   }),
 }));
 
-export const pageViewsRelations = relations(pageViews, ({ one }) => ({
-  restaurant: one(restaurants, {
-    fields: [pageViews.restaurantId],
-    references: [restaurants.id],
-  }),
-}));
-
 // === SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users);
 
@@ -198,10 +175,6 @@ export const insertMenuItemSchema = createInsertSchema(menuItems, {
   sortOrder: z.number().optional(),
 }).omit({ id: true });
 
-export const insertPageViewSchema = createInsertSchema(pageViews).omit({
-  id: true,
-});
-
 export const insertWaiterSchema = createInsertSchema(waiters, {
   name: z.string().min(1),
   pinCode: z.string().length(3).regex(/^\d{3}$/, "PIN must be 3 digits"),
@@ -219,8 +192,6 @@ export type Restaurant = typeof restaurants.$inferSelect;
 export type InsertRestaurant = z.infer<typeof insertRestaurantSchema>;
 export type MenuItem = typeof menuItems.$inferSelect;
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
-export type PageView = typeof pageViews.$inferSelect;
-export type InsertPageView = z.infer<typeof insertPageViewSchema>;
 export type Waiter = typeof waiters.$inferSelect;
 export type InsertWaiter = z.infer<typeof insertWaiterSchema>;
 export type Order = typeof orders.$inferSelect;

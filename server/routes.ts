@@ -9,10 +9,10 @@ import { db } from "./db.js";
 import {
   restaurants as restaurantsTable,
   menuItems as menuItemsTable,
-  pageViews,
   insertWaiterSchema,
+  orders as ordersTable,
 } from "../shared/schema.js";
-import { eq, sql, gte, and } from "drizzle-orm";
+import { eq, sql, lt } from "drizzle-orm";
 
 // ── In-memory cart store (keyed by Pusher channel name) ──────────────────────
 interface CartItem {
@@ -67,6 +67,14 @@ export async function registerRoutes(
   app: Express,
 ): Promise<Server> {
   const { hashPassword } = setupAuth(app);
+
+  // Auto-cleanup: delete orders older than 1 day every hour
+  const cleanOldOrders = async () => {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db.delete(ordersTable).where(lt(ordersTable.createdAt, cutoff));
+  };
+  cleanOldOrders();
+  setInterval(cleanOldOrders, 60 * 60 * 1000);
 
   // === AUTH — /api/auth?action=login|logout|me ===
   app.all("/api/auth", (req, res, next) => {
@@ -350,84 +358,6 @@ export async function registerRoutes(
     return res.json({ id: waiter.id, name: waiter.name });
   });
 
-  // === ANALYTICS ROUTES ===
-  app.post(api.analytics.track.path, async (req, res) => {
-    try {
-      const { restaurantId } = api.analytics.track.input.parse(req.body);
-      const today = new Date().toISOString().split("T")[0];
-      await db.insert(pageViews).values({ restaurantId, dateStr: today });
-      res.json({ ok: true });
-    } catch (err) {
-      console.error("Analytics track error:", err);
-      res.json({ ok: false });
-    }
-  });
-
-  app.get(api.analytics.get.path, async (req, res) => {
-    try {
-      const restaurantId = parseInt(req.params.restaurantId);
-      const today = new Date().toISOString().split("T")[0];
-      const d30 = new Date();
-      d30.setDate(d30.getDate() - 30);
-      const date30 = d30.toISOString().split("T")[0];
-      const d7 = new Date();
-      d7.setDate(d7.getDate() - 7);
-      const date7 = d7.toISOString().split("T")[0];
-
-      const totalResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(pageViews)
-        .where(eq(pageViews.restaurantId, restaurantId));
-      const total = totalResult[0]?.count ?? 0;
-
-      const todayResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(pageViews)
-        .where(
-          and(
-            eq(pageViews.restaurantId, restaurantId),
-            eq(pageViews.dateStr, today),
-          ),
-        );
-      const todayCount = todayResult[0]?.count ?? 0;
-
-      const last30Result = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(pageViews)
-        .where(
-          and(
-            eq(pageViews.restaurantId, restaurantId),
-            gte(pageViews.dateStr, date30),
-          ),
-        );
-      const last30Days = last30Result[0]?.count ?? 0;
-
-      const last7Result = await db
-        .select({ date: pageViews.dateStr, count: sql<number>`count(*)::int` })
-        .from(pageViews)
-        .where(
-          and(
-            eq(pageViews.restaurantId, restaurantId),
-            gte(pageViews.dateStr, date7),
-          ),
-        )
-        .groupBy(pageViews.dateStr);
-
-      const last7Map = new Map(last7Result.map((r) => [r.date, r.count]));
-      const last7Days = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0];
-        last7Days.push({ date: dateStr, count: last7Map.get(dateStr) ?? 0 });
-      }
-
-      res.json({ total, today: todayCount, last7Days, last30Days });
-    } catch (err) {
-      console.error("Analytics get error:", err);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
 
   // === PUBLIC RESTAURANTS — /api/restaurants[?slug=X] ===
   app.get("/api/restaurants", async (req, res) => {

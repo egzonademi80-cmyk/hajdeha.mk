@@ -194,109 +194,6 @@ function ImageUploadField({
   );
 }
 
-// ── Analytics Panel (per restaurant) ─────────────────────────────────────────
-function AnalyticsPanel({ restaurantId }: { restaurantId: number }) {
-  const { data, isLoading } = useQuery<any>({
-    queryKey: [`analytics-${restaurantId}`],
-    queryFn: async () => {
-      const res = await fetch(
-        buildUrl(api.analytics.get.path, {
-          restaurantId: String(restaurantId),
-        }),
-      );
-      return res.json();
-    },
-    staleTime: 60_000,
-  });
-
-  if (isLoading)
-    return (
-      <div className="py-4 flex justify-center">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-      </div>
-    );
-  if (!data) return null;
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en", { month: "short", day: "numeric" });
-  };
-
-  const chartData = (data.last7Days || []).map((d: any) => ({
-    date: formatDate(d.date),
-    views: d.count,
-  }));
-
-  return (
-    <div className="mt-4 pt-4 border-t border-border space-y-3">
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-muted/50 rounded-lg p-2 text-center">
-          <p className="text-lg font-bold text-foreground">{data.today ?? 0}</p>
-          <p className="text-xs text-muted-foreground">Today</p>
-        </div>
-        <div className="bg-muted/50 rounded-lg p-2 text-center">
-          <p className="text-lg font-bold text-foreground">
-            {data.last30Days ?? 0}
-          </p>
-          <p className="text-xs text-muted-foreground">30 days</p>
-        </div>
-        <div className="bg-muted/50 rounded-lg p-2 text-center">
-          <p className="text-lg font-bold text-foreground">{data.total ?? 0}</p>
-          <p className="text-xs text-muted-foreground">All time</p>
-        </div>
-      </div>
-
-      {/* 7-day chart */}
-      {chartData.length > 0 && (
-        <div>
-          <p className="text-xs text-muted-foreground mb-2">Last 7 days</p>
-          <ResponsiveContainer width="100%" height={80}>
-            <BarChart
-              data={chartData}
-              margin={{ top: 0, right: 0, left: -30, bottom: 0 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-                stroke="hsl(var(--border))"
-              />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(var(--background))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: 8,
-                  fontSize: 11,
-                }}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
-                itemStyle={{ color: "hsl(var(--primary))" }}
-                formatter={(v: any) => [v, "Views"]}
-              />
-              <Bar
-                dataKey="views"
-                fill="hsl(var(--primary))"
-                radius={[3, 3, 0, 0]}
-                maxBarSize={24}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function WaiterEarningsPanel({ restaurantId }: { restaurantId: number }) {
   const { data: raw, isLoading } = useQuery<{ earnings: { waiterId: number; waiterName: string; total: number }[]; days: string[] }>({
@@ -1063,10 +960,8 @@ export default function AdminDashboard() {
                     </Button>
                   </div>
 
-                  {/* Analytics panel — expandable */}
                   {expandedAnalytics.has(restaurant.id) && (
                     <>
-                      <AnalyticsPanel restaurantId={restaurant.id} />
                       <WaiterEarningsPanel restaurantId={restaurant.id} />
                     </>
                   )}

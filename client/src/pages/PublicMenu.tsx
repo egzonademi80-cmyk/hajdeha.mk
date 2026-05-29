@@ -2858,20 +2858,6 @@ export default function PublicMenu() {
     staleTime: 10 * 60 * 1000,
   });
 
-  // ── Analytics: track page view once per session per restaurant ──
-  useEffect(() => {
-    if (!restaurant?.id) return;
-    const key = `pv-tracked-${restaurant.id}`;
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, "1");
-    fetch(api.analytics.track.path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ restaurantId: restaurant.id }),
-    }).catch(() => {
-      /* silent fail */
-    });
-  }, [restaurant?.id]);
 
   const [cart, setCart] = useState<Record<number, number>>({});
   const [openOrderDialog, setOpenOrderDialog] = useState(false);
