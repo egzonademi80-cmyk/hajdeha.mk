@@ -329,13 +329,47 @@ function SortableMenuItemCard({
   };
 
   const { mutate: deleteItem } = useDeleteMenuItem();
+  const { mutate: updateItem, isPending: isUpdatingSpecial } = useUpdateMenuItem();
   const { toast } = useToast();
+
+  const [showSpecialPanel, setShowSpecialPanel] = useState(false);
+  const [specialValue, setSpecialValue] = useState<string>(
+    item.specialDiscount ? String(item.specialDiscount) : "",
+  );
+  const [specialType, setSpecialType] = useState<"percent" | "fixed">(
+    (item.specialType as "percent" | "fixed") || "percent",
+  );
+
+  const hasSpecial = !!item.specialDiscount && !!item.specialType;
+
+  const handleSetSpecial = () => {
+    const val = parseInt(specialValue);
+    if (!val || val <= 0) return;
+    updateItem(
+      { id: item.id, specialDiscount: val, specialType },
+      {
+        onSuccess: () => {
+          toast({ title: "Today's Special set ⭐" });
+          setShowSpecialPanel(false);
+        },
+      },
+    );
+  };
+
+  const handleClearSpecial = () => {
+    updateItem(
+      { id: item.id, specialDiscount: null, specialType: null },
+      {
+        onSuccess: () => toast({ title: "Special removed" }),
+      },
+    );
+  };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-background rounded-lg p-3 border border-border group hover:border-primary/30 transition-colors relative"
+      className={`bg-background rounded-lg p-3 border transition-colors relative ${hasSpecial ? "border-amber-400/60 dark:border-amber-500/40" : "border-border hover:border-primary/30"} group`}
     >
       {/* Drag handle */}
       <div
@@ -382,9 +416,64 @@ function SortableMenuItemCard({
                 Veg
               </div>
             )}
+            {hasSpecial && (
+              <div className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-semibold">
+                ⭐ -{item.specialType === "percent" ? `${item.specialDiscount}%` : `${item.specialDiscount} DEN`}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Today's Special inline panel */}
+      {showSpecialPanel && (
+        <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2 space-y-2">
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">⭐ Set Today's Special Discount</p>
+          <div className="flex gap-2">
+            <div className="flex rounded-md overflow-hidden border border-border text-xs">
+              <button
+                type="button"
+                onClick={() => setSpecialType("percent")}
+                className={`px-2 py-1 ${specialType === "percent" ? "bg-amber-500 text-white" : "bg-background text-foreground"}`}
+              >
+                %
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpecialType("fixed")}
+                className={`px-2 py-1 ${specialType === "fixed" ? "bg-amber-500 text-white" : "bg-background text-foreground"}`}
+              >
+                DEN
+              </button>
+            </div>
+            <Input
+              type="number"
+              min={1}
+              max={specialType === "percent" ? 100 : undefined}
+              value={specialValue}
+              onChange={(e) => setSpecialValue(e.target.value)}
+              placeholder={specialType === "percent" ? "e.g. 15" : "e.g. 50"}
+              className="h-7 text-xs flex-1"
+            />
+            <Button
+              size="sm"
+              className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={handleSetSpecial}
+              disabled={isUpdatingSpecial}
+            >
+              {isUpdatingSpecial ? <Loader2 className="h-3 w-3 animate-spin" /> : "Set"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={() => setShowSpecialPanel(false)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-1 mt-2 pt-2 border-t border-border opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
@@ -395,6 +484,25 @@ function SortableMenuItemCard({
         >
           <Edit2 className="h-3 w-3 mr-1" />
           Edit
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-7 text-xs ${hasSpecial ? "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" : "text-muted-foreground"}`}
+          onClick={() => {
+            if (hasSpecial) {
+              handleClearSpecial();
+            } else {
+              setShowSpecialPanel((v) => !v);
+            }
+          }}
+          title={hasSpecial ? "Remove special" : "Set Today's Special"}
+        >
+          {isUpdatingSpecial ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <span className="text-sm">⭐</span>
+          )}
         </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>

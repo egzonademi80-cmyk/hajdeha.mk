@@ -46,6 +46,16 @@ interface MenuItem {
   description?: string | null;
   descriptionAl?: string | null;
   descriptionMk?: string | null;
+  specialDiscount?: number | null;
+  specialType?: string | null;
+}
+
+function getSpecialPrice(item: MenuItem): number | null {
+  if (!item.specialDiscount || !item.specialType) return null;
+  const base = parsePrice(item.price);
+  if (item.specialType === "percent") return Math.round(base * (1 - item.specialDiscount / 100));
+  if (item.specialType === "fixed") return Math.max(0, base - item.specialDiscount);
+  return null;
 }
 function getItemName(item: MenuItem, lang: Lang): string {
   if (lang === "al" && item.nameAl) return item.nameAl;
@@ -2265,7 +2275,7 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
               {
                 id: item.id,
                 name: item.name,
-                price: parsePrice(item.price),
+                price: getSpecialPrice(item) ?? parsePrice(item.price),
                 qty: 1,
                 addedBy: myId,
               },
@@ -2830,12 +2840,29 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                               {getItemDesc(item, lang)}
                             </p>
                           )}
-                          <p className="text-[13px] sm:text-sm font-bold text-primary mt-1">
-                            {parsePrice(item.price)}{" "}
-                            <span className="text-[10px] text-muted-foreground font-normal">
-                              DEN
-                            </span>
-                          </p>
+                          {item.specialDiscount && item.specialType ? (
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
+                                ⭐ Today's Special
+                              </span>
+                              <span className="text-[11px] text-muted-foreground line-through">
+                                {parsePrice(item.price)} DEN
+                              </span>
+                              <span className="text-[13px] sm:text-sm font-bold text-amber-500">
+                                {getSpecialPrice(item)} <span className="text-[10px] font-normal">DEN</span>
+                              </span>
+                              <span className="text-[10px] font-bold text-red-500">
+                                -{item.specialType === "percent" ? `${item.specialDiscount}%` : `${item.specialDiscount} DEN`}
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-[13px] sm:text-sm font-bold text-primary mt-1">
+                              {parsePrice(item.price)}{" "}
+                              <span className="text-[10px] text-muted-foreground font-normal">
+                                DEN
+                              </span>
+                            </p>
+                          )}
                         </div>
                         {!menuOnly && (
                         <div className="flex-shrink-0">

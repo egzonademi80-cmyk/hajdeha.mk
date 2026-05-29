@@ -70,6 +70,8 @@ export const menuItems = pgTable(
     isSpicy: boolean("is_spicy").default(false).notNull(),
     containsNuts: boolean("is_contains_nuts").default(false).notNull(),
     sortOrder: integer("sort_order").default(0).notNull(),
+    specialDiscount: integer("special_discount"),
+    specialType: text("special_type"),
   },
   (table) => ({
     restaurantIdIdx: index("restaurant_id_idx").on(table.restaurantId),
@@ -173,6 +175,8 @@ export const insertMenuItemSchema = createInsertSchema(menuItems, {
   nameAl: z.string().optional().nullable(),
   nameMk: z.string().optional().nullable(),
   sortOrder: z.number().optional(),
+  specialDiscount: z.number().optional().nullable(),
+  specialType: z.string().optional().nullable(),
 }).omit({ id: true });
 
 export const insertWaiterSchema = createInsertSchema(waiters, {
