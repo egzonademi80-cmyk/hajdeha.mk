@@ -42,6 +42,7 @@ interface OrderItem {
   nameMk?: string;
   price: number;
   qty: number;
+  discount?: number;
 }
 
 interface OrderRound {
@@ -136,6 +137,9 @@ const emptyTable = (): TableOrder => ({
 function parsePrice(price: string): number {
   return parseInt(price.replace(/[^0-9]/g, "")) || 0;
 }
+
+const ep = (item: OrderItem): number =>
+  item.discount ? Math.round(item.price * (1 - item.discount / 100)) : item.price;
 
 type ActiveSlot =
   | { kind: "table"; idx: number }
@@ -483,14 +487,15 @@ function buildEscPosBytes({
     (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) ||
     item.name;
   for (const item of items) {
+    const linePrice = ep(item) * item.qty;
     cols(
-      `${item.qty}x ${itemName(item)}`,
-      `${(item.price * item.qty).toFixed(0)} DEN`,
+      `${item.qty}x ${itemName(item)}${item.discount ? ` (-${item.discount}%)` : ""}`,
+      `${linePrice.toFixed(0)} DEN`,
     );
   }
   dashes();
   push(0x1b, 0x45, 0x01);
-  const total = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const total = items.reduce((s, i) => s + ep(i) * i.qty, 0);
   cols("TOTAL", `${total.toFixed(0)} DEN`);
   push(0x1b, 0x45, 0x00);
   const rl = posTranslations[(lang as PosLang) || "en"];
@@ -563,7 +568,7 @@ function printReceiptWindow({
     "width=340,height=800,toolbar=0,scrollbars=0,status=0,menubar=0",
   );
   if (!win) return;
-  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const total = items.reduce((sum, item) => sum + ep(item) * item.qty, 0);
   const now = new Date();
   const dateStr = now.toLocaleDateString("sq-MK", {
     day: "2-digit",
@@ -601,7 +606,7 @@ function printReceiptWindow({
   const rows = items
     .map(
       (item) =>
-        `<tr><td class="item-qty">${item.qty}×</td><td class="item-name">${getItemName(item)}</td><td class="item-price">${(item.price * item.qty).toLocaleString()} DEN</td></tr>`,
+        `<tr><td class="item-qty">${item.qty}×</td><td class="item-name">${getItemName(item)}${item.discount ? ` <span style="color:#ef4444;font-size:10px">-${item.discount}%</span>` : ""}</td><td class="item-price">${(ep(item) * item.qty).toLocaleString()} DEN</td></tr>`,
     )
     .join("");
 
@@ -951,6 +956,8 @@ export default function POS({ slug }: POSProps) {
   const [draftSections, setDraftSections] = useState<TableSection[]>([]);
   const [activeDraftSection, setActiveDraftSection] =
     useState<string>("Indoor");
+  const [discountItemId, setDiscountItemId] = useState<number | null>(null);
+  const [discountInput, setDiscountInput] = useState("");
 
   const [tables, setTables] = useState<TableOrder[]>(() => {
     try {
@@ -1479,7 +1486,7 @@ export default function POS({ slug }: POSProps) {
   }, [active, tables, personTabs]);
 
   const orderTotal = (o: TableOrder | PersonTab) =>
-    o.items.reduce((s, i) => s + i.price * i.qty, 0);
+    o.items.reduce((s, i) => s + ep(i) * i.qty, 0);
   const orderCount = (o: TableOrder | PersonTab) =>
     o.items.reduce((s, i) => s + i.qty, 0);
 
@@ -1634,6 +1641,29 @@ export default function POS({ slug }: POSProps) {
     }
   };
 
+  const applyDiscount = (itemId: number, discount: number | undefined) => {
+    if (!active) return;
+    const upd = (order: TableOrder | PersonTab): TableOrder | PersonTab => ({
+      ...order,
+      items: order.items.map((i) =>
+        i.id === itemId ? { ...i, discount } : i,
+      ),
+    });
+    if (active.kind === "table") {
+      setTables((prev) => {
+        const next = [...prev];
+        next[active.idx] = upd(next[active.idx]) as TableOrder;
+        return next;
+      });
+    } else {
+      setPersonTabs((prev) => {
+        const next = [...prev];
+        next[active.idx] = upd(next[active.idx]) as PersonTab;
+        return next;
+      });
+    }
+  };
+
   const openSplitBill = (tableIdx: number) => {
     setSplitTableIdx(tableIdx);
     setSplitPersons([
@@ -1668,7 +1698,7 @@ export default function POS({ slug }: POSProps) {
     if (splitTableIdx === null) return 0;
     return tables[splitTableIdx].items.reduce(
       (sum, item, i) =>
-        itemAssignments[i] === personIdx ? sum + item.price * item.qty : sum,
+        itemAssignments[i] === personIdx ? sum + ep(item) * item.qty : sum,
       0,
     );
   };
@@ -1681,7 +1711,7 @@ export default function POS({ slug }: POSProps) {
   };
 
   const unassignedTotal = (): number =>
-    unassignedItems().reduce((s, { item }) => s + item.price * item.qty, 0);
+    unassignedItems().reduce((s, { item }) => s + ep(item) * item.qty, 0);
 
   const markPaid = (personIdx: number, method: "cash" | "card") => {
     if (splitTableIdx !== null) {
@@ -2924,47 +2954,106 @@ export default function POS({ slug }: POSProps) {
                       const itemCard = (item: OrderItem, isNew: boolean) => (
                         <div
                           key={item.id}
-                          className={`flex items-center gap-3 p-3 rounded-xl border mb-2 transition-colors ${isNew ? "bg-amber-500/5 border-amber-500/25" : `${t.surface} ${t.border}`}`}
+                          className={`p-3 rounded-xl border mb-2 transition-colors ${isNew ? "bg-amber-500/5 border-amber-500/25" : `${t.surface} ${t.border}`}`}
                         >
-                          {isNew && (
-                            <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
+                          <div className="flex items-center gap-3">
+                            {isNew && (
+                              <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
+                                {item.name}
+                              </p>
+                              <p
+                                className="text-xs text-amber-400 mt-0.5"
+                                style={{ fontFamily: "'DM Mono', monospace" }}
+                              >
+                                {item.discount ? (
+                                  <>
+                                    <span className="line-through opacity-50">{item.price}</span>
+                                    {" "}<span className="text-red-400">-{item.discount}%</span>
+                                    {" "}{ep(item)} × {item.qty} = {ep(item) * item.qty} DEN
+                                  </>
+                                ) : (
+                                  <>{item.price} × {item.qty} = {item.price * item.qty} DEN</>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  if (discountItemId === item.id) {
+                                    setDiscountItemId(null);
+                                    setDiscountInput("");
+                                  } else {
+                                    setDiscountItemId(item.id);
+                                    setDiscountInput(item.discount ? String(item.discount) : "");
+                                  }
+                                }}
+                                className={`h-6 w-6 rounded-lg flex items-center justify-center text-[10px] font-bold border transition-colors ${item.discount ? "bg-red-500/20 border-red-500/50 text-red-400" : `${t.surfaceSoft} border-transparent ${t.textMuted} hover:bg-white/10`}`}
+                              >
+                                %
+                              </button>
+                              <div className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}>
+                                <button
+                                  onClick={() => updateQty(item.id, -1)}
+                                  className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span
+                                  className="text-sm font-bold text-amber-400 w-5 text-center"
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {item.qty}
+                                </span>
+                                <button
+                                  onClick={() => updateQty(item.id, 1)}
+                                  className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          {discountItemId === item.id && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                placeholder="Discount %"
+                                value={discountInput}
+                                onChange={(e) => setDiscountInput(e.target.value)}
+                                className={`flex-1 h-8 rounded-lg px-2 text-sm font-mono border ${t.surface} ${t.border} ${t.text} bg-transparent outline-none focus:border-amber-400`}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => {
+                                  const val = parseInt(discountInput);
+                                  if (val > 0 && val <= 100) applyDiscount(item.id, val);
+                                  else applyDiscount(item.id, undefined);
+                                  setDiscountItemId(null);
+                                  setDiscountInput("");
+                                }}
+                                className="h-8 px-3 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-bold hover:bg-amber-500/30"
+                              >
+                                Apply
+                              </button>
+                              {item.discount && (
+                                <button
+                                  onClick={() => {
+                                    applyDiscount(item.id, undefined);
+                                    setDiscountItemId(null);
+                                    setDiscountInput("");
+                                  }}
+                                  className={`h-8 px-2 rounded-lg text-xs font-bold ${t.surfaceSoft} ${t.textMuted} hover:bg-white/10`}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
                           )}
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-sm font-semibold ${t.textSoft} truncate`}
-                            >
-                              {item.name}
-                            </p>
-                            <p
-                              className="text-xs text-amber-400 mt-0.5"
-                              style={{ fontFamily: "'DM Mono', monospace" }}
-                            >
-                              {item.price} × {item.qty} ={" "}
-                              {item.price * item.qty} DEN
-                            </p>
-                          </div>
-                          <div
-                            className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}
-                          >
-                            <button
-                              onClick={() => updateQty(item.id, -1)}
-                              className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span
-                              className="text-sm font-bold text-amber-400 w-5 text-center"
-                              style={{ fontFamily: "'DM Mono', monospace" }}
-                            >
-                              {item.qty}
-                            </span>
-                            <button
-                              onClick={() => updateQty(item.id, 1)}
-                              className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
                         </div>
                       );
 
@@ -3232,11 +3321,11 @@ export default function POS({ slug }: POSProps) {
                                   className={`text-xs mt-0.5 ${pc ? pc.text : t.textFaint}`}
                                   style={{ fontFamily: "'DM Mono', monospace" }}
                                 >
-                                  {item.price} × {item.qty} ={" "}
-                                  <span className="font-bold">
-                                    {item.price * item.qty}
-                                  </span>{" "}
-                                  DEN
+                                  {item.discount ? (
+                                    <>{ep(item)} × {item.qty} = <span className="font-bold">{ep(item) * item.qty}</span> DEN <span className="text-red-400">(-{item.discount}%)</span></>
+                                  ) : (
+                                    <>{item.price} × {item.qty} = <span className="font-bold">{item.price * item.qty}</span> DEN</>
+                                  )}
                                 </p>
                               </div>
                               {assignedPerson !== null && pc && (
