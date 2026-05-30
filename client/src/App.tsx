@@ -11,6 +11,7 @@ import Home from "@/pages/Home";
 import PublicMenu from "@/pages/PublicMenu";
 import AuthLogin from "@/pages/AuthLogin";
 import POS from "@/pages/POS";
+import KDS from "@/pages/KDS";
 import TablePage from "@/pages/TablePage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminRestaurant from "@/pages/AdminRestaurant";
@@ -43,6 +44,7 @@ function Router() {
         {/* Fallback */}
         <Route path="/pos/bujar">{() => <POS slug="embeltoresport" />}</Route>
         <Route path="/pos/:slug">{(params: any) => <POS slug={params.slug} />}</Route>
+        <Route path="/kitchen/:slug">{(params: any) => <KDS slug={params.slug} />}</Route>
         <Route component={NotFound} />
       </Switch>
     </div>
