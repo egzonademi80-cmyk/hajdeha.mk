@@ -1768,9 +1768,17 @@ function AIWaiterPanel({
                                   <p className="text-xs font-semibold text-foreground truncate">
                                     {getItemName(item, lang)}
                                   </p>
-                                  <p className="text-xs font-bold text-primary">
-                                    {item.price}
-                                  </p>
+                                  {item.specialDiscount && item.specialType ? (
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      <span className="text-[9px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded-full">⭐</span>
+                                      <span className="text-[10px] text-muted-foreground line-through">{parsePrice(item.price)}</span>
+                                      <span className="text-xs font-bold text-amber-500">{getSpecialPrice(item)} DEN</span>
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs font-bold text-primary">
+                                      {item.price}
+                                    </p>
+                                  )}
                                 </div>
                                 <button
                                   onClick={() => {
@@ -3334,9 +3342,22 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                   </p>
                 )}
                 <div className="flex items-center justify-between mt-4">
-                  <p className="text-primary font-bold text-xl">
-                    {lightboxItem.price ? `${parsePrice(lightboxItem.price)} DEN` : ""}
-                  </p>
+                  {lightboxItem.specialDiscount && lightboxItem.specialType ? (
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">⭐ Today's Special</span>
+                        <span className="text-[11px] font-bold text-red-500">-{lightboxItem.specialType === "percent" ? `${lightboxItem.specialDiscount}%` : `${lightboxItem.specialDiscount} DEN`}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-stone-400 line-through text-sm">{parsePrice(lightboxItem.price)} DEN</span>
+                        <span className="text-amber-500 font-bold text-xl">{getSpecialPrice(lightboxItem)} DEN</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-primary font-bold text-xl">
+                      {lightboxItem.price ? `${parsePrice(lightboxItem.price)} DEN` : ""}
+                    </p>
+                  )}
                   <AnimatePresence mode="wait">
                     {lbQty > 0 ? (
                       <motion.div

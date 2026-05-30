@@ -514,7 +514,16 @@ export async function registerRoutes(
           return res.status(400).json({
             message: result.error.errors[0]?.message || "Invalid input",
           });
-        const updated = await storage.updateMenuItem(id, result.data);
+        // Zod strips explicit nulls from partial schemas — re-apply them from raw body
+        const updates: Record<string, any> = { ...result.data };
+        const nullableFields = ["specialDiscount", "specialType"] as const;
+        for (const field of nullableFields) {
+          if (field in req.body && req.body[field] === null) {
+            updates[field] = null;
+          }
+        }
+        if (Object.keys(updates).length === 0) return res.json(item);
+        const updated = await storage.updateMenuItem(id, updates as any);
         return res.json(updated);
       }
 
