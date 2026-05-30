@@ -25,6 +25,7 @@ import {
   Printer,
   ClipboardList,
   KeyRound,
+  ChefHat,
 } from "lucide-react";
 
 interface MenuItem {
@@ -270,6 +271,8 @@ const posTranslations = {
     card: "Card",
     paid: "Paid",
     porosiLabel: "ORDER",
+    sendKitchen: "Send to Kitchen",
+    kitchenSent: "Sent!",
   },
   al: {
     addItems: "SHTO",
@@ -354,6 +357,8 @@ const posTranslations = {
     card: "Kartë",
     paid: "Paguar",
     porosiLabel: "POROSI",
+    sendKitchen: "Dërgo në Kuzhinë",
+    kitchenSent: "Dërguar!",
   },
   mk: {
     addItems: "ДОДАЈ",
@@ -438,6 +443,8 @@ const posTranslations = {
     card: "Картичка",
     paid: "Платено",
     porosiLabel: "НАРАЧКА",
+    sendKitchen: "Испрати во Кујна",
+    kitchenSent: "Испратено!",
   },
 };
 type PosLang = keyof typeof posTranslations;
@@ -1464,6 +1471,7 @@ export default function POS({ slug }: POSProps) {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [screen, setScreen] = useState<Screen>("tables");
   const [payConfirm, setPayConfirm] = useState(false);
+  const [kitchenSentTable, setKitchenSentTable] = useState<number | null>(null);
   const [justPaid, setJustPaid] = useState<ActiveSlot>(null);
   const [pendingWaiter, setPendingWaiter] = useState<{
     id: number;
@@ -3234,6 +3242,40 @@ export default function POS({ slug }: POSProps) {
                             {tr.splitBill}
                           </button>
                         )}
+                        <button
+                          onClick={() => {
+                            if (!active || currentOrder.items.length === 0) return;
+                            const tableNum = active.kind === "table" ? active.idx + 1 : 0;
+                            fetch("/api/pos/send-to-kitchen", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                slug: RESTAURANT_SLUG,
+                                tableNumber: tableNum,
+                                cart: currentOrder.items,
+                              }),
+                            }).catch(() => {});
+                            setKitchenSentTable(active.idx);
+                            setTimeout(() => setKitchenSentTable(null), 2000);
+                          }}
+                          className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
+                            kitchenSentTable === active?.idx
+                              ? "bg-emerald-600 text-white"
+                              : `border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-orange-500/40`
+                          }`}
+                        >
+                          {kitchenSentTable === active?.idx ? (
+                            <>
+                              <CheckCircle className="h-4 w-4" />
+                              {tr.kitchenSent}
+                            </>
+                          ) : (
+                            <>
+                              <ChefHat className="h-4 w-4" />
+                              {tr.sendKitchen}
+                            </>
+                          )}
+                        </button>
                         <button
                           onClick={() => setPayConfirm(true)}
                           className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"

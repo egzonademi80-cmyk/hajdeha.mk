@@ -18,6 +18,7 @@ interface KDSOrder {
   customerNote: string | null;
   receivedAt: number;
   isNew: boolean;
+  source: "qr" | "pos";
 }
 
 function timeAgo(ms: number): string {
@@ -59,7 +60,7 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
     return () => clearInterval(t);
   }, []);
 
-  const handleIncoming = useCallback((data: any) => {
+  const addOrder = useCallback((data: any, source: "qr" | "pos") => {
     beep();
     const uid = `${Date.now()}-${Math.random()}`;
     const order: KDSOrder = {
@@ -69,6 +70,7 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
       customerNote: data.customerNote || null,
       receivedAt: data.timestamp || Date.now(),
       isNew: true,
+      source,
     };
     setOrders((prev) => [order, ...prev]);
     setTimeout(() => {
@@ -88,14 +90,15 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
     pusher.connection.bind("connected", () => setConnected(true));
     pusher.connection.bind("disconnected", () => setConnected(false));
     const channel = pusher.subscribe(`pos-${slug}`);
-    channel.bind("incoming-order", handleIncoming);
+    channel.bind("incoming-order", (data: any) => addOrder(data, "qr"));
+    channel.bind("kitchen-order", (data: any) => addOrder(data, "pos"));
 
     return () => {
       channel.unbind_all();
       pusher.unsubscribe(`pos-${slug}`);
       pusher.disconnect();
     };
-  }, [slug, handleIncoming]);
+  }, [slug, addOrder]);
 
   const markDone = (uid: string) => {
     setOrders((prev) => prev.filter((o) => o.uid !== uid));
@@ -190,13 +193,22 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
                         : "border-stone-700/60 bg-stone-800/50"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2">
                       <span
                         className={`font-black text-2xl tabular-nums leading-none ${
                           order.isNew ? "text-orange-400" : "text-white"
                         }`}
                       >
                         T{order.tableNumber}
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          order.source === "pos"
+                            ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                            : "bg-violet-500/20 text-violet-400 border border-violet-500/30"
+                        }`}
+                      >
+                        {order.source === "pos" ? "POS" : "QR"}
                       </span>
                       {order.isNew && (
                         <motion.span

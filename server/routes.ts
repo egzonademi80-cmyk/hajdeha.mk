@@ -635,6 +635,23 @@ export async function registerRoutes(
   });
 
   // === POS MANUAL CHECKOUT — saves a completed order for profit tracking ===
+  app.post("/api/pos/send-to-kitchen", async (req, res) => {
+    try {
+      const { slug, tableNumber, cart } = req.body;
+      if (!slug || !Array.isArray(cart) || cart.length === 0)
+        return res.status(400).json({ message: "Missing fields" });
+      await safeTrigger(`pos-${slug}`, "kitchen-order", {
+        cart,
+        tableNumber,
+        timestamp: Date.now(),
+        source: "pos",
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/pos/checkout", async (req, res) => {
     try {
       const { restaurantId, tableNumber, items, waiterId } = req.body;
