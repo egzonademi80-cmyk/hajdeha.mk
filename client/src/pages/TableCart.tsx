@@ -224,6 +224,7 @@ const t = {
     loading: "Duke ngarkuar menunë…",
     notFound: "Restoranti nuk u gjet. Kontrolloni URL-në dhe provoni përsëri.",
     allCategories: "Të gjitha",
+    todaySpecials: "⭐ Specialet e Sotme",
     emptyCategory: "Nuk ka artikuj në këtë kategori",
     viewCart: "Shiko shportën",
     cart: "Shporta",
@@ -338,6 +339,7 @@ const t = {
     notFound:
       "Ресторанот не е пронајден. Проверете ја URL-то и обидете се повторно.",
     allCategories: "Сите",
+    todaySpecials: "⭐ Денешни Специјалитети",
     emptyCategory: "Нема артикли во оваа категорија",
     viewCart: "Кошничка",
     cart: "Кошничка",
@@ -451,6 +453,7 @@ const t = {
     loading: "Loading menu…",
     notFound: "Restaurant not found. Check the URL and try again.",
     allCategories: "All",
+    todaySpecials: "⭐ Today's Specials",
     emptyCategory: "No items in this category",
     viewCart: "View Cart",
     cart: "Cart",
@@ -2024,16 +2027,24 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
     () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
     [restaurant],
   );
+  const specialItems = useMemo(
+    () => menuItems.filter((i) => i.specialDiscount && i.specialType),
+    [menuItems],
+  );
   const categories = useMemo(() => {
     const cats = Array.from(new Set(menuItems.map((i) => i.category)));
-    return [tr.allCategories, ...cats];
-  }, [menuItems, lang]);
+    const base = [tr.allCategories, ...cats];
+    if (specialItems.length > 0) base.splice(1, 0, tr.todaySpecials);
+    return base;
+  }, [menuItems, lang, specialItems]);
   const filtered = useMemo(
     () =>
       activeCategory === tr.allCategories
         ? menuItems
-        : menuItems.filter((i) => i.category === activeCategory),
-    [menuItems, activeCategory, lang],
+        : activeCategory === tr.todaySpecials
+          ? specialItems
+          : menuItems.filter((i) => i.category === activeCategory),
+    [menuItems, activeCategory, lang, specialItems],
   );
 
   useEffect(() => {
@@ -2758,23 +2769,32 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
             >
               <div className="flex-shrink-0 relative border-b border-border bg-white dark:bg-stone-900">
                 <div className="flex gap-2 px-4 py-2.5 overflow-x-auto no-scrollbar">
-                  {categories.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => {
-                        setActiveCategory(cat);
-                        menuScrollRef.current?.scrollTo({
-                          top: 0,
-                          behavior: "smooth",
-                        });
-                      }}
-                      className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${activeCategory === cat ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                    >
-                      {cat === tr.allCategories
-                        ? cat
-                        : getCategoryDisplay(cat, lang)}
-                    </button>
-                  ))}
+                  {categories.map((cat) => {
+                    const isSpecialsCat = cat === tr.todaySpecials;
+                    const isActive = activeCategory === cat;
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => {
+                          setActiveCategory(cat);
+                          menuScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className={`flex-shrink-0 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${
+                          isSpecialsCat
+                            ? isActive
+                              ? "bg-amber-500 text-white shadow-sm"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+                            : isActive
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {cat === tr.allCategories || isSpecialsCat
+                          ? cat
+                          : getCategoryDisplay(cat, lang)}
+                      </button>
+                    );
+                  })}
                   {/* Spacer so last pill isn't hidden behind fade */}
                   <div className="flex-shrink-0 w-8" />
                 </div>
@@ -3358,48 +3378,50 @@ export default function TableCart({ restaurantSlug, tableNumber }: Props) {
                       {lightboxItem.price ? `${parsePrice(lightboxItem.price)} DEN` : ""}
                     </p>
                   )}
-                  <AnimatePresence mode="wait">
-                    {lbQty > 0 ? (
-                      <motion.div
-                        key="stepper"
-                        initial={{ scale: 0.85, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.85, opacity: 0 }}
-                        transition={{ duration: 0.12 }}
-                        className="flex items-center gap-2 bg-muted rounded-2xl px-2 py-1.5"
-                      >
-                        <button
-                          onClick={() => updateQty(lightboxItem.id, -1, myId)}
-                          disabled={lbMyQty === 0}
-                          className="h-8 w-8 rounded-xl flex items-center justify-center active:bg-black/10 dark:active:bg-white/10 disabled:opacity-30"
+                  {!menuOnly && (
+                    <AnimatePresence mode="wait">
+                      {lbQty > 0 ? (
+                        <motion.div
+                          key="stepper"
+                          initial={{ scale: 0.85, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.85, opacity: 0 }}
+                          transition={{ duration: 0.12 }}
+                          className="flex items-center gap-2 bg-muted rounded-2xl px-2 py-1.5"
                         >
-                          <Minus className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                        <span className="text-base font-bold text-foreground w-6 text-center">
-                          {lbQty}
-                        </span>
-                        <button
+                          <button
+                            onClick={() => updateQty(lightboxItem.id, -1, myId)}
+                            disabled={lbMyQty === 0}
+                            className="h-8 w-8 rounded-xl flex items-center justify-center active:bg-black/10 dark:active:bg-white/10 disabled:opacity-30"
+                          >
+                            <Minus className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <span className="text-base font-bold text-foreground w-6 text-center">
+                            {lbQty}
+                          </span>
+                          <button
+                            onClick={() => addItem(lightboxItem)}
+                            className="h-8 w-8 rounded-xl flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                          >
+                            <Plus className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </motion.div>
+                      ) : (
+                        <motion.button
+                          key="add"
+                          initial={{ scale: 0.85, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.85, opacity: 0 }}
+                          whileTap={{ scale: 0.88 }}
+                          transition={{ duration: 0.12 }}
                           onClick={() => addItem(lightboxItem)}
-                          className="h-8 w-8 rounded-xl flex items-center justify-center active:bg-black/10 dark:active:bg-white/10"
+                          className="h-10 w-10 rounded-2xl bg-primary flex items-center justify-center shadow-sm active:brightness-90 transition-all"
                         >
-                          <Plus className="h-4 w-4 text-muted-foreground" />
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <motion.button
-                        key="add"
-                        initial={{ scale: 0.85, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.85, opacity: 0 }}
-                        whileTap={{ scale: 0.88 }}
-                        transition={{ duration: 0.12 }}
-                        onClick={() => addItem(lightboxItem)}
-                        className="h-10 w-10 rounded-2xl bg-primary flex items-center justify-center shadow-sm active:brightness-90 transition-all"
-                      >
-                        <Plus className="h-5 w-5 text-primary-foreground" />
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
+                          <Plus className="h-5 w-5 text-primary-foreground" />
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  )}
                 </div>
               </div>
             </div>
