@@ -30,9 +30,21 @@ import {
 interface MenuItem {
   id: number;
   name: string;
+  nameAl?: string | null;
+  nameMk?: string | null;
   price: string;
   category: string;
   active: boolean;
+  specialDiscount?: number | null;
+  specialType?: string | null;
+}
+
+function getMenuItemSpecialPrice(item: MenuItem): number | null {
+  if (!item.specialDiscount || !item.specialType) return null;
+  const base = parsePrice(item.price);
+  if (item.specialType === "percent") return Math.round(base * (1 - item.specialDiscount / 100));
+  if (item.specialType === "fixed") return Math.max(0, base - item.specialDiscount);
+  return null;
 }
 
 interface OrderItem {
@@ -1565,7 +1577,7 @@ export default function POS({ slug }: POSProps) {
           name: item.name,
           nameAl: item.nameAl ?? undefined,
           nameMk: item.nameMk ?? undefined,
-          price: parsePrice(item.price),
+          price: getMenuItemSpecialPrice(item) ?? parsePrice(item.price),
           qty: 1,
         });
       return { ...order, items, startedAt: order.startedAt ?? new Date() };
@@ -2885,17 +2897,29 @@ export default function POS({ slug }: POSProps) {
                             >
                               {item.name}
                             </p>
-                            <p
-                              className="text-xs lg:text-sm font-bold text-amber-400 mt-1.5"
-                              style={{ fontFamily: "'DM Mono', monospace" }}
-                            >
-                              {parsePrice(item.price)}{" "}
-                              <span
-                                className={`text-[9px] lg:text-[10px] ${t.textFaint}`}
+                            {item.specialDiscount && item.specialType ? (
+                              <div className="mt-1.5 space-y-0.5">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded-full leading-none">⭐</span>
+                                  <span className={`text-[9px] line-through ${t.textFaint}`}>{parsePrice(item.price)}</span>
+                                </div>
+                                <p
+                                  className="text-xs lg:text-sm font-bold text-amber-400"
+                                  style={{ fontFamily: "'DM Mono', monospace" }}
+                                >
+                                  {getMenuItemSpecialPrice(item)}{" "}
+                                  <span className={`text-[9px] lg:text-[10px] ${t.textFaint}`}>DEN</span>
+                                </p>
+                              </div>
+                            ) : (
+                              <p
+                                className="text-xs lg:text-sm font-bold text-amber-400 mt-1.5"
+                                style={{ fontFamily: "'DM Mono', monospace" }}
                               >
-                                DEN
-                              </span>
-                            </p>
+                                {parsePrice(item.price)}{" "}
+                                <span className={`text-[9px] lg:text-[10px] ${t.textFaint}`}>DEN</span>
+                              </p>
+                            )}
                             <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-0.5 opacity-20">
                               <div className="h-0.5 w-0.5 rounded-full bg-current" />
                               <div className="h-0.5 w-0.5 rounded-full bg-current" />
