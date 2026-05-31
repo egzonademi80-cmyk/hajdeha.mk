@@ -413,6 +413,8 @@ export async function registerRoutes(
       }
 
       if (action === "create") {
+        if (user.username !== "hajdeha")
+          return res.status(403).json({ message: "Only the platform admin can create restaurants" });
         const result = api.restaurants.create.input.safeParse(req.body);
         if (!result.success)
           return res.status(400).json({

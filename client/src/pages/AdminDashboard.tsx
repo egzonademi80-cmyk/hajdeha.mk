@@ -569,6 +569,7 @@ export default function AdminDashboard() {
           </div>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            {user?.username === 'hajdeha' && (
             <DialogTrigger asChild>
               <Button
                 size="lg"
@@ -578,6 +579,7 @@ export default function AdminDashboard() {
                 {t.addRestaurant}
               </Button>
             </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto bg-background border-border">
               <DialogTitle className="text-xl text-foreground">
                 {t.createNew}
@@ -985,6 +987,7 @@ export default function AdminDashboard() {
                 Get started by adding your first restaurant to manage menus and
                 generate QR codes.
               </p>
+              {user?.username === 'hajdeha' && (
               <Button
                 size="lg"
                 onClick={() => setIsCreateOpen(true)}
@@ -993,6 +996,7 @@ export default function AdminDashboard() {
                 <Plus className="h-5 w-5 mr-2" />
                 Add Your First Restaurant
               </Button>
+              )}
             </div>
           </div>
         )}
