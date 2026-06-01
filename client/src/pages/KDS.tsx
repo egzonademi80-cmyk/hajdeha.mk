@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "wouter";
 import Pusher from "pusher-js";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, ChefHat, Clock, UtensilsCrossed, Wifi, WifiOff } from "lucide-react";
+import { CheckCircle2, ChefHat, Clock, UtensilsCrossed, Wifi, WifiOff, Check } from "lucide-react";
 
 interface KDSItem {
   id: number;
@@ -19,6 +19,7 @@ interface KDSOrder {
   receivedAt: number;
   isNew: boolean;
   source: "qr" | "pos";
+  doneItems: Set<number>;
 }
 
 function useElapsed(ms: number) {
@@ -51,8 +52,17 @@ function beep() {
   } catch {}
 }
 
-function OrderCard({ order, onDone }: { order: KDSOrder; onDone: () => void }) {
+function OrderCard({
+  order,
+  onDone,
+  onToggleItem,
+}: {
+  order: KDSOrder;
+  onDone: () => void;
+  onToggleItem: (index: number) => void;
+}) {
   const { label, mins } = useElapsed(order.receivedAt);
+  const allDone = order.doneItems.size === order.items.length;
 
   const urgency =
     mins >= 15 ? "red" :
@@ -66,12 +76,14 @@ function OrderCard({ order, onDone }: { order: KDSOrder; onDone: () => void }) {
                            "bg-muted";
 
   const borderColor =
+    allDone              ? "border-green-500/50" :
     order.isNew          ? "border-primary/60" :
     urgency === "red"    ? "border-red-500/50" :
     urgency === "yellow" ? "border-amber-400/30" :
                            "border-border";
 
   const glow =
+    allDone           ? "shadow-[0_0_24px_rgba(34,197,94,0.2)]" :
     order.isNew       ? "shadow-[0_0_32px_hsl(15_75%_55%_/_0.25)]" :
     urgency === "red" ? "shadow-[0_0_24px_rgba(239,68,68,0.2)]" :
                         "";
@@ -86,14 +98,15 @@ function OrderCard({ order, onDone }: { order: KDSOrder; onDone: () => void }) {
       className={`flex flex-col rounded-2xl border bg-secondary overflow-hidden ${borderColor} ${glow}`}
     >
       {/* Urgency bar */}
-      <div className={`h-1 w-full ${urgencyBar} transition-colors duration-700`} />
+      <div className={`h-1 w-full ${allDone ? "bg-green-500" : urgencyBar} transition-colors duration-700`} />
 
       {/* Header */}
       <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2 border-b border-border">
         <div className="flex items-center gap-2.5">
           <span className={`font-black text-3xl tabular-nums leading-none ${
-            order.isNew ? "text-primary" :
-            urgency === "red" ? "text-red-400" :
+            allDone            ? "text-green-400" :
+            order.isNew        ? "text-primary" :
+            urgency === "red"  ? "text-red-400" :
             urgency === "yellow" ? "text-amber-400" :
             "text-foreground"
           }`}>
@@ -120,34 +133,65 @@ function OrderCard({ order, onDone }: { order: KDSOrder; onDone: () => void }) {
           </div>
         </div>
 
-        <div className={`flex items-center gap-1 text-xs font-semibold tabular-nums ${
-          urgency === "red"    ? "text-red-400" :
-          urgency === "yellow" ? "text-amber-400" :
-          "text-muted-foreground"
-        }`}>
-          <Clock className="h-3.5 w-3.5" />
-          {label}
+        <div className="flex items-center gap-2">
+          {/* Progress indicator */}
+          {order.doneItems.size > 0 && (
+            <span className="text-[10px] font-bold text-green-400 tabular-nums">
+              {order.doneItems.size}/{order.items.length}
+            </span>
+          )}
+          <div className={`flex items-center gap-1 text-xs font-semibold tabular-nums ${
+            urgency === "red"    ? "text-red-400" :
+            urgency === "yellow" ? "text-amber-400" :
+            "text-muted-foreground"
+          }`}>
+            <Clock className="h-3.5 w-3.5" />
+            {label}
+          </div>
         </div>
       </div>
 
-      {/* Items */}
-      <div className="flex-1 px-4 py-3 space-y-2.5">
-        {order.items.map((item, i) => (
-          <div key={i} className="flex items-start justify-between gap-3">
-            <span className="text-sm font-semibold text-foreground leading-snug">
-              {item.name}
-            </span>
-            <span className={`text-sm font-black flex-shrink-0 tabular-nums h-6 w-6 rounded-md flex items-center justify-center ${
-              item.qty >= 3
-                ? "bg-primary text-primary-foreground"
-                : item.qty === 2
-                ? "bg-primary/20 text-primary"
-                : "bg-muted text-muted-foreground"
-            }`}>
-              {item.qty}
-            </span>
-          </div>
-        ))}
+      {/* Items — tap to mark done */}
+      <div className="flex-1 px-3 py-3 space-y-1.5">
+        {order.items.map((item, i) => {
+          const isDone = order.doneItems.has(i);
+          return (
+            <motion.button
+              key={i}
+              layout
+              onClick={() => onToggleItem(i)}
+              className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border transition-all active:scale-95 ${
+                isDone
+                  ? "border-green-500/30 bg-green-500/10 opacity-60"
+                  : "border-border bg-background/40 hover:bg-background/70"
+              }`}
+            >
+              <span className={`text-sm font-semibold leading-snug text-left ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                {item.name}
+              </span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`text-sm font-black tabular-nums h-6 w-6 rounded-md flex items-center justify-center ${
+                  isDone
+                    ? "bg-green-500/20 text-green-400"
+                    : item.qty >= 3
+                    ? "bg-primary text-primary-foreground"
+                    : item.qty === 2
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {item.qty}
+                </span>
+                <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                  isDone
+                    ? "border-green-500 bg-green-500"
+                    : "border-muted-foreground/40 bg-transparent"
+                }`}>
+                  {isDone && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                </div>
+              </div>
+            </motion.button>
+          );
+        })}
       </div>
 
       {/* Customer note */}
@@ -162,11 +206,14 @@ function OrderCard({ order, onDone }: { order: KDSOrder; onDone: () => void }) {
       <div className="px-3 pb-3">
         <button
           onClick={onDone}
-          className="w-full py-3 rounded-xl bg-accent-foreground/90 hover:bg-accent-foreground active:scale-95 transition-all font-black text-sm tracking-widest uppercase text-background flex items-center justify-center gap-2 shadow-md"
-          style={{ backgroundColor: "hsl(150 50% 35%)", color: "#fff" }}
+          className="w-full py-3 rounded-xl transition-all font-black text-sm tracking-widest uppercase text-white flex items-center justify-center gap-2 shadow-md active:scale-95"
+          style={{
+            backgroundColor: allDone ? "hsl(150 60% 30%)" : "hsl(150 50% 35%)",
+            opacity: 1,
+          }}
         >
           <CheckCircle2 className="h-4 w-4" />
-          Done
+          {allDone ? "Clear Order" : "Done"}
         </button>
       </div>
     </motion.div>
@@ -192,6 +239,7 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
       receivedAt: data.timestamp || Date.now(),
       isNew: true,
       source,
+      doneItems: new Set(),
     };
     setOrders((prev) => [order, ...prev]);
     setTimeout(() => {
@@ -224,6 +272,21 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
   const markDone = (uid: string) => {
     setOrders((prev) => prev.filter((o) => o.uid !== uid));
     setDoneCount((n) => n + 1);
+  };
+
+  const toggleItem = (uid: string, index: number) => {
+    setOrders((prev) =>
+      prev.map((o) => {
+        if (o.uid !== uid) return o;
+        const next = new Set(o.doneItems);
+        if (next.has(index)) {
+          next.delete(index);
+        } else {
+          next.add(index);
+        }
+        return { ...o, doneItems: next };
+      })
+    );
   };
 
   const restaurantLabel = slug
@@ -309,6 +372,7 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
                   key={order.uid}
                   order={order}
                   onDone={() => markDone(order.uid)}
+                  onToggleItem={(i) => toggleItem(order.uid, i)}
                 />
               ))}
             </AnimatePresence>
