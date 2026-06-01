@@ -2862,6 +2862,12 @@ export default function POS({ slug }: POSProps) {
                       type="text"
                       value={menuSearch}
                       onChange={(e) => setMenuSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && filteredItems.length > 0) {
+                          addItem(filteredItems[0]);
+                          setMenuSearch("");
+                        }
+                      }}
                       placeholder="Search items…"
                       className={`flex-1 bg-transparent text-xs lg:text-sm outline-none ${t.textSoft} placeholder:${t.textFaint}`}
                     />
