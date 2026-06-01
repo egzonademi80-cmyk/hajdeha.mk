@@ -3252,51 +3252,62 @@ export default function POS({ slug }: POSProps) {
                             {tr.splitBill}
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            if (!active || currentOrder.items.length === 0) return;
-                            const snapshot = JSON.stringify(currentOrder.items);
-                            const alreadySent = kitchenSentSnapshots.get(active.idx) === snapshot;
-                            if (alreadySent) return;
-                            const tableNum = active.kind === "table" ? active.idx + 1 : 0;
-                            fetch("/api/pos/send-to-kitchen", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                slug: RESTAURANT_SLUG,
-                                tableNumber: tableNum,
-                                cart: currentOrder.items,
-                              }),
-                            }).catch(() => {});
-                            setKitchenSentSnapshots((prev) => {
-                              const next = new Map(prev);
-                              next.set(active.idx, snapshot);
-                              return next;
-                            });
-                          }}
-                          disabled={
-                            !active ||
-                            currentOrder.items.length === 0 ||
-                            kitchenSentSnapshots.get(active.idx) === JSON.stringify(currentOrder.items)
-                          }
-                          className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
-                            active && kitchenSentSnapshots.get(active.idx) === JSON.stringify(currentOrder.items)
-                              ? "bg-emerald-600 text-white opacity-80 cursor-not-allowed"
-                              : `border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-orange-500/40`
-                          }`}
-                        >
-                          {active && kitchenSentSnapshots.get(active.idx) === JSON.stringify(currentOrder.items) ? (
-                            <>
-                              <CheckCircle className="h-4 w-4" />
-                              {tr.kitchenSent}
-                            </>
-                          ) : (
-                            <>
-                              <ChefHat className="h-4 w-4" />
-                              {tr.sendKitchen}
-                            </>
-                          )}
-                        </button>
+                        {(() => {
+                          // Compute delta once — items added or qty-increased since last send
+                          const prevRaw = active ? kitchenSentSnapshots.get(active.idx) : undefined;
+                          const prevMap = new Map<number, number>(
+                            prevRaw
+                              ? (JSON.parse(prevRaw) as { id: number; qty: number }[]).map((i) => [i.id, i.qty])
+                              : []
+                          );
+                          const deltaCart = currentOrder
+                            ? currentOrder.items
+                                .map((item) => {
+                                  const newQty = item.qty - (prevMap.get(item.id) ?? 0);
+                                  return newQty > 0 ? { ...item, qty: newQty } : null;
+                                })
+                                .filter(Boolean)
+                            : [];
+                          const allSent = deltaCart.length === 0;
+
+                          return (
+                            <button
+                              disabled={allSent}
+                              onClick={() => {
+                                if (!active || allSent) return;
+                                const tableNum = active.kind === "table" ? active.idx + 1 : 0;
+                                fetch("/api/pos/send-to-kitchen", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    slug: RESTAURANT_SLUG,
+                                    tableNumber: tableNum,
+                                    cart: deltaCart,
+                                  }),
+                                }).catch(() => {});
+                                const snapshot = JSON.stringify(
+                                  currentOrder!.items.map((i) => ({ id: i.id, qty: i.qty }))
+                                );
+                                setKitchenSentSnapshots((prev) => {
+                                  const next = new Map(prev);
+                                  next.set(active.idx, snapshot);
+                                  return next;
+                                });
+                              }}
+                              className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
+                                allSent
+                                  ? "bg-emerald-600 text-white opacity-80 cursor-not-allowed"
+                                  : `border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-orange-500/40`
+                              }`}
+                            >
+                              {allSent ? (
+                                <><CheckCircle className="h-4 w-4" />{tr.kitchenSent}</>
+                              ) : (
+                                <><ChefHat className="h-4 w-4" />{tr.sendKitchen}</>
+                              )}
+                            </button>
+                          );
+                        })()}
                         <button
                           onClick={() => setPayConfirm(true)}
                           className="w-full h-14 rounded-2xl bg-amber-500 text-sm font-bold text-black flex items-center justify-center gap-2 active:bg-amber-400 hover:bg-amber-400"
