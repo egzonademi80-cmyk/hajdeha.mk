@@ -28,18 +28,19 @@ interface TableRoom {
 
 const tableRooms = new Map<string, TableRoom>();
 // ── Pusher server client ──────────────────────────────────────────────────────
-const pusherConfigured =
-  !!process.env.PUSHER_APP_ID &&
-  !!process.env.PUSHER_KEY &&
-  !!process.env.PUSHER_SECRET &&
-  !!process.env.PUSHER_CLUSTER;
+const PUSHER_APP_ID = process.env.PUSHER_APP_ID || "";
+const PUSHER_KEY    = process.env.PUSHER_KEY    || process.env.VITE_PUSHER_KEY    || "";
+const PUSHER_SECRET = process.env.PUSHER_SECRET || "";
+const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || process.env.VITE_PUSHER_CLUSTER || "";
+
+const pusherConfigured = !!(PUSHER_APP_ID && PUSHER_KEY && PUSHER_SECRET && PUSHER_CLUSTER);
 
 const pusherServer = pusherConfigured
   ? new Pusher({
-      appId: process.env.PUSHER_APP_ID!,
-      key: process.env.PUSHER_KEY!,
-      secret: process.env.PUSHER_SECRET!,
-      cluster: process.env.PUSHER_CLUSTER!,
+      appId: PUSHER_APP_ID,
+      key:   PUSHER_KEY,
+      secret: PUSHER_SECRET,
+      cluster: PUSHER_CLUSTER,
       useTLS: true,
     })
   : null;
