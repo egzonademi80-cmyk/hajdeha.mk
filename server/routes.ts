@@ -234,8 +234,8 @@ export async function registerRoutes(
 
   app.get("/api/config/pusher", (_req, res) => {
     res.json({
-      key: process.env.PUSHER_KEY || "",
-      cluster: process.env.PUSHER_CLUSTER || "",
+      key: PUSHER_KEY,
+      cluster: PUSHER_CLUSTER,
     });
   });
 
