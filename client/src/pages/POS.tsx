@@ -2176,6 +2176,7 @@ export default function POS({ slug }: POSProps) {
           refetchAssignments();
         });
         channel.bind("order-ready", (data: { tableNumber: number }) => {
+          console.log("[POS] order-ready received:", data);
           const id = `${Date.now()}-${Math.random()}`;
           setReadyBanners((prev) => [...prev, { id, tableNumber: data.tableNumber }]);
           // play a gentle "ding" sound
@@ -2454,7 +2455,7 @@ export default function POS({ slug }: POSProps) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -80, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 28 }}
-            className="absolute top-[60px] left-3 right-3 z-60 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl"
+            className="absolute top-[60px] left-3 right-3 z-[60] flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-2xl"
             style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
           >
             <motion.div
@@ -2490,7 +2491,7 @@ export default function POS({ slug }: POSProps) {
       </AnimatePresence>
 
       {/* ── Kitchen ready banners ── */}
-      <div className="absolute top-[60px] left-3 right-3 z-60 flex flex-col gap-2 pointer-events-none">
+      <div className="absolute top-[60px] left-3 right-3 z-[60] flex flex-col gap-2 pointer-events-none">
         <AnimatePresence>
           {readyBanners.map((b) => (
             <motion.div

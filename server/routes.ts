@@ -658,12 +658,14 @@ export async function registerRoutes(
   app.post("/api/kitchen/order-ready", async (req, res) => {
     try {
       const { slug, tableNumber } = req.body;
+      console.log("[order-ready] received:", { slug, tableNumber, pusherConfigured, pusherServerNull: !pusherServer });
       if (!slug || !tableNumber)
         return res.status(400).json({ message: "Missing fields" });
       await safeTrigger(`pos-${slug}`, "order-ready", {
         tableNumber,
         timestamp: Date.now(),
       });
+      console.log("[order-ready] trigger sent to pos-" + slug);
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
