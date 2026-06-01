@@ -1476,6 +1476,7 @@ export default function POS({ slug }: POSProps) {
 
   const [active, setActive] = useState<ActiveSlot>(null);
   const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [menuSearch, setMenuSearch] = useState("");
   const [screen, setScreen] = useState<Screen>("tables");
   const [payConfirm, setPayConfirm] = useState(false);
   const [kitchenSentSnapshots, setKitchenSentSnapshots] = useState<Map<number, string>>(new Map());
@@ -1498,13 +1499,20 @@ export default function POS({ slug }: POSProps) {
     const cats = Array.from(new Set(menuItems.map((i) => i.category)));
     return ["All", ...cats];
   }, [menuItems]);
-  const filteredItems = useMemo(
-    () =>
+  const filteredItems = useMemo(() => {
+    const byCategory =
       activeCategory === "All"
         ? menuItems
-        : menuItems.filter((i) => i.category === activeCategory),
-    [menuItems, activeCategory],
-  );
+        : menuItems.filter((i) => i.category === activeCategory);
+    if (!menuSearch.trim()) return byCategory;
+    const q = menuSearch.trim().toLowerCase();
+    return byCategory.filter(
+      (i) =>
+        i.name.toLowerCase().includes(q) ||
+        (i.nameAl ?? "").toLowerCase().includes(q) ||
+        (i.nameMk ?? "").toLowerCase().includes(q),
+    );
+  }, [menuItems, activeCategory, menuSearch]);
 
   const currentOrder: TableOrder | PersonTab | null = useMemo(() => {
     if (!active) return null;
@@ -2844,8 +2852,29 @@ export default function POS({ slug }: POSProps) {
               <div
                 className={`flex-1 flex-col overflow-hidden ${screen === "order" ? "hidden lg:flex" : "flex"}`}
               >
+                {/* Search box */}
+                <div className={`flex-shrink-0 px-4 lg:px-6 pt-2.5 pb-2`}>
+                  <div className={`flex items-center gap-2 rounded-xl border ${t.border} ${t.surface} px-3 py-2`}>
+                    <svg className={`h-3.5 w-3.5 flex-shrink-0 ${t.textDim}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      value={menuSearch}
+                      onChange={(e) => setMenuSearch(e.target.value)}
+                      placeholder="Search items…"
+                      className={`flex-1 bg-transparent text-xs lg:text-sm outline-none ${t.textSoft} placeholder:${t.textFaint}`}
+                    />
+                    {menuSearch && (
+                      <button onClick={() => setMenuSearch("")} className={`${t.textDim} hover:${t.textMuted} transition-colors`}>
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {/* Category chips */}
                 <div
-                  className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2.5 lg:py-3 overflow-x-auto border-b ${t.borderSoft}`}
+                  className={`flex-shrink-0 flex gap-2 px-4 lg:px-6 py-2 overflow-x-auto border-b ${t.borderSoft}`}
                 >
                   {categories.map((cat) => (
                     <button
