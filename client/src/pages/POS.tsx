@@ -449,6 +449,13 @@ const posTranslations = {
 };
 type PosLang = keyof typeof posTranslations;
 
+const localName = (
+  item: { name: string; nameAl?: string | null; nameMk?: string | null },
+  lang: PosLang
+): string =>
+  (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) ||
+  item.name;
+
 // ─── ESC/POS Printer ──────────────────────────────────────────────────────────
 function buildEscPosBytes({
   restaurantName,
@@ -2913,7 +2920,7 @@ export default function POS({ slug }: POSProps) {
                             <p
                               className={`text-xs lg:text-sm font-semibold ${t.textSoft} leading-snug pr-6 line-clamp-2`}
                             >
-                              {item.name}
+                              {localName(item, lang)}
                             </p>
                             {item.specialDiscount && item.specialType ? (
                               <div className="mt-1.5 space-y-0.5">
@@ -3004,7 +3011,7 @@ export default function POS({ slug }: POSProps) {
                             )}
                             <div className="flex-1 min-w-0">
                               <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
-                                {item.name}
+                                {localName(item, lang)}
                               </p>
                               <p
                                 className="text-xs text-amber-400 mt-0.5"
@@ -3264,7 +3271,9 @@ export default function POS({ slug }: POSProps) {
                             ? currentOrder.items
                                 .map((item) => {
                                   const newQty = item.qty - (prevMap.get(item.id) ?? 0);
-                                  return newQty > 0 ? { ...item, qty: newQty } : null;
+                                  return newQty > 0
+                                    ? { ...item, name: localName(item, lang), qty: newQty }
+                                    : null;
                                 })
                                 .filter(Boolean)
                             : [];
@@ -3413,7 +3422,7 @@ export default function POS({ slug }: POSProps) {
                                 <p
                                   className={`text-sm font-semibold ${t.textSoft} truncate`}
                                 >
-                                  {item.name}
+                                  {localName(item, lang)}
                                 </p>
                                 <p
                                   className={`text-xs mt-0.5 ${pc ? pc.text : t.textFaint}`}
@@ -4153,7 +4162,7 @@ export default function POS({ slug }: POSProps) {
                         className="flex justify-between text-xs py-0.5"
                       >
                         <span className={t.textMuted}>
-                          {item.qty}× {item.name}
+                          {item.qty}× {localName(item, lang)}
                         </span>
                         <span className={`font-semibold ${t.text}`}>
                           {item.price * item.qty} DEN
@@ -4367,7 +4376,7 @@ export default function POS({ slug }: POSProps) {
                                 className="flex justify-between text-xs"
                               >
                                 <span className={t.textMuted}>
-                                  {item.qty}× {item.name}
+                                  {item.qty}× {localName(item, lang)}
                                 </span>
                                 <span className={`font-semibold ${t.text}`}>
                                   {item.price * item.qty} DEN
