@@ -655,6 +655,21 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/kitchen/order-ready", async (req, res) => {
+    try {
+      const { slug, tableNumber } = req.body;
+      if (!slug || !tableNumber)
+        return res.status(400).json({ message: "Missing fields" });
+      await safeTrigger(`pos-${slug}`, "order-ready", {
+        tableNumber,
+        timestamp: Date.now(),
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post("/api/pos/checkout", async (req, res) => {
     try {
       const { restaurantId, tableNumber, items, waiterId } = req.body;

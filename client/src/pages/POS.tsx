@@ -1026,6 +1026,7 @@ export default function POS({ slug }: POSProps) {
   const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(
     null,
   );
+  const [readyBanners, setReadyBanners] = useState<{ id: string; tableNumber: number }[]>([]);
   const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
 
@@ -2174,6 +2175,26 @@ export default function POS({ slug }: POSProps) {
         channel.bind("table-released", (data: { tableNumber: number }) => {
           refetchAssignments();
         });
+        channel.bind("order-ready", (data: { tableNumber: number }) => {
+          const id = `${Date.now()}-${Math.random()}`;
+          setReadyBanners((prev) => [...prev, { id, tableNumber: data.tableNumber }]);
+          // play a gentle "ding" sound
+          try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.35, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.6);
+          } catch {}
+          setTimeout(() => setReadyBanners((prev) => prev.filter((b) => b.id !== id)), 8000);
+        });
         channel.bind(
           "waiter-request",
           (data: { tableNumber: number | string; type: string }) => {
@@ -2467,6 +2488,42 @@ export default function POS({ slug }: POSProps) {
           </motion.button>
         )}
       </AnimatePresence>
+
+      {/* ── Kitchen ready banners ── */}
+      <div className="absolute top-[60px] left-3 right-3 z-60 flex flex-col gap-2 pointer-events-none">
+        <AnimatePresence>
+          {readyBanners.map((b) => (
+            <motion.div
+              key={b.id}
+              initial={{ y: -60, opacity: 0, scale: 0.95 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -60, opacity: 0, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
+              className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl"
+              style={{ background: "linear-gradient(90deg, hsl(150 60% 30%), hsl(150 55% 38%))" }}
+            >
+              <motion.div
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 0.7, repeat: 2 }}
+              >
+                <CheckCircle className="h-5 w-5 text-white" />
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-white leading-tight">
+                  🍽️ Order Ready — Table {b.tableNumber}
+                </p>
+                <p className="text-[11px] text-white/70 font-medium">Kitchen marked this order as done</p>
+              </div>
+              <button
+                onClick={() => setReadyBanners((prev) => prev.filter((x) => x.id !== b.id))}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
           SCREEN: TABLES

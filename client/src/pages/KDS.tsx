@@ -270,6 +270,14 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
   }, [slug, addOrder]);
 
   const markDone = (uid: string) => {
+    const order = orders.find((o) => o.uid === uid);
+    if (order) {
+      fetch("/api/kitchen/order-ready", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, tableNumber: order.tableNumber }),
+      }).catch(() => {});
+    }
     setOrders((prev) => prev.filter((o) => o.uid !== uid));
     setDoneCount((n) => n + 1);
   };
