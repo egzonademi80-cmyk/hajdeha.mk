@@ -1471,7 +1471,7 @@ export default function POS({ slug }: POSProps) {
   const [activeCategory, setActiveCategory] = useState<string>("All");
   const [screen, setScreen] = useState<Screen>("tables");
   const [payConfirm, setPayConfirm] = useState(false);
-  const [kitchenSentTable, setKitchenSentTable] = useState<number | null>(null);
+  const [kitchenSentSnapshots, setKitchenSentSnapshots] = useState<Map<number, string>>(new Map());
   const [justPaid, setJustPaid] = useState<ActiveSlot>(null);
   const [pendingWaiter, setPendingWaiter] = useState<{
     id: number;
@@ -1776,6 +1776,11 @@ export default function POS({ slug }: POSProps) {
           updated[splitTableIdx] = emptyTable();
           return updated;
         });
+        setKitchenSentSnapshots((prev) => {
+          const next = new Map(prev);
+          next.delete(splitTableIdx);
+          return next;
+        });
         fetch("/api/table/cart-cleared", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1851,6 +1856,11 @@ export default function POS({ slug }: POSProps) {
       setTables((prev) => {
         const next = [...prev];
         next[slot.idx] = emptyTable();
+        return next;
+      });
+      setKitchenSentSnapshots((prev) => {
+        const next = new Map(prev);
+        next.delete(slot.idx);
         return next;
       });
       fetch("/api/table/cart-cleared", {
@@ -3245,6 +3255,9 @@ export default function POS({ slug }: POSProps) {
                         <button
                           onClick={() => {
                             if (!active || currentOrder.items.length === 0) return;
+                            const snapshot = JSON.stringify(currentOrder.items);
+                            const alreadySent = kitchenSentSnapshots.get(active.idx) === snapshot;
+                            if (alreadySent) return;
                             const tableNum = active.kind === "table" ? active.idx + 1 : 0;
                             fetch("/api/pos/send-to-kitchen", {
                               method: "POST",
@@ -3255,16 +3268,24 @@ export default function POS({ slug }: POSProps) {
                                 cart: currentOrder.items,
                               }),
                             }).catch(() => {});
-                            setKitchenSentTable(active.idx);
-                            setTimeout(() => setKitchenSentTable(null), 2000);
+                            setKitchenSentSnapshots((prev) => {
+                              const next = new Map(prev);
+                              next.set(active.idx, snapshot);
+                              return next;
+                            });
                           }}
+                          disabled={
+                            !active ||
+                            currentOrder.items.length === 0 ||
+                            kitchenSentSnapshots.get(active.idx) === JSON.stringify(currentOrder.items)
+                          }
                           className={`w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
-                            kitchenSentTable === active?.idx
-                              ? "bg-emerald-600 text-white"
+                            active && kitchenSentSnapshots.get(active.idx) === JSON.stringify(currentOrder.items)
+                              ? "bg-emerald-600 text-white opacity-80 cursor-not-allowed"
                               : `border ${t.border} ${t.surfaceSoft} ${t.textSoft} hover:border-orange-500/40`
                           }`}
                         >
-                          {kitchenSentTable === active?.idx ? (
+                          {active && kitchenSentSnapshots.get(active.idx) === JSON.stringify(currentOrder.items) ? (
                             <>
                               <CheckCircle className="h-4 w-4" />
                               {tr.kitchenSent}
