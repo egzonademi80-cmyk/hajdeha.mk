@@ -43,8 +43,10 @@ interface MenuItem {
 function getMenuItemSpecialPrice(item: MenuItem): number | null {
   if (!item.specialDiscount || !item.specialType) return null;
   const base = parsePrice(item.price);
-  if (item.specialType === "percent") return Math.round(base * (1 - item.specialDiscount / 100));
-  if (item.specialType === "fixed") return Math.max(0, base - item.specialDiscount);
+  if (item.specialType === "percent")
+    return Math.round(base * (1 - item.specialDiscount / 100));
+  if (item.specialType === "fixed")
+    return Math.max(0, base - item.specialDiscount);
   return null;
 }
 
@@ -152,7 +154,9 @@ function parsePrice(price: string): number {
 }
 
 const ep = (item: OrderItem): number =>
-  item.discount ? Math.round(item.price * (1 - item.discount / 100)) : item.price;
+  item.discount
+    ? Math.round(item.price * (1 - item.discount / 100))
+    : item.price;
 
 type ActiveSlot =
   | { kind: "table"; idx: number }
@@ -451,7 +455,7 @@ type PosLang = keyof typeof posTranslations;
 
 const localName = (
   item: { name: string; nameAl?: string | null; nameMk?: string | null },
-  lang: PosLang
+  lang: PosLang,
 ): string =>
   (lang === "al" ? item.nameAl : lang === "mk" ? item.nameMk : undefined) ||
   item.name;
@@ -1026,7 +1030,9 @@ export default function POS({ slug }: POSProps) {
   const [incomingBanner, setIncomingBanner] = useState<IncomingOrder | null>(
     null,
   );
-  const [readyBanners, setReadyBanners] = useState<{ id: string; tableNumber: number }[]>([]);
+  const [readyBanners, setReadyBanners] = useState<
+    { id: string; tableNumber: number }[]
+  >([]);
   const [waiterSignals, setWaiterSignals] = useState<WaiterSignal[]>([]);
   const [tableFlash, setTableFlash] = useState<number | null>(null);
 
@@ -1480,7 +1486,16 @@ export default function POS({ slug }: POSProps) {
   const [menuSearch, setMenuSearch] = useState("");
   const [screen, setScreen] = useState<Screen>("tables");
   const [payConfirm, setPayConfirm] = useState(false);
-  const [kitchenSentSnapshots, setKitchenSentSnapshots] = useState<Map<number, string>>(new Map());
+  const KITCHEN_KEY = `pos-${slug}-kitchen-snapshots-v1`;
+  const [kitchenSentSnapshots, setKitchenSentSnapshots] = useState<
+    Map<number, string>
+  >(() => {
+    try {
+      const saved = localStorage.getItem(KITCHEN_KEY);
+      if (saved) return new Map(JSON.parse(saved));
+    } catch {}
+    return new Map();
+  });
   const [justPaid, setJustPaid] = useState<ActiveSlot>(null);
   const [pendingWaiter, setPendingWaiter] = useState<{
     id: number;
@@ -1681,9 +1696,7 @@ export default function POS({ slug }: POSProps) {
     if (!active) return;
     const upd = (order: TableOrder | PersonTab): TableOrder | PersonTab => ({
       ...order,
-      items: order.items.map((i) =>
-        i.id === itemId ? { ...i, discount } : i,
-      ),
+      items: order.items.map((i) => (i.id === itemId ? { ...i, discount } : i)),
     });
     if (active.kind === "table") {
       setTables((prev) => {
@@ -2061,6 +2074,14 @@ export default function POS({ slug }: POSProps) {
     } catch {}
   }, [sections, SECTIONS_KEY]);
   useEffect(() => {
+    try {
+      localStorage.setItem(
+        KITCHEN_KEY,
+        JSON.stringify([...kitchenSentSnapshots]),
+      );
+    } catch {}
+  }, [kitchenSentSnapshots, KITCHEN_KEY]);
+  useEffect(() => {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
   }, [showNewPerson]);
 
@@ -2178,10 +2199,14 @@ export default function POS({ slug }: POSProps) {
         channel.bind("order-ready", (data: { tableNumber: number }) => {
           console.log("[POS] order-ready received:", data);
           const id = `${Date.now()}-${Math.random()}`;
-          setReadyBanners((prev) => [...prev, { id, tableNumber: data.tableNumber }]);
+          setReadyBanners((prev) => [
+            ...prev,
+            { id, tableNumber: data.tableNumber },
+          ]);
           // play a gentle "ding" sound
           try {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const ctx = new (window.AudioContext ||
+              (window as any).webkitAudioContext)();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
@@ -2190,11 +2215,17 @@ export default function POS({ slug }: POSProps) {
             osc.frequency.setValueAtTime(880, ctx.currentTime);
             osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.12);
             gain.gain.setValueAtTime(0.35, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+            gain.gain.exponentialRampToValueAtTime(
+              0.001,
+              ctx.currentTime + 0.6,
+            );
             osc.start(ctx.currentTime);
             osc.stop(ctx.currentTime + 0.6);
           } catch {}
-          setTimeout(() => setReadyBanners((prev) => prev.filter((b) => b.id !== id)), 8000);
+          setTimeout(
+            () => setReadyBanners((prev) => prev.filter((b) => b.id !== id)),
+            8000,
+          );
         });
         channel.bind(
           "waiter-request",
@@ -2501,7 +2532,10 @@ export default function POS({ slug }: POSProps) {
               exit={{ y: -60, opacity: 0, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 380, damping: 28 }}
               className="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl"
-              style={{ background: "linear-gradient(90deg, hsl(150 60% 30%), hsl(150 55% 38%))" }}
+              style={{
+                background:
+                  "linear-gradient(90deg, hsl(150 60% 30%), hsl(150 55% 38%))",
+              }}
             >
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
@@ -2513,10 +2547,14 @@ export default function POS({ slug }: POSProps) {
                 <p className="text-sm font-black text-white leading-tight">
                   🍽️ Order Ready — Table {b.tableNumber}
                 </p>
-                <p className="text-[11px] text-white/70 font-medium">Kitchen marked this order as done</p>
+                <p className="text-[11px] text-white/70 font-medium">
+                  Kitchen marked this order as done
+                </p>
               </div>
               <button
-                onClick={() => setReadyBanners((prev) => prev.filter((x) => x.id !== b.id))}
+                onClick={() =>
+                  setReadyBanners((prev) => prev.filter((x) => x.id !== b.id))
+                }
                 className="text-white/60 hover:text-white transition-colors"
               >
                 <X className="h-4 w-4" />
@@ -2912,9 +2950,21 @@ export default function POS({ slug }: POSProps) {
               >
                 {/* Search box */}
                 <div className={`flex-shrink-0 px-4 lg:px-6 pt-2.5 pb-2`}>
-                  <div className={`flex items-center gap-2 rounded-xl border ${t.border} ${t.surface} px-3 py-2`}>
-                    <svg className={`h-3.5 w-3.5 flex-shrink-0 ${t.textDim}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                  <div
+                    className={`flex items-center gap-2 rounded-xl border ${t.border} ${t.surface} px-3 py-2`}
+                  >
+                    <svg
+                      className={`h-3.5 w-3.5 flex-shrink-0 ${t.textDim}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+                      />
                     </svg>
                     <input
                       type="text"
@@ -2930,7 +2980,10 @@ export default function POS({ slug }: POSProps) {
                       className={`flex-1 bg-transparent text-xs lg:text-sm outline-none ${t.textSoft} placeholder:${t.textFaint}`}
                     />
                     {menuSearch && (
-                      <button onClick={() => setMenuSearch("")} className={`${t.textDim} hover:${t.textMuted} transition-colors`}>
+                      <button
+                        onClick={() => setMenuSearch("")}
+                        className={`${t.textDim} hover:${t.textMuted} transition-colors`}
+                      >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     )}
@@ -3018,15 +3071,25 @@ export default function POS({ slug }: POSProps) {
                             {item.specialDiscount && item.specialType ? (
                               <div className="mt-1.5 space-y-0.5">
                                 <div className="flex items-center gap-1">
-                                  <span className="text-[9px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded-full leading-none">⭐</span>
-                                  <span className={`text-[9px] line-through ${t.textFaint}`}>{parsePrice(item.price)}</span>
+                                  <span className="text-[9px] font-bold bg-amber-500 text-white px-1 py-0.5 rounded-full leading-none">
+                                    ⭐
+                                  </span>
+                                  <span
+                                    className={`text-[9px] line-through ${t.textFaint}`}
+                                  >
+                                    {parsePrice(item.price)}
+                                  </span>
                                 </div>
                                 <p
                                   className="text-xs lg:text-sm font-bold text-amber-400"
                                   style={{ fontFamily: "'DM Mono', monospace" }}
                                 >
                                   {getMenuItemSpecialPrice(item)}{" "}
-                                  <span className={`text-[9px] lg:text-[10px] ${t.textFaint}`}>DEN</span>
+                                  <span
+                                    className={`text-[9px] lg:text-[10px] ${t.textFaint}`}
+                                  >
+                                    DEN
+                                  </span>
                                 </p>
                               </div>
                             ) : (
@@ -3035,7 +3098,11 @@ export default function POS({ slug }: POSProps) {
                                 style={{ fontFamily: "'DM Mono', monospace" }}
                               >
                                 {parsePrice(item.price)}{" "}
-                                <span className={`text-[9px] lg:text-[10px] ${t.textFaint}`}>DEN</span>
+                                <span
+                                  className={`text-[9px] lg:text-[10px] ${t.textFaint}`}
+                                >
+                                  DEN
+                                </span>
                               </p>
                             )}
                             <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-0.5 opacity-20">
@@ -3051,23 +3118,23 @@ export default function POS({ slug }: POSProps) {
                 </div>
               </div>
 
-                {screen === "menu" && currentOrder.items.length > 0 && (
-                  <button
-                    onClick={() => setScreen("order")}
-                    className="lg:hidden fixed bottom-6 right-4 z-30 flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-amber-500 text-black font-bold text-sm shadow-2xl active:scale-95 transition-transform"
-                  >
-                    <ShoppingBag className="h-4 w-4" />
-                    <span>{orderTotal(currentOrder)} DEN</span>
-                    <span className="opacity-60">·</span>
-                    <span className="h-5 w-5 rounded-full bg-black/20 flex items-center justify-center text-[11px] font-bold">
-                      {orderCount(currentOrder)}
-                    </span>
-                  </button>
-                )}
-
-                <div
-                  className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
+              {screen === "menu" && currentOrder.items.length > 0 && (
+                <button
+                  onClick={() => setScreen("order")}
+                  className="lg:hidden fixed bottom-6 right-4 z-30 flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-amber-500 text-black font-bold text-sm shadow-2xl active:scale-95 transition-transform"
                 >
+                  <ShoppingBag className="h-4 w-4" />
+                  <span>{orderTotal(currentOrder)} DEN</span>
+                  <span className="opacity-60">·</span>
+                  <span className="h-5 w-5 rounded-full bg-black/20 flex items-center justify-center text-[11px] font-bold">
+                    {orderCount(currentOrder)}
+                  </span>
+                </button>
+              )}
+
+              <div
+                className={`flex-col overflow-hidden ${t.panelBg} lg:border-l lg:${t.border} lg:w-[380px] xl:w-[440px] ${screen === "menu" ? "hidden lg:flex" : "flex flex-1 lg:flex-none"}`}
+              >
                 <div
                   className={`hidden lg:flex flex-shrink-0 items-center gap-2 px-5 py-4 border-b ${t.border}`}
                 >
@@ -3103,7 +3170,9 @@ export default function POS({ slug }: POSProps) {
                               <div className="w-0.5 self-stretch rounded-full bg-amber-400 flex-shrink-0" />
                             )}
                             <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-semibold ${t.textSoft} truncate`}>
+                              <p
+                                className={`text-sm font-semibold ${t.textSoft} truncate`}
+                              >
                                 {localName(item, lang)}
                               </p>
                               <p
@@ -3112,12 +3181,20 @@ export default function POS({ slug }: POSProps) {
                               >
                                 {item.discount ? (
                                   <>
-                                    <span className="line-through opacity-50">{item.price}</span>
-                                    {" "}<span className="text-red-400">-{item.discount}%</span>
-                                    {" "}{ep(item)} × {item.qty} = {ep(item) * item.qty} DEN
+                                    <span className="line-through opacity-50">
+                                      {item.price}
+                                    </span>{" "}
+                                    <span className="text-red-400">
+                                      -{item.discount}%
+                                    </span>{" "}
+                                    {ep(item)} × {item.qty} ={" "}
+                                    {ep(item) * item.qty} DEN
                                   </>
                                 ) : (
-                                  <>{item.price} × {item.qty} = {item.price * item.qty} DEN</>
+                                  <>
+                                    {item.price} × {item.qty} ={" "}
+                                    {item.price * item.qty} DEN
+                                  </>
                                 )}
                               </p>
                             </div>
@@ -3129,14 +3206,20 @@ export default function POS({ slug }: POSProps) {
                                     setDiscountInput("");
                                   } else {
                                     setDiscountItemId(item.id);
-                                    setDiscountInput(item.discount ? String(item.discount) : "");
+                                    setDiscountInput(
+                                      item.discount
+                                        ? String(item.discount)
+                                        : "",
+                                    );
                                   }
                                 }}
                                 className={`h-6 w-6 rounded-lg flex items-center justify-center text-[10px] font-bold border transition-colors ${item.discount ? "bg-red-500/20 border-red-500/50 text-red-400" : `${t.surfaceSoft} border-transparent ${t.textMuted} hover:bg-white/10`}`}
                               >
                                 %
                               </button>
-                              <div className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}>
+                              <div
+                                className={`flex items-center gap-2 ${t.surfaceSoft} rounded-xl px-2 py-1.5`}
+                              >
                                 <button
                                   onClick={() => updateQty(item.id, -1)}
                                   className={`h-6 w-6 lg:h-7 lg:w-7 rounded-lg flex items-center justify-center ${t.textMuted} active:bg-white/10 hover:bg-white/10`}
@@ -3166,14 +3249,17 @@ export default function POS({ slug }: POSProps) {
                                 max="100"
                                 placeholder="Discount %"
                                 value={discountInput}
-                                onChange={(e) => setDiscountInput(e.target.value)}
+                                onChange={(e) =>
+                                  setDiscountInput(e.target.value)
+                                }
                                 className={`flex-1 h-8 rounded-lg px-2 text-sm font-mono border ${t.surface} ${t.border} ${t.text} bg-transparent outline-none focus:border-amber-400`}
                                 autoFocus
                               />
                               <button
                                 onClick={() => {
                                   const val = parseInt(discountInput);
-                                  if (val > 0 && val <= 100) applyDiscount(item.id, val);
+                                  if (val > 0 && val <= 100)
+                                    applyDiscount(item.id, val);
                                   else applyDiscount(item.id, undefined);
                                   setDiscountItemId(null);
                                   setDiscountInput("");
@@ -3354,18 +3440,30 @@ export default function POS({ slug }: POSProps) {
                         )}
                         {(() => {
                           // Compute delta once — items added or qty-increased since last send
-                          const prevRaw = active ? kitchenSentSnapshots.get(active.idx) : undefined;
-                          const prevMap = new Map<number, number>(
-                            prevRaw
-                              ? (JSON.parse(prevRaw) as { id: number; qty: number }[]).map((i) => [i.id, i.qty])
-                              : []
-                          );
+                          const sentMap = new Map<number, number>();
+                          if (active?.kind === "table") {
+                            const rounds =
+                              (currentOrder as TableOrder).rounds ?? [];
+                            for (const round of rounds) {
+                              for (const item of round.items) {
+                                sentMap.set(
+                                  item.id,
+                                  (sentMap.get(item.id) ?? 0) + item.qty,
+                                );
+                              }
+                            }
+                          }
                           const deltaCart = currentOrder
                             ? currentOrder.items
                                 .map((item) => {
-                                  const newQty = item.qty - (prevMap.get(item.id) ?? 0);
+                                  const newQty =
+                                    item.qty - (sentMap.get(item.id) ?? 0);
                                   return newQty > 0
-                                    ? { ...item, name: localName(item, lang), qty: newQty }
+                                    ? {
+                                        ...item,
+                                        name: localName(item, lang),
+                                        qty: newQty,
+                                      }
                                     : null;
                                 })
                                 .filter(Boolean)
@@ -3377,22 +3475,33 @@ export default function POS({ slug }: POSProps) {
                               disabled={allSent}
                               onClick={() => {
                                 if (!active || allSent) return;
-                                const tableNum = active.kind === "table" ? active.idx + 1 : 0;
+                                const tableNum =
+                                  active.kind === "table" ? active.idx + 1 : 0;
                                 fetch("/api/pos/send-to-kitchen", {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json" },
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
                                   body: JSON.stringify({
                                     slug: RESTAURANT_SLUG,
                                     tableNumber: tableNum,
                                     cart: deltaCart,
                                   }),
                                 }).catch(() => {});
-                                const snapshot = JSON.stringify(
-                                  currentOrder!.items.map((i) => ({ id: i.id, qty: i.qty }))
-                                );
-                                setKitchenSentSnapshots((prev) => {
-                                  const next = new Map(prev);
-                                  next.set(active.idx, snapshot);
+                                // Add a new round to the table so the sent items are tracked
+                                setTables((prev) => {
+                                  const next = [...prev];
+                                  const t = next[active.idx];
+                                  next[active.idx] = {
+                                    ...t,
+                                    rounds: [
+                                      ...(t.rounds ?? []),
+                                      {
+                                        items: deltaCart as OrderItem[],
+                                        sentAt: Date.now(),
+                                      },
+                                    ],
+                                  };
                                   return next;
                                 });
                               }}
@@ -3403,9 +3512,15 @@ export default function POS({ slug }: POSProps) {
                               }`}
                             >
                               {allSent ? (
-                                <><CheckCircle className="h-4 w-4" />{tr.kitchenSent}</>
+                                <>
+                                  <CheckCircle className="h-4 w-4" />
+                                  {tr.kitchenSent}
+                                </>
                               ) : (
-                                <><ChefHat className="h-4 w-4" />{tr.sendKitchen}</>
+                                <>
+                                  <ChefHat className="h-4 w-4" />
+                                  {tr.sendKitchen}
+                                </>
                               )}
                             </button>
                           );
@@ -3522,9 +3637,24 @@ export default function POS({ slug }: POSProps) {
                                   style={{ fontFamily: "'DM Mono', monospace" }}
                                 >
                                   {item.discount ? (
-                                    <>{ep(item)} × {item.qty} = <span className="font-bold">{ep(item) * item.qty}</span> DEN <span className="text-red-400">(-{item.discount}%)</span></>
+                                    <>
+                                      {ep(item)} × {item.qty} ={" "}
+                                      <span className="font-bold">
+                                        {ep(item) * item.qty}
+                                      </span>{" "}
+                                      DEN{" "}
+                                      <span className="text-red-400">
+                                        (-{item.discount}%)
+                                      </span>
+                                    </>
                                   ) : (
-                                    <>{item.price} × {item.qty} = <span className="font-bold">{item.price * item.qty}</span> DEN</>
+                                    <>
+                                      {item.price} × {item.qty} ={" "}
+                                      <span className="font-bold">
+                                        {item.price * item.qty}
+                                      </span>{" "}
+                                      DEN
+                                    </>
                                   )}
                                 </p>
                               </div>
