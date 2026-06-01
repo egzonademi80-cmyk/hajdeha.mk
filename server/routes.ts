@@ -637,40 +637,53 @@ export async function registerRoutes(
     }
   });
 
-  // === POS MANUAL CHECKOUT — saves a completed order for profit tracking ===
+  // === IN-MEMORY KITCHEN ORDERS (no DB cost) ===
+  // Orders are stored per restaurant slug. Clears on server restart which is fine for kitchen orders.
+  const kitchenOrdersStore: Map<string, Array<{
+    id: number;
+    tableNumber: number;
+    cart: any[];
+    customerNote: string | null;
+    timestamp: number;
+    source: "pos" | "qr";
+  }>> = new Map();
+  
+  let kitchenOrderIdCounter = 1;
+
+  // === POS MANUAL CHECKOUT — sends order to kitchen ===
   app.post("/api/pos/send-to-kitchen", async (req, res) => {
     try {
       const { slug, tableNumber, cart } = req.body;
       if (!slug || !Array.isArray(cart) || cart.length === 0)
         return res.status(400).json({ message: "Missing fields" });
       
-      // Look up restaurant to get ID for database persistence
-      const restaurant = await storage.getRestaurantBySlug(slug);
-      if (!restaurant) {
-        return res.status(404).json({ message: "Restaurant not found" });
-      }
-      
       const timestamp = Date.now();
+      const orderId = kitchenOrderIdCounter++;
       
-      // Save to database with "kitchen" status so it persists across page refreshes
-      const order = await storage.createOrder({
-        restaurantId: restaurant.id,
+      // Store in memory (no DB call)
+      const order = {
+        id: orderId,
         tableNumber: Number(tableNumber) || 0,
-        cart: JSON.stringify(cart),
+        cart,
         customerNote: null,
-        status: "kitchen",
-        waiterId: null,
-      });
+        timestamp,
+        source: "pos" as const,
+      };
+      
+      if (!kitchenOrdersStore.has(slug)) {
+        kitchenOrdersStore.set(slug, []);
+      }
+      kitchenOrdersStore.get(slug)!.push(order);
       
       // Broadcast to KDS via Pusher
       await safeTrigger(`pos-${slug}`, "kitchen-order", {
-        id: order.id,
+        id: orderId,
         cart,
         tableNumber,
         timestamp,
         source: "pos",
       });
-      res.json({ ok: true, orderId: order.id });
+      res.json({ ok: true, orderId });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -684,25 +697,9 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing slug" });
       }
       
-      const restaurant = await storage.getRestaurantBySlug(slug);
-      if (!restaurant) {
-        return res.status(404).json({ message: "Restaurant not found" });
-      }
-      
-      // Get orders with "kitchen" or "pending" status (both are relevant for KDS)
-      const kitchenOrders = await storage.getOrders(restaurant.id, "kitchen");
-      const pendingOrders = await storage.getOrders(restaurant.id, "pending");
-      
-      const allOrders = [...kitchenOrders, ...pendingOrders].map(order => ({
-        id: order.id,
-        tableNumber: order.tableNumber,
-        cart: JSON.parse(order.cart || "[]"),
-        customerNote: order.customerNote,
-        timestamp: order.createdAt ? new Date(order.createdAt).getTime() : Date.now(),
-        source: order.status === "kitchen" ? "pos" : "qr",
-      }));
-      
-      res.json(allOrders);
+      // Get from memory (no DB call)
+      const orders = kitchenOrdersStore.get(slug) || [];
+      res.json(orders);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -711,13 +708,19 @@ export async function registerRoutes(
   // === MARK KITCHEN ORDER AS DONE ===
   app.post("/api/kitchen/order-done", async (req, res) => {
     try {
-      const { orderId } = req.body;
-      if (!orderId) {
-        return res.status(400).json({ message: "Missing orderId" });
+      const { orderId, slug } = req.body;
+      if (!orderId || !slug) {
+        return res.status(400).json({ message: "Missing orderId or slug" });
       }
       
-      // Mark the order as completed in the database
-      await storage.completeOrder(Number(orderId));
+      // Remove from memory (no DB call)
+      const orders = kitchenOrdersStore.get(slug);
+      if (orders) {
+        const idx = orders.findIndex(o => o.id === orderId);
+        if (idx !== -1) {
+          orders.splice(idx, 1);
+        }
+      }
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

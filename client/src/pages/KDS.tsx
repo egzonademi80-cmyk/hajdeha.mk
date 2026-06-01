@@ -315,12 +315,12 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
         body: JSON.stringify({ slug, tableNumber: order.tableNumber }),
       }).catch(() => {});
       
-      // Mark order as completed in database if it has a dbId
+      // Remove order from server memory store
       if (order.dbId) {
         fetch("/api/kitchen/order-done", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId: order.dbId }),
+          body: JSON.stringify({ orderId: order.dbId, slug }),
         }).catch(() => {});
       }
     }
