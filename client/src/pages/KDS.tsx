@@ -13,6 +13,7 @@ interface KDSItem {
 
 interface KDSOrder {
   uid: string;
+  dbId?: number; // Database ID for marking as done
   tableNumber: number;
   items: KDSItem[];
   customerNote: string | null;
@@ -228,26 +229,61 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
   const [doneCount, setDoneCount] = useState(0);
   const [connected, setConnected] = useState(false);
 
-  const addOrder = useCallback((data: any, source: "qr" | "pos") => {
-    beep();
-    const uid = `${Date.now()}-${Math.random()}`;
-    const order: KDSOrder = {
-      uid,
-      tableNumber: data.tableNumber,
-      items: data.cart || [],
-      customerNote: data.customerNote || null,
-      receivedAt: data.timestamp || Date.now(),
-      isNew: true,
-      source,
-      doneItems: new Set(),
-    };
-    setOrders((prev) => [order, ...prev]);
-    setTimeout(() => {
-      setOrders((prev) =>
-        prev.map((o) => (o.uid === uid ? { ...o, isNew: false } : o))
+  const addOrder = useCallback((data: any, source: "qr" | "pos", isExisting = false) => {
+    if (!isExisting) beep(); // Only beep for new orders, not loaded ones
+    const uid = data.id ? `db-${data.id}` : `${Date.now()}-${Math.random()}`;
+    
+    // Check if this order already exists (by dbId or uid)
+    setOrders((prev) => {
+      const exists = prev.some(o => 
+        (data.id && o.dbId === data.id) || o.uid === uid
       );
-    }, 5000);
+      if (exists) return prev;
+      
+      const order: KDSOrder = {
+        uid,
+        dbId: data.id || undefined,
+        tableNumber: data.tableNumber,
+        items: data.cart || [],
+        customerNote: data.customerNote || null,
+        receivedAt: data.timestamp || Date.now(),
+        isNew: !isExisting,
+        source,
+        doneItems: new Set(),
+      };
+      
+      if (!isExisting) {
+        // For new orders, mark as not new after 5 seconds
+        setTimeout(() => {
+          setOrders((prev) =>
+            prev.map((o) => (o.uid === uid ? { ...o, isNew: false } : o))
+          );
+        }, 5000);
+      }
+      
+      return isExisting ? [...prev, order] : [order, ...prev];
+    });
   }, []);
+
+  // Load existing orders on mount
+  useEffect(() => {
+    if (!slug) return;
+    
+    fetch(`/api/kitchen/orders?slug=${encodeURIComponent(slug)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          // Sort by timestamp (oldest first) so they appear in order
+          const sorted = data.sort((a: any, b: any) => a.timestamp - b.timestamp);
+          sorted.forEach((order: any) => {
+            addOrder(order, order.source === "pos" ? "pos" : "qr", true);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load kitchen orders:", err);
+      });
+  }, [slug, addOrder]);
 
   useEffect(() => {
     if (!slug) return;
@@ -272,11 +308,21 @@ export default function KDS({ slug: propSlug }: { slug?: string }) {
   const markDone = (uid: string) => {
     const order = orders.find((o) => o.uid === uid);
     if (order) {
+      // Notify POS that order is ready
       fetch("/api/kitchen/order-ready", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug, tableNumber: order.tableNumber }),
       }).catch(() => {});
+      
+      // Mark order as completed in database if it has a dbId
+      if (order.dbId) {
+        fetch("/api/kitchen/order-done", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: order.dbId }),
+        }).catch(() => {});
+      }
     }
     setOrders((prev) => prev.filter((o) => o.uid !== uid));
     setDoneCount((n) => n + 1);

@@ -643,12 +643,81 @@ export async function registerRoutes(
       const { slug, tableNumber, cart } = req.body;
       if (!slug || !Array.isArray(cart) || cart.length === 0)
         return res.status(400).json({ message: "Missing fields" });
+      
+      // Look up restaurant to get ID for database persistence
+      const restaurant = await storage.getRestaurantBySlug(slug);
+      if (!restaurant) {
+        return res.status(404).json({ message: "Restaurant not found" });
+      }
+      
+      const timestamp = Date.now();
+      
+      // Save to database with "kitchen" status so it persists across page refreshes
+      const order = await storage.createOrder({
+        restaurantId: restaurant.id,
+        tableNumber: Number(tableNumber) || 0,
+        cart: JSON.stringify(cart),
+        customerNote: null,
+        status: "kitchen",
+        waiterId: null,
+      });
+      
+      // Broadcast to KDS via Pusher
       await safeTrigger(`pos-${slug}`, "kitchen-order", {
+        id: order.id,
         cart,
         tableNumber,
-        timestamp: Date.now(),
+        timestamp,
         source: "pos",
       });
+      res.json({ ok: true, orderId: order.id });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+  
+  // === GET PENDING KITCHEN ORDERS — for KDS to load on mount ===
+  app.get("/api/kitchen/orders", async (req, res) => {
+    try {
+      const slug = req.query.slug as string;
+      if (!slug) {
+        return res.status(400).json({ message: "Missing slug" });
+      }
+      
+      const restaurant = await storage.getRestaurantBySlug(slug);
+      if (!restaurant) {
+        return res.status(404).json({ message: "Restaurant not found" });
+      }
+      
+      // Get orders with "kitchen" or "pending" status (both are relevant for KDS)
+      const kitchenOrders = await storage.getOrders(restaurant.id, "kitchen");
+      const pendingOrders = await storage.getOrders(restaurant.id, "pending");
+      
+      const allOrders = [...kitchenOrders, ...pendingOrders].map(order => ({
+        id: order.id,
+        tableNumber: order.tableNumber,
+        cart: JSON.parse(order.cart || "[]"),
+        customerNote: order.customerNote,
+        timestamp: order.createdAt ? new Date(order.createdAt).getTime() : Date.now(),
+        source: order.status === "kitchen" ? "pos" : "qr",
+      }));
+      
+      res.json(allOrders);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+  
+  // === MARK KITCHEN ORDER AS DONE ===
+  app.post("/api/kitchen/order-done", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      if (!orderId) {
+        return res.status(400).json({ message: "Missing orderId" });
+      }
+      
+      // Mark the order as completed in the database
+      await storage.completeOrder(Number(orderId));
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
