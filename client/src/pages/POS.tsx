@@ -26,6 +26,8 @@ import {
   ClipboardList,
   KeyRound,
   ChefHat,
+  WifiOff,
+  Wifi,
 } from "lucide-react";
 
 interface MenuItem {
@@ -962,13 +964,23 @@ export default function POS({ slug }: POSProps) {
   const TABLES_KEY = `pos-${slug}-tables-v3`;
   const PERSONS_KEY = `pos-${slug}-persons-v1`;
   const SECTIONS_KEY = `pos-${slug}-sections-v1`;
+  const RESTAURANT_CACHE_KEY = `pos-${slug}-restaurant-cache-v1`;
+  const OFFLINE_QUEUE_KEY = `pos-${slug}-offline-queue-v1`;
 
   const { data: restaurant, isLoading } = useQuery({
     queryKey: ["pos-restaurant"],
     queryFn: async () => {
-      const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
-      if (!res.ok) throw new Error("Restaurant not found");
-      return res.json() as Promise<Restaurant>;
+      try {
+        const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
+        if (!res.ok) throw new Error("Restaurant not found");
+        const data = await res.json();
+        localStorage.setItem(RESTAURANT_CACHE_KEY, JSON.stringify(data));
+        return data as Restaurant;
+      } catch (err) {
+        const cached = localStorage.getItem(RESTAURANT_CACHE_KEY);
+        if (cached) return JSON.parse(cached) as Restaurant;
+        throw err;
+      }
     },
     retry: false,
   });
@@ -1506,6 +1518,61 @@ export default function POS({ slug }: POSProps) {
   const [newPersonName, setNewPersonName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [, forceUpdate] = useState(0);
+
+  // ── Offline queue ──────────────────────────────────────────────────────────
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [offlineQueue, setOfflineQueue] = useState<
+    Array<{
+      slug: string;
+      tableNumber: number;
+      cart: OrderItem[];
+      queuedAt: number;
+    }>
+  >(() => {
+    try {
+      const saved = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(offlineQueue));
+  }, [offlineQueue, OFFLINE_QUEUE_KEY]);
+
+  useEffect(() => {
+    if (!isOnline || offlineQueue.length === 0) return;
+    const drain = async () => {
+      const queue = [...offlineQueue];
+      const failed: typeof queue = [];
+      for (const item of queue) {
+        try {
+          await fetch("/api/pos/send-to-kitchen", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          });
+        } catch {
+          failed.push(item);
+        }
+      }
+      setOfflineQueue(failed);
+    };
+    drain();
+  }, [isOnline]);
+  // ──────────────────────────────────────────────────────────────────────────
 
   const menuItems: MenuItem[] = useMemo(
     () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
@@ -2390,6 +2457,41 @@ export default function POS({ slug }: POSProps) {
         </button>
         {/* Orders panel button */}
       </div>
+
+      {/* ── Offline status banner ── */}
+      <AnimatePresence>
+        {(!isOnline || offlineQueue.length > 0) && (
+          <motion.div
+            initial={{ y: -60, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -60, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className={`fixed left-3 right-3 z-[70] rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-xl ${
+              !isOnline
+                ? "bg-red-600"
+                : "bg-amber-500"
+            }`}
+            style={{ top: 72 }}
+          >
+            {!isOnline ? (
+              <WifiOff className="h-4 w-4 text-white flex-shrink-0" />
+            ) : (
+              <Wifi className="h-4 w-4 text-white flex-shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              {!isOnline ? (
+                <p className="text-white text-xs font-semibold leading-tight">
+                  Offline{offlineQueue.length > 0 ? ` — ${offlineQueue.length} order${offlineQueue.length > 1 ? "s" : ""} queued` : " — orders will be saved locally"}
+                </p>
+              ) : (
+                <p className="text-white text-xs font-semibold leading-tight">
+                  Back online — sending {offlineQueue.length} queued order{offlineQueue.length > 1 ? "s" : ""} to kitchen…
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Waiter signal banners ── */}
       <AnimatePresence>
@@ -3477,17 +3579,36 @@ export default function POS({ slug }: POSProps) {
                                 if (!active || allSent) return;
                                 const tableNum =
                                   active.kind === "table" ? active.idx + 1 : 0;
-                                fetch("/api/pos/send-to-kitchen", {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    slug: RESTAURANT_SLUG,
-                                    tableNumber: tableNum,
-                                    cart: deltaCart,
-                                  }),
-                                }).catch(() => {});
+                                const kitchenPayload = {
+                                  slug: RESTAURANT_SLUG,
+                                  tableNumber: tableNum,
+                                  cart: deltaCart,
+                                };
+                                if (!isOnline) {
+                                  setOfflineQueue((prev) => [
+                                    ...prev,
+                                    {
+                                      ...kitchenPayload,
+                                      queuedAt: Date.now(),
+                                    },
+                                  ]);
+                                } else {
+                                  fetch("/api/pos/send-to-kitchen", {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify(kitchenPayload),
+                                  }).catch(() => {
+                                    setOfflineQueue((prev) => [
+                                      ...prev,
+                                      {
+                                        ...kitchenPayload,
+                                        queuedAt: Date.now(),
+                                      },
+                                    ]);
+                                  });
+                                }
                                 // Add a new round to the table so the sent items are tracked
                                 setTables((prev) => {
                                   const next = [...prev];
