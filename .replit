@@ -5,6 +5,8 @@ packages = ["unzip", "nano"]
 
 [agent]
 expertMode = true
+stack = "FULLSTACK_JS"
+integrations = ["javascript_anthropic_ai_integrations:2.0.0"]
 
 [workflows]
 runButton = "Project"
