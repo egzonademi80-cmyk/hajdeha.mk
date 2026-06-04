@@ -1004,6 +1004,29 @@ export default function POS({ slug }: POSProps) {
     tablesRef.current = tables;
   }, [tables]);
 
+  // ─── Live sync: stable per-tab device identity ────────────────────────────
+  const deviceId = useRef<string>(() => {
+    let id = sessionStorage.getItem("pos-device-id");
+    if (!id) { id = Math.random().toString(36).slice(2); sessionStorage.setItem("pos-device-id", id); }
+    return id;
+  }).current as unknown as string;
+  // Resolved lazily so sessionStorage is only read once on mount
+  const deviceIdRef = useRef<string>("");
+  useEffect(() => {
+    let id = sessionStorage.getItem("pos-device-id");
+    if (!id) { id = Math.random().toString(36).slice(2); sessionStorage.setItem("pos-device-id", id); }
+    deviceIdRef.current = id;
+  }, []);
+
+  // Set to true while applying a remote Pusher update → prevents echo back to server
+  const isSyncingFromRemote = useRef(false);
+  // Only start broadcasting after initial server state has been loaded
+  const serverSyncReady = useRef(false);
+  // Debounce timer ref for server sync
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track last synced snapshot per table to avoid redundant requests
+  const lastSyncedRef = useRef<string[]>([]);
+
   // Dedup ref — never merge  if (!dbOrders ||the same DB order twice
   const processedOrderIdsRef = useRef<Set<number>>(new Set());
 
@@ -2085,6 +2108,68 @@ export default function POS({ slug }: POSProps) {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
   }, [showNewPerson]);
 
+  // ─── Load initial table state from server (source of truth for all devices) ─
+  useEffect(() => {
+    if (!restaurantId) return;
+    fetch(`/api/pos/table-state?restaurantId=${restaurantId}`)
+      .then((r) => r.json())
+      .then((rows: { tableNumber: number; stateJson: string }[]) => {
+        if (!Array.isArray(rows) || rows.length === 0) {
+          serverSyncReady.current = true;
+          return;
+        }
+        isSyncingFromRemote.current = true;
+        setTables((prev) => {
+          const next = [...prev];
+          rows.forEach(({ tableNumber, stateJson }) => {
+            const idx = tableNumber - 1;
+            if (idx < 0 || idx >= next.length) return;
+            try {
+              const serverState = JSON.parse(stateJson);
+              // Server wins if it has items; keep local if local is non-empty and server is empty
+              if (serverState.items && serverState.items.length > 0) {
+                next[idx] = serverState;
+              }
+            } catch {}
+          });
+          lastSyncedRef.current = next.map((t) => JSON.stringify(t));
+          return next;
+        });
+        setTimeout(() => {
+          isSyncingFromRemote.current = false;
+          serverSyncReady.current = true;
+        }, 100);
+      })
+      .catch(() => { serverSyncReady.current = true; });
+  }, [restaurantId]);
+
+  // ─── Debounced sync: broadcast table changes to all other POS devices ────────
+  useEffect(() => {
+    if (!serverSyncReady.current || !restaurantId || isSyncingFromRemote.current) return;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      const slug = RESTAURANT_SLUG;
+      const devId = deviceIdRef.current;
+      tables.forEach((table, idx) => {
+        const serialized = JSON.stringify(table);
+        if (lastSyncedRef.current[idx] === serialized) return; // no change
+        lastSyncedRef.current[idx] = serialized;
+        fetch("/api/pos/table-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            restaurantId,
+            tableNumber: idx + 1,
+            stateJson: serialized,
+            slug,
+            deviceId: devId,
+          }),
+        }).catch(() => {});
+      });
+    }, 700);
+    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+  }, [tables, restaurantId, RESTAURANT_SLUG]);
+
   // ─── Pusher realtime ────────────────────────────────────────────────────────
   useEffect(() => {
     let pusher: Pusher | null = null;
@@ -2246,6 +2331,29 @@ export default function POS({ slug }: POSProps) {
               30000,
             );
             playWaiterChime(data.type as WaiterSignal["type"]);
+          },
+        );
+
+        // ── Live table-state sync from other devices ───────────────────────
+        channel.bind(
+          "table-state-updated",
+          (data: { tableNumber: number; stateJson: string; deviceId: string | null }) => {
+            // Ignore updates originating from this same browser tab
+            if (data.deviceId && data.deviceId === deviceIdRef.current) return;
+            const idx = data.tableNumber - 1;
+            if (idx < 0) return;
+            try {
+              const remoteState = JSON.parse(data.stateJson);
+              isSyncingFromRemote.current = true;
+              setTables((prev) => {
+                if (idx >= prev.length) return prev;
+                const next = [...prev];
+                next[idx] = remoteState;
+                lastSyncedRef.current[idx] = data.stateJson;
+                return next;
+              });
+              setTimeout(() => { isSyncingFromRemote.current = false; }, 150);
+            } catch {}
           },
         );
       } catch (e) {

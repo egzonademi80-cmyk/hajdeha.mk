@@ -797,6 +797,35 @@ export async function registerRoutes(
     }
   });
 
+  // === POS TABLE STATE (live sync between devices) ===
+  app.get("/api/pos/table-state", async (req, res) => {
+    try {
+      const restaurantId = parseInt(req.query.restaurantId as string);
+      if (isNaN(restaurantId)) return res.status(400).json({ message: "restaurantId required" });
+      const rows = await storage.getPosTableStates(restaurantId);
+      return res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/pos/table-state", async (req, res) => {
+    try {
+      const { restaurantId, tableNumber, stateJson, slug, deviceId } = req.body;
+      if (!restaurantId || !tableNumber || !stateJson || !slug)
+        return res.status(400).json({ message: "Missing fields" });
+      await storage.upsertPosTableState(Number(restaurantId), Number(tableNumber), stateJson);
+      await safeTrigger(`pos-${slug}`, "table-state-updated", {
+        tableNumber: Number(tableNumber),
+        stateJson,
+        deviceId: deviceId || null,
+      });
+      return res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // === TABLE ASSIGNMENTS (persist waiter-table claims) ===
   app.get("/api/pos/table-assignments", async (req, res) => {
     try {

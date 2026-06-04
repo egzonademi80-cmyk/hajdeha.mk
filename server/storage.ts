@@ -7,6 +7,7 @@ import {
   waiters,
   orders,
   tableAssignments,
+  posTableState,
   type User,
   type InsertUser,
   type Restaurant,
@@ -62,6 +63,11 @@ export interface IStorage {
   getTableAssignments(restaurantId: number): Promise<(TableAssignment & { waiterName: string })[]>;
   upsertTableAssignment(restaurantId: number, tableNumber: number, waiterId: number): Promise<void>;
   deleteTableAssignment(restaurantId: number, tableNumber: number): Promise<void>;
+
+  // POS table state (live sync)
+  getPosTableStates(restaurantId: number): Promise<{ tableNumber: number; stateJson: string }[]>;
+  upsertPosTableState(restaurantId: number, tableNumber: number, stateJson: string): Promise<void>;
+  clearPosTableState(restaurantId: number, tableNumber: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -251,6 +257,28 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(tableAssignments)
       .where(and(eq(tableAssignments.restaurantId, restaurantId), eq(tableAssignments.tableNumber, tableNumber)));
+  }
+
+  // POS table state methods
+  async getPosTableStates(restaurantId: number): Promise<{ tableNumber: number; stateJson: string }[]> {
+    const rows = await db
+      .select({ tableNumber: posTableState.tableNumber, stateJson: posTableState.stateJson })
+      .from(posTableState)
+      .where(eq(posTableState.restaurantId, restaurantId));
+    return rows;
+  }
+
+  async upsertPosTableState(restaurantId: number, tableNumber: number, stateJson: string): Promise<void> {
+    await db
+      .delete(posTableState)
+      .where(and(eq(posTableState.restaurantId, restaurantId), eq(posTableState.tableNumber, tableNumber)));
+    await db.insert(posTableState).values({ restaurantId, tableNumber, stateJson });
+  }
+
+  async clearPosTableState(restaurantId: number, tableNumber: number): Promise<void> {
+    await db
+      .delete(posTableState)
+      .where(and(eq(posTableState.restaurantId, restaurantId), eq(posTableState.tableNumber, tableNumber)));
   }
 }
 

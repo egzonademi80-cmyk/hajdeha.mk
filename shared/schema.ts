@@ -118,6 +118,22 @@ export const tableAssignments = pgTable(
   }),
 );
 
+export const posTableState = pgTable(
+  "pos_table_state",
+  {
+    id: serial("id").primaryKey(),
+    restaurantId: integer("restaurant_id")
+      .notNull()
+      .references(() => restaurants.id, { onDelete: "cascade" }),
+    tableNumber: integer("table_number").notNull(),
+    stateJson: text("state_json").notNull().default("{}"),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    posStateIdx: index("pos_state_restaurant_table_idx").on(table.restaurantId, table.tableNumber),
+  }),
+);
+
 // === RELATIONS ===
 export const usersRelations = relations(users, ({ many }) => ({
   restaurants: many(restaurants),
