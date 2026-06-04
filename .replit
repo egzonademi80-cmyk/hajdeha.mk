@@ -5,7 +5,6 @@ packages = ["unzip", "nano"]
 
 [agent]
 expertMode = true
-stack = "FULLSTACK_JS"
 
 [workflows]
 runButton = "Project"

@@ -26,8 +26,6 @@ import {
   ClipboardList,
   KeyRound,
   ChefHat,
-  WifiOff,
-  Wifi,
 } from "lucide-react";
 
 interface MenuItem {
@@ -964,31 +962,13 @@ export default function POS({ slug }: POSProps) {
   const TABLES_KEY = `pos-${slug}-tables-v3`;
   const PERSONS_KEY = `pos-${slug}-persons-v1`;
   const SECTIONS_KEY = `pos-${slug}-sections-v1`;
-  const RESTAURANT_CACHE_KEY = `pos-${slug}-restaurant-cache-v1`;
-  const OFFLINE_QUEUE_KEY = `pos-${slug}-offline-queue-v1`;
 
   const { data: restaurant, isLoading } = useQuery({
-    queryKey: ["pos-restaurant", RESTAURANT_SLUG],
+    queryKey: ["pos-restaurant"],
     queryFn: async () => {
-      try {
-        const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
-        if (!res.ok) throw new Error("Restaurant not found");
-        const data = await res.json();
-        localStorage.setItem(RESTAURANT_CACHE_KEY, JSON.stringify(data));
-        return data as Restaurant;
-      } catch (err) {
-        const cached = localStorage.getItem(RESTAURANT_CACHE_KEY);
-        if (cached) return JSON.parse(cached) as Restaurant;
-        throw err;
-      }
-    },
-    initialData: () => {
-      try {
-        const saved = localStorage.getItem(RESTAURANT_CACHE_KEY);
-        return saved ? (JSON.parse(saved) as Restaurant) : undefined;
-      } catch {
-        return undefined;
-      }
+      const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
+      if (!res.ok) throw new Error("Restaurant not found");
+      return res.json() as Promise<Restaurant>;
     },
     retry: false,
   });
@@ -1028,7 +1008,6 @@ export default function POS({ slug }: POSProps) {
   const processedOrderIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    if (!restaurant) return; // wait for real table count before adjusting
     setTables((prev) => {
       if (prev.length === TABLE_COUNT) return prev;
       if (prev.length < TABLE_COUNT)
@@ -1038,7 +1017,7 @@ export default function POS({ slug }: POSProps) {
         ];
       return prev.slice(0, TABLE_COUNT);
     });
-  }, [TABLE_COUNT, restaurant]);
+  }, [TABLE_COUNT]);
 
   const [personTabs, setPersonTabs] = useState<PersonTab[]>(() => {
     try {
@@ -1230,7 +1209,7 @@ export default function POS({ slug }: POSProps) {
         fetch(`/api/orders/${order.id}/claim`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pinCode: existingWaiterPin, restaurantId, slug: RESTAURANT_SLUG }),
+          body: JSON.stringify({ pinCode: existingWaiterPin, restaurantId }),
         })
           .then(() => refetchOrders())
           .catch(() => {});
@@ -1527,61 +1506,6 @@ export default function POS({ slug }: POSProps) {
   const [newPersonName, setNewPersonName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [, forceUpdate] = useState(0);
-
-  // ── Offline queue ──────────────────────────────────────────────────────────
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [offlineQueue, setOfflineQueue] = useState<
-    Array<{
-      slug: string;
-      tableNumber: number;
-      cart: OrderItem[];
-      queuedAt: number;
-    }>
-  >(() => {
-    try {
-      const saved = localStorage.getItem(OFFLINE_QUEUE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    const onOnline = () => setIsOnline(true);
-    const onOffline = () => setIsOnline(false);
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-    };
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(offlineQueue));
-  }, [offlineQueue, OFFLINE_QUEUE_KEY]);
-
-  useEffect(() => {
-    if (!isOnline || offlineQueue.length === 0) return;
-    const drain = async () => {
-      const queue = [...offlineQueue];
-      const failed: typeof queue = [];
-      for (const item of queue) {
-        try {
-          await fetch("/api/pos/send-to-kitchen", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(item),
-          });
-        } catch {
-          failed.push(item);
-        }
-      }
-      setOfflineQueue(failed);
-    };
-    drain();
-  }, [isOnline]);
-  // ──────────────────────────────────────────────────────────────────────────
 
   const menuItems: MenuItem[] = useMemo(
     () => (restaurant?.menuItems || []).filter((i: MenuItem) => i.active),
@@ -2027,7 +1951,7 @@ export default function POS({ slug }: POSProps) {
       const res = await fetch("/api/pos/verify-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pinCode: tablePinDigits, restaurantId, slug: RESTAURANT_SLUG }),
+        body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -2081,7 +2005,7 @@ export default function POS({ slug }: POSProps) {
           await fetch(`/api/orders/${pendingOrder.id}/claim`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pinCode: tablePinDigits, restaurantId, slug: RESTAURANT_SLUG }),
+            body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
           }).catch(() => {});
           refetchOrders();
         }
@@ -2466,41 +2390,6 @@ export default function POS({ slug }: POSProps) {
         </button>
         {/* Orders panel button */}
       </div>
-
-      {/* ── Offline status banner ── */}
-      <AnimatePresence>
-        {(!isOnline || offlineQueue.length > 0) && (
-          <motion.div
-            initial={{ y: -60, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -60, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={`fixed left-3 right-3 z-[70] rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-xl ${
-              !isOnline
-                ? "bg-red-600"
-                : "bg-amber-500"
-            }`}
-            style={{ top: 72 }}
-          >
-            {!isOnline ? (
-              <WifiOff className="h-4 w-4 text-white flex-shrink-0" />
-            ) : (
-              <Wifi className="h-4 w-4 text-white flex-shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              {!isOnline ? (
-                <p className="text-white text-xs font-semibold leading-tight">
-                  Offline{offlineQueue.length > 0 ? ` — ${offlineQueue.length} order${offlineQueue.length > 1 ? "s" : ""} queued` : " — orders will be saved locally"}
-                </p>
-              ) : (
-                <p className="text-white text-xs font-semibold leading-tight">
-                  Back online — sending {offlineQueue.length} queued order{offlineQueue.length > 1 ? "s" : ""} to kitchen…
-                </p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── Waiter signal banners ── */}
       <AnimatePresence>
@@ -3128,15 +3017,6 @@ export default function POS({ slug }: POSProps) {
                         <Coffee className="h-7 w-7 text-amber-500" />
                       </motion.div>
                     </div>
-                  ) : filteredItems.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-40 gap-2">
-                      <Coffee className={`h-8 w-8 ${t.textDim}`} />
-                      <p className={`text-sm ${t.textDim}`}>
-                        {menuSearch.trim()
-                          ? "No items match your search"
-                          : "No items in this category"}
-                      </p>
-                    </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-3">
                       {filteredItems.map((item) => {
@@ -3597,36 +3477,17 @@ export default function POS({ slug }: POSProps) {
                                 if (!active || allSent) return;
                                 const tableNum =
                                   active.kind === "table" ? active.idx + 1 : 0;
-                                const kitchenPayload = {
-                                  slug: RESTAURANT_SLUG,
-                                  tableNumber: tableNum,
-                                  cart: deltaCart,
-                                };
-                                if (!isOnline) {
-                                  setOfflineQueue((prev) => [
-                                    ...prev,
-                                    {
-                                      ...kitchenPayload,
-                                      queuedAt: Date.now(),
-                                    },
-                                  ]);
-                                } else {
-                                  fetch("/api/pos/send-to-kitchen", {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify(kitchenPayload),
-                                  }).catch(() => {
-                                    setOfflineQueue((prev) => [
-                                      ...prev,
-                                      {
-                                        ...kitchenPayload,
-                                        queuedAt: Date.now(),
-                                      },
-                                    ]);
-                                  });
-                                }
+                                fetch("/api/pos/send-to-kitchen", {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    slug: RESTAURANT_SLUG,
+                                    tableNumber: tableNum,
+                                    cart: deltaCart,
+                                  }),
+                                }).catch(() => {});
                                 // Add a new round to the table so the sent items are tracked
                                 setTables((prev) => {
                                   const next = [...prev];
@@ -4423,7 +4284,7 @@ export default function POS({ slug }: POSProps) {
                 const res = await fetch(`/api/orders/${order.id}/claim`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ pinCode: pinDigits, restaurantId, slug: RESTAURANT_SLUG }),
+                  body: JSON.stringify({ pinCode: pinDigits, restaurantId }),
                 });
                 if (res.ok) {
                   const claimed = await res.json();
