@@ -1020,6 +1020,7 @@ export default function POS({ slug }: POSProps) {
   const processedOrderIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
+    if (!restaurant) return; // wait for real table count before adjusting
     setTables((prev) => {
       if (prev.length === TABLE_COUNT) return prev;
       if (prev.length < TABLE_COUNT)
@@ -1029,7 +1030,7 @@ export default function POS({ slug }: POSProps) {
         ];
       return prev.slice(0, TABLE_COUNT);
     });
-  }, [TABLE_COUNT]);
+  }, [TABLE_COUNT, restaurant]);
 
   const [personTabs, setPersonTabs] = useState<PersonTab[]>(() => {
     try {
@@ -1221,7 +1222,7 @@ export default function POS({ slug }: POSProps) {
         fetch(`/api/orders/${order.id}/claim`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pinCode: existingWaiterPin, restaurantId }),
+          body: JSON.stringify({ pinCode: existingWaiterPin, restaurantId, slug: RESTAURANT_SLUG }),
         })
           .then(() => refetchOrders())
           .catch(() => {});
@@ -2018,7 +2019,7 @@ export default function POS({ slug }: POSProps) {
       const res = await fetch("/api/pos/verify-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
+        body: JSON.stringify({ pinCode: tablePinDigits, restaurantId, slug: RESTAURANT_SLUG }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -2072,7 +2073,7 @@ export default function POS({ slug }: POSProps) {
           await fetch(`/api/orders/${pendingOrder.id}/claim`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ pinCode: tablePinDigits, restaurantId }),
+            body: JSON.stringify({ pinCode: tablePinDigits, restaurantId, slug: RESTAURANT_SLUG }),
           }).catch(() => {});
           refetchOrders();
         }
@@ -4405,7 +4406,7 @@ export default function POS({ slug }: POSProps) {
                 const res = await fetch(`/api/orders/${order.id}/claim`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ pinCode: pinDigits, restaurantId }),
+                  body: JSON.stringify({ pinCode: pinDigits, restaurantId, slug: RESTAURANT_SLUG }),
                 });
                 if (res.ok) {
                   const claimed = await res.json();

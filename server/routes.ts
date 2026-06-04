@@ -750,13 +750,20 @@ export async function registerRoutes(
   app.post("/api/orders/:id/claim", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { pinCode, restaurantId } = req.body;
-      if (!pinCode || !restaurantId)
+      const { pinCode, restaurantId, slug } = req.body;
+      if (!pinCode) return res.status(400).json({ message: "Missing fields" });
+
+      let resolvedRestaurantId = restaurantId ? Number(restaurantId) : null;
+      if (!resolvedRestaurantId && slug) {
+        const r = await storage.getRestaurantBySlug(String(slug));
+        if (r) resolvedRestaurantId = r.id;
+      }
+      if (!resolvedRestaurantId)
         return res.status(400).json({ message: "Missing fields" });
 
       const order = await storage.getOrder(id);
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.restaurantId !== Number(restaurantId))
+      if (order.restaurantId !== resolvedRestaurantId)
         return res
           .status(403)
           .json({ message: "Order does not belong to this restaurant" });
@@ -764,7 +771,7 @@ export async function registerRoutes(
         return res.status(409).json({ message: "Order already taken" });
 
       const waiter = await storage.getWaiterByPin(
-        Number(restaurantId),
+        resolvedRestaurantId,
         pinCode,
       );
       if (!waiter) return res.status(401).json({ message: "Invalid PIN" });
@@ -851,11 +858,19 @@ export async function registerRoutes(
   // === VERIFY WAITER PIN (for POS table claim) ===
   app.post("/api/pos/verify-pin", async (req, res) => {
     try {
-      const { pinCode, restaurantId } = req.body;
-      if (!pinCode || !restaurantId)
+      const { pinCode, restaurantId, slug } = req.body;
+      if (!pinCode) return res.status(400).json({ message: "Missing fields" });
+
+      let resolvedRestaurantId = restaurantId ? Number(restaurantId) : null;
+      if (!resolvedRestaurantId && slug) {
+        const r = await storage.getRestaurantBySlug(String(slug));
+        if (r) resolvedRestaurantId = r.id;
+      }
+      if (!resolvedRestaurantId)
         return res.status(400).json({ message: "Missing fields" });
+
       const waiter = await storage.getWaiterByPin(
-        Number(restaurantId),
+        resolvedRestaurantId,
         String(pinCode),
       );
       if (!waiter) return res.status(401).json({ message: "PIN i gabuar" });
