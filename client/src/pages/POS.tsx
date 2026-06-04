@@ -1,5 +1,5 @@
 /// <reference types="w3c-web-usb" />
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import Pusher from "pusher-js";
@@ -2108,40 +2108,64 @@ export default function POS({ slug }: POSProps) {
     if (showNewPerson) setTimeout(() => nameInputRef.current?.focus(), 80);
   }, [showNewPerson]);
 
+  // ─── Apply server rows to tables state (shared by initial load + polling) ────
+  const applyServerRows = useCallback((rows: { tableNumber: number; stateJson: string }[], isInitial = false) => {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      if (isInitial) {
+        setTables((prev) => {
+          lastSyncedRef.current = prev.map((t) => JSON.stringify(t));
+          return prev;
+        });
+        serverSyncReady.current = true;
+      }
+      return;
+    }
+    isSyncingFromRemote.current = true;
+    setTables((prev) => {
+      const next = [...prev];
+      rows.forEach(({ tableNumber, stateJson }) => {
+        const idx = tableNumber - 1;
+        if (idx < 0 || idx >= next.length) return;
+        try {
+          const serverState = JSON.parse(stateJson);
+          if (serverState.items && serverState.items.length > 0) {
+            next[idx] = serverState;
+          } else if (serverState.items && serverState.items.length === 0 && !isInitial) {
+            // On polls, also apply cleared tables
+            next[idx] = serverState;
+          }
+        } catch {}
+      });
+      lastSyncedRef.current = next.map((t) => JSON.stringify(t));
+      return next;
+    });
+    setTimeout(() => {
+      isSyncingFromRemote.current = false;
+      if (isInitial) serverSyncReady.current = true;
+    }, 100);
+  }, []);
+
   // ─── Load initial table state from server (source of truth for all devices) ─
   useEffect(() => {
     if (!restaurantId) return;
     fetch(`/api/pos/table-state?restaurantId=${restaurantId}`)
       .then((r) => r.json())
-      .then((rows: { tableNumber: number; stateJson: string }[]) => {
-        if (!Array.isArray(rows) || rows.length === 0) {
-          serverSyncReady.current = true;
-          return;
-        }
-        isSyncingFromRemote.current = true;
-        setTables((prev) => {
-          const next = [...prev];
-          rows.forEach(({ tableNumber, stateJson }) => {
-            const idx = tableNumber - 1;
-            if (idx < 0 || idx >= next.length) return;
-            try {
-              const serverState = JSON.parse(stateJson);
-              // Server wins if it has items; keep local if local is non-empty and server is empty
-              if (serverState.items && serverState.items.length > 0) {
-                next[idx] = serverState;
-              }
-            } catch {}
-          });
-          lastSyncedRef.current = next.map((t) => JSON.stringify(t));
-          return next;
-        });
-        setTimeout(() => {
-          isSyncingFromRemote.current = false;
-          serverSyncReady.current = true;
-        }, 100);
-      })
+      .then((rows) => applyServerRows(rows, true))
       .catch(() => { serverSyncReady.current = true; });
-  }, [restaurantId]);
+  }, [restaurantId, applyServerRows]);
+
+  // ─── Polling fallback: re-sync every 10s in case a Pusher event was missed ──
+  useEffect(() => {
+    if (!restaurantId) return;
+    const interval = setInterval(() => {
+      if (isSyncingFromRemote.current) return;
+      fetch(`/api/pos/table-state?restaurantId=${restaurantId}`)
+        .then((r) => r.json())
+        .then((rows) => applyServerRows(rows, false))
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [restaurantId, applyServerRows]);
 
   // ─── Debounced sync: broadcast table changes to all other POS devices ────────
   useEffect(() => {
