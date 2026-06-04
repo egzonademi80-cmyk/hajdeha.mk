@@ -2123,20 +2123,37 @@ export default function POS({ slug }: POSProps) {
     isSyncingFromRemote.current = true;
     setTables((prev) => {
       const next = [...prev];
+      let changed = false;
       rows.forEach(({ tableNumber, stateJson }) => {
         const idx = tableNumber - 1;
         if (idx < 0 || idx >= next.length) return;
         try {
           const serverState = JSON.parse(stateJson);
-          if (serverState.items && serverState.items.length > 0) {
+          const hasServerItems = serverState.items && serverState.items.length > 0;
+
+          if (isInitial) {
+            // On initial load: server wins only if it has items
+            if (hasServerItems) {
+              next[idx] = serverState;
+              changed = true;
+            }
+          } else {
+            // On polling: ONLY apply if server has items AND local has no pending changes
+            // "pending changes" = local state differs from what was last synced to server
+            if (!hasServerItems) return; // never wipe a table via polling
+            const localStr = JSON.stringify(next[idx]);
+            const lastSyncedStr = lastSyncedRef.current[idx];
+            const hasPendingLocal = localStr !== lastSyncedStr;
+            if (hasPendingLocal) return; // waiter is mid-order — don't touch it
+            if (stateJson === lastSyncedStr) return; // no change from another device
             next[idx] = serverState;
-          } else if (serverState.items && serverState.items.length === 0 && !isInitial) {
-            // On polls, also apply cleared tables
-            next[idx] = serverState;
+            changed = true;
           }
         } catch {}
       });
-      lastSyncedRef.current = next.map((t) => JSON.stringify(t));
+      if (changed || isInitial) {
+        lastSyncedRef.current = next.map((t) => JSON.stringify(t));
+      }
       return next;
     });
     setTimeout(() => {
