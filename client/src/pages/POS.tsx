@@ -982,6 +982,14 @@ export default function POS({ slug }: POSProps) {
         throw err;
       }
     },
+    initialData: () => {
+      try {
+        const saved = localStorage.getItem(RESTAURANT_CACHE_KEY);
+        return saved ? (JSON.parse(saved) as Restaurant) : undefined;
+      } catch {
+        return undefined;
+      }
+    },
     retry: false,
   });
 
@@ -3119,6 +3127,15 @@ export default function POS({ slug }: POSProps) {
                       >
                         <Coffee className="h-7 w-7 text-amber-500" />
                       </motion.div>
+                    </div>
+                  ) : filteredItems.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 gap-2">
+                      <Coffee className={`h-8 w-8 ${t.textDim}`} />
+                      <p className={`text-sm ${t.textDim}`}>
+                        {menuSearch.trim()
+                          ? "No items match your search"
+                          : "No items in this category"}
+                      </p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 lg:gap-3">
