@@ -968,7 +968,7 @@ export default function POS({ slug }: POSProps) {
   const OFFLINE_QUEUE_KEY = `pos-${slug}-offline-queue-v1`;
 
   const { data: restaurant, isLoading } = useQuery({
-    queryKey: ["pos-restaurant"],
+    queryKey: ["pos-restaurant", RESTAURANT_SLUG],
     queryFn: async () => {
       try {
         const res = await fetch(`/api/restaurants?slug=${RESTAURANT_SLUG}`);
