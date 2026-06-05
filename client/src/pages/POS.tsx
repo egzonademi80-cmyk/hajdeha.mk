@@ -1089,7 +1089,7 @@ export default function POS({ slug }: POSProps) {
       >;
     },
     enabled: !!restaurantId,
-    staleTime: 0,
+    staleTime: 60_000,
   });
 
   // Public check — works even when POS is not logged in
@@ -1117,7 +1117,7 @@ export default function POS({ slug }: POSProps) {
       return res.json();
     },
     enabled: !!restaurantId,
-    refetchInterval: 8000,
+    refetchInterval: 30_000,
   });
 
   const { data: tableAssignmentsData = [], refetch: refetchAssignments } =
@@ -1144,7 +1144,7 @@ export default function POS({ slug }: POSProps) {
         >;
       },
       enabled: !!restaurantId,
-      staleTime: 0,
+      staleTime: 30_000,
     });
 
   const pendingCount = dbOrders.filter(

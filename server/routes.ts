@@ -233,10 +233,33 @@ export async function registerRoutes(
   });
 
   app.get("/api/config/pusher", (_req, res) => {
+    res.set("Cache-Control", "public, max-age=3600");
     res.json({
       key: PUSHER_KEY,
       cluster: PUSHER_CLUSTER,
     });
+  });
+
+  // === MENU IMAGES — served from DB base64, with aggressive caching ===
+  app.get("/api/menu-image/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).end();
+      const item = await storage.getMenuItem(id);
+      if (!item?.imageUrl || !item.imageUrl.startsWith("data:"))
+        return res.status(404).end();
+      const match = item.imageUrl.match(/^data:([^;]+);base64,(.+)$/s);
+      if (!match) return res.status(404).end();
+      const buf = Buffer.from(match[2], "base64");
+      res.set({
+        "Content-Type": match[1],
+        "Cache-Control": "public, max-age=86400, immutable",
+        "Content-Length": String(buf.length),
+      });
+      return res.end(buf);
+    } catch (err: any) {
+      res.status(500).end();
+    }
   });
 
   app.get("/api/table/:pin/cart", (req, res) => {
@@ -361,23 +384,33 @@ export async function registerRoutes(
 
 
   // === PUBLIC RESTAURANTS — /api/restaurants[?slug=X] ===
+  // Images are stripped from this response and served via /api/menu-image/:id
+  // with 24-hour Cache-Control so repeat visits cost almost nothing.
+  function stripImages(items: any[]) {
+    return items.map((item) => {
+      if (!item.imageUrl || !item.imageUrl.startsWith("data:")) return item;
+      return { ...item, imageUrl: `/api/menu-image/${item.id}` };
+    });
+  }
+
   app.get("/api/restaurants", async (req, res) => {
     try {
       const slug = req.query.slug as string | undefined;
+      res.set("Cache-Control", "public, max-age=60, s-maxage=60");
 
       if (slug) {
         const restaurant = await storage.getRestaurantBySlug(slug);
         if (!restaurant)
           return res.status(404).json({ message: "Restaurant not found" });
         const items = await storage.getMenuItems(restaurant.id);
-        return res.json({ ...restaurant, menuItems: items });
+        return res.json({ ...restaurant, menuItems: stripImages(items) });
       }
 
       const restaurants = await db.select().from(restaurantsTable);
       const enriched = await Promise.all(
         restaurants.map(async (r) => {
           const menuItems = await storage.getMenuItems(r.id);
-          return { ...r, menuItems };
+          return { ...r, menuItems: stripImages(menuItems) };
         }),
       );
       res.json(enriched);
