@@ -826,6 +826,22 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/pos/table-state/clear", async (req, res) => {
+    try {
+      const { restaurantId, tableNumber, slug, deviceId } = req.body;
+      if (!restaurantId || !tableNumber || !slug)
+        return res.status(400).json({ message: "Missing fields" });
+      await storage.clearPosTableState(Number(restaurantId), Number(tableNumber));
+      await safeTrigger(`pos-${slug}`, "table-state-cleared", {
+        tableNumber: Number(tableNumber),
+        deviceId: deviceId || null,
+      });
+      return res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // === TABLE ASSIGNMENTS (persist waiter-table claims) ===
   app.get("/api/pos/table-assignments", async (req, res) => {
     try {

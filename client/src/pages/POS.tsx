@@ -1586,6 +1586,7 @@ export default function POS({ slug }: POSProps) {
       next[sourceIdx] = emptyTable();
       return next;
     });
+    if (restaurantId) fetch("/api/pos/table-state/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restaurantId, tableNumber: sourceIdx + 1, slug: RESTAURANT_SLUG, deviceId: deviceIdRef.current }) }).catch(() => {});
     setShowTransferModal(false);
     setTransferSource(null);
     setTableFlash(targetIdx);
@@ -1610,6 +1611,7 @@ export default function POS({ slug }: POSProps) {
       next[sourceIdx] = emptyTable();
       return next;
     });
+    if (restaurantId) fetch("/api/pos/table-state/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restaurantId, tableNumber: sourceIdx + 1, slug: RESTAURANT_SLUG, deviceId: deviceIdRef.current }) }).catch(() => {});
     setShowMergeModal(false);
     setMergeSource(null);
     setTableFlash(targetIdx);
@@ -1840,6 +1842,7 @@ export default function POS({ slug }: POSProps) {
             channel: `table-${RESTAURANT_SLUG}-${splitTableIdx + 1}`,
           }),
         }).catch(() => {});
+        if (restaurantId) fetch("/api/pos/table-state/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restaurantId, tableNumber: splitTableIdx + 1, slug: RESTAURANT_SLUG, deviceId: deviceIdRef.current }) }).catch(() => {});
         if (restaurantId) {
           fetch("/api/pos/assign-table", {
             method: "DELETE",
@@ -1922,6 +1925,7 @@ export default function POS({ slug }: POSProps) {
           channel: `table-${RESTAURANT_SLUG}-${slot.idx + 1}`,
         }),
       }).catch(() => {});
+      if (restaurantId) fetch("/api/pos/table-state/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restaurantId, tableNumber: slot.idx + 1, slug: RESTAURANT_SLUG, deviceId: deviceIdRef.current }) }).catch(() => {});
       if (restaurantId) {
         fetch("/api/pos/assign-table", {
           method: "DELETE",
@@ -2192,6 +2196,8 @@ export default function POS({ slug }: POSProps) {
       const slug = RESTAURANT_SLUG;
       const devId = deviceIdRef.current;
       tables.forEach((table, idx) => {
+        // Never sync empty tables — only tables with actual items are broadcast
+        if (!table.items || table.items.length === 0) return;
         const serialized = JSON.stringify(table);
         if (lastSyncedRef.current[idx] === serialized) return; // no change
         lastSyncedRef.current[idx] = serialized;
@@ -2372,6 +2378,25 @@ export default function POS({ slug }: POSProps) {
               30000,
             );
             playWaiterChime(data.type as WaiterSignal["type"]);
+          },
+        );
+
+        // ── Table cleared by another device (payment/transfer/merge) ─────
+        channel.bind(
+          "table-state-cleared",
+          (data: { tableNumber: number; deviceId: string | null }) => {
+            if (data.deviceId && data.deviceId === deviceIdRef.current) return;
+            const idx = data.tableNumber - 1;
+            if (idx < 0) return;
+            isSyncingFromRemote.current = true;
+            setTables((prev) => {
+              if (idx >= prev.length) return prev;
+              const next = [...prev];
+              next[idx] = emptyTable();
+              lastSyncedRef.current[idx] = JSON.stringify(next[idx]);
+              return next;
+            });
+            setTimeout(() => { isSyncingFromRemote.current = false; }, 150);
           },
         );
 
